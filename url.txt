@@ -1,0 +1,6 @@
+API Swagger Docs: http://localhost:8000/docs
+Alternative ReDoc: http://localhost:8000/redoc
+Health Check: http://localhost:8000/api/health
+Database: postgres://postgres:postgres@localhost:5432/restai
+Ollama UI: http://localhost:11434 (if running via Docker)
+🐳 Full Docker Deployment

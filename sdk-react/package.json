@@ -1,0 +1,27 @@
+{
+  "name": "brainbox-react-sdk",
+  "version": "1.0.0",
+  "description": "React SDK for Brainbox AI Backend",
+  "main": "brainbox-sdk.ts",
+  "types": "brainbox-sdk.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "keywords": ["ai", "sdk", "brainbox", "react"],
+  "author": "REST AI Team",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

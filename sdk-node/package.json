@@ -1,0 +1,19 @@
+{
+  "name": "brainbox-node-sdk",
+  "version": "1.0.0",
+  "description": "Node.js SDK for Brainbox AI Backend",
+  "main": "brainbox-sdk.js",
+  "scripts": {
+    "test": "node test.js",
+    "example": "node example.js"
+  },
+  "keywords": ["ai", "sdk", "brainbox", "node"],
+  "author": "REST AI Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
