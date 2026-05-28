@@ -2,9 +2,9 @@
 
 ## 🚀 Brainbox Backend - Quick Start (5 minutes)
 
-### Prerequisites
+### Prerequisites but use python 3.14.5
 - Docker & Docker Compose installed
-- Python 3.11+
+- Python 3.11+ 
 - ~4GB RAM free
 
 ### Step 1: Start All Services
@@ -12,6 +12,9 @@
 ```bash
 cd brainBox
 docker-compose up -d
+
+### Step 1: Start All Services if you made changes to the requirements.txt or code remove the if you are push for the first time
+docker compose up -d --build api celery_worker
 ```
 
 Wait 30 seconds for services to start.
