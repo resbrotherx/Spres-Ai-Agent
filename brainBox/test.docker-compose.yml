@@ -103,7 +103,7 @@ services:
   #     - portainer_data:/data
   #   restart: always
   #   networks:
-  #     - brainbox
+  #     - brainbox /
 volumes:
   postgres_data:
   redis_data:

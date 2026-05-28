@@ -144,3 +144,74 @@ except Exception as e:
 | codebase | Source code |
 | json | JSON formatted data |
 | csv | CSV formatted data |
+
+## Function Locator (Built-in)
+
+Find functions in your codebase without needing a separate tool.
+
+### Find a Specific Function
+
+```python
+sdk = BrainboxPythonSDK("http://localhost:8000", "api-key", "tenant-1")
+
+# Find login function
+login_funcs = sdk.find_function("login", directory="./src")
+for func in login_funcs:
+    print(f"Found: {func.name}")
+    print(f"Location: {func.file_path}:{func.line_number}")
+    print(f"Signature: {func.signature}")
+    print(f"Parameters: {func.parameters}")
+```
+
+### Find All Functions
+
+```python
+# Get all functions in codebase
+all_funcs = sdk.find_all_functions(directory="./src")
+print(f"Total functions: {len(all_funcs)}")
+```
+
+### Find Functions in Specific File
+
+```python
+# Get all functions in a file
+auth_funcs = sdk.find_function_by_file("./src/auth.py")
+for func in auth_funcs:
+    print(f"  {func.name} at line {func.line_number}")
+```
+
+### Find Async Functions
+
+```python
+# Find all async/await functions
+async_funcs = sdk.find_async_functions(directory="./src")
+print(f"Found {len(async_funcs)} async functions")
+
+for func in async_funcs:
+    print(f"  {func.name} (async) in {func.file_path}")
+```
+
+### Function Info Object
+
+```python
+func = sdk.find_function("login")[0]
+
+# Access function details
+print(func.name)           # "login"
+print(func.file_path)      # "/app/auth.py"
+print(func.line_number)    # 45
+print(func.signature)      # "def login(username, password)"
+print(func.parameters)     # ["username", "password"]
+print(func.is_async)       # False
+print(func.language)       # "python"
+print(func.class_name)     # None (or class name if method)
+
+# Convert to dict
+func_dict = func.to_dict()
+```
+
+### Supported Languages
+
+- Python (`.py` files)
+- JavaScript (`.js` files)
+- TypeScript/React (`.ts`, `.tsx` files)

@@ -19,6 +19,63 @@ interface ChatSessionPayload {
   title?: string;
 }
 
+export interface FunctionInfo {
+  name: string;
+  file_path: string;
+  line_number: number;
+  language: string;
+  signature: string;
+  parameters: string[];
+  is_async: boolean;
+  class_name?: string | null;
+
+  toObject(): Record<string, any>;
+}
+
+class FunctionInfoImpl implements FunctionInfo {
+  name: string;
+  file_path: string;
+  line_number: number;
+  language: string;
+  signature: string;
+  parameters: string[];
+  is_async: boolean;
+  class_name?: string | null;
+
+  constructor(
+    name: string,
+    filePath: string,
+    lineNumber: number,
+    language: string,
+    signature: string,
+    parameters: string[],
+    isAsync: boolean = false,
+    className: string | null = null
+  ) {
+    this.name = name;
+    this.file_path = filePath;
+    this.line_number = lineNumber;
+    this.language = language;
+    this.signature = signature;
+    this.parameters = parameters;
+    this.is_async = isAsync;
+    this.class_name = className;
+  }
+
+  toObject(): Record<string, any> {
+    return {
+      name: this.name,
+      file_path: this.file_path,
+      line_number: this.line_number,
+      language: this.language,
+      signature: this.signature,
+      parameters: this.parameters,
+      is_async: this.is_async,
+      class_name: this.class_name
+    };
+  }
+}
+
 export class BrainboxReactSDK {
   private apiUrl: string;
   private apiKey: string;
@@ -107,6 +164,108 @@ export class BrainboxReactSDK {
       throw new Error(`Health check failed: ${error.message}`);
     }
   }
+
+  // ==================== FUNCTION LOCATOR ====================
+
+  findFunction(functionName: string, codeContent: string): FunctionInfo[] {
+    return this._parseJSCode(codeContent, functionName);
+  }
+
+  findAllFunctions(codeContent: string): FunctionInfo[] {
+    return this._parseJSCode(codeContent);
+  }
+
+  findAsyncFunctions(codeContent: string): FunctionInfo[] {
+    const allFuncs = this._parseJSCode(codeContent);
+    return allFuncs.filter(f => f.is_async);
+  }
+
+  private _parseJSCode(content: string, searchName?: string): FunctionInfo[] {
+    const functions: FunctionInfo[] = [];
+
+    // Regular function declarations: function name() {}
+    const funcDeclRegex = /(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/g;
+    let match;
+
+    while ((match = funcDeclRegex.exec(content)) !== null) {
+      const name = match[1];
+      if (searchName && name.toLowerCase() !== searchName.toLowerCase()) continue;
+
+      const paramsStr = match[2];
+      const params = paramsStr
+        .split(',')
+        .map(p => p.trim().split(':')[0].trim())
+        .filter(p => p);
+
+      const isAsync = content.substring(match.index, match.index + 10).includes('async');
+      const lineNumber = content.substring(0, match.index).split('\n').length;
+
+      functions.push(
+        new FunctionInfoImpl(
+          name,
+          'current-file',
+          lineNumber,
+          'javascript',
+          `${isAsync ? 'async ' : ''}function ${name}(${paramsStr})`,
+          params,
+          isAsync
+        )
+      );
+    }
+
+    // Arrow functions: const name = () => {}
+    const arrowRegex = /(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>/g;
+
+    while ((match = arrowRegex.exec(content)) !== null) {
+      const name = match[1];
+      if (searchName && name.toLowerCase() !== searchName.toLowerCase()) continue;
+
+      const paramsStr = match[2];
+      const params = paramsStr
+        .split(',')
+        .map(p => p.trim().split(':')[0].trim())
+        .filter(p => p);
+
+      const isAsync = content.substring(match.index, match.index + 50).includes('async');
+      const lineNumber = content.substring(0, match.index).split('\n').length;
+
+      functions.push(
+        new FunctionInfoImpl(
+          name,
+          'current-file',
+          lineNumber,
+          'javascript',
+          `${isAsync ? 'async ' : ''}const ${name} = (${paramsStr}) =>`,
+          params,
+          isAsync
+        )
+      );
+    }
+
+    // React components (functions starting with capital letter)
+    const componentRegex = /(?:const|function)\s+([A-Z]\w+)\s*[=:\(]/g;
+
+    while ((match = componentRegex.exec(content)) !== null) {
+      const name = match[1];
+      if (searchName && name.toLowerCase() !== searchName.toLowerCase()) continue;
+
+      const lineNumber = content.substring(0, match.index).split('\n').length;
+
+      functions.push(
+        new FunctionInfoImpl(
+          name,
+          'current-file',
+          lineNumber,
+          'typescript',
+          `${name} (Component)`,
+          [],
+          false
+        )
+      );
+    }
+
+    return functions;
+  }
 }
 
 // React Hook for using Brainbox SDK
@@ -168,10 +327,35 @@ export const useBrainbox = (apiUrl: string, apiKey: string, tenantId: string) =>
     [sdk]
   );
 
+  // Function locator methods
+  const findFunction = useCallback(
+    (functionName: string, codeContent: string): FunctionInfo[] => {
+      return sdk.findFunction(functionName, codeContent);
+    },
+    [sdk]
+  );
+
+  const findAllFunctions = useCallback(
+    (codeContent: string): FunctionInfo[] => {
+      return sdk.findAllFunctions(codeContent);
+    },
+    [sdk]
+  );
+
+  const findAsyncFunctions = useCallback(
+    (codeContent: string): FunctionInfo[] => {
+      return sdk.findAsyncFunctions(codeContent);
+    },
+    [sdk]
+  );
+
   return {
     ingest,
     chat,
     createChatSession,
+    findFunction,
+    findAllFunctions,
+    findAsyncFunctions,
     loading,
     error
   };
