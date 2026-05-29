@@ -13,6 +13,8 @@ from typing import Dict, List, Optional, Any
 import argparse
 import tempfile
 import hashlib
+import time
+import re
 
 class BrainboxCLI:
     """CLI tool for collecting server logs and ingesting into Brainbox"""
@@ -242,32 +244,60 @@ class BrainboxCLI:
         self.collected_logs.extend(logs)
         return logs
 
+    def _restart_service_if_down(self, service: str) -> str:
+        """Attempt to restart a managed service if it is inactive or failed."""
+        status_result = subprocess.run(
+            ["systemctl", "is-active", service],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        service_state = status_result.stdout.strip()
+        restart_note = ""
+
+        if service_state not in ["active", "activating"]:
+            restart_result = subprocess.run(
+                ["systemctl", "restart", service],
+                capture_output=True,
+                text=True,
+                timeout=20
+            )
+            if restart_result.returncode == 0:
+                restart_note = f"\n=== Restarted {service} successfully ===\n"
+                print(f"  ✓ Restarted service {service}")
+            else:
+                restart_note = f"\n=== Failed to restart {service} ===\n{restart_result.stdout}\n{restart_result.stderr}\n"
+                print(f"  ✗ Failed to restart service {service}")
+
+        return restart_note
+
     def collect_service_status(self) -> List[Dict[str, Any]]:
-        """Collect system service status"""
+        """Collect system service status and restart key services if they are down."""
         logs = []
         try:
-            # Get systemctl status for key services
             services = ["nginx", "postgresql", "redis", "docker", "mysql"]
 
             for service in services:
                 try:
-                    result = subprocess.run(
+                    status_result = subprocess.run(
                         ["systemctl", "status", service],
                         capture_output=True,
                         text=True,
-                        timeout=5
+                        timeout=10
                     )
 
+                    restart_note = self._restart_service_if_down(service)
                     logs.append({
                         "source_type": "service_status",
                         "service_name": service,
-                        "content": result.stdout + result.stderr,
+                        "content": status_result.stdout + status_result.stderr + restart_note,
                         "file_path": f"service://{service}",
                         "timestamp": datetime.now().isoformat()
                     })
                     print(f"  ✓ Collected status for {service}")
-                except Exception:
-                    pass  # Service might not exist
+                except Exception as e:
+                    print(f"  ✗ Error checking {service}: {e}")
+                    continue
 
             self.collected_logs.extend(logs)
             return logs
@@ -318,6 +348,92 @@ class BrainboxCLI:
         except Exception as e:
             print(f"✗ Error collecting system resources: {e}")
             return logs
+
+    def collect_nginx_sites(self, nginx_config_path: str = "/etc/nginx/") -> List[Dict[str, Any]]:
+        """Collect Nginx site configuration and enabled site files"""
+        logs = []
+        enabled_dir = Path(nginx_config_path) / "sites-enabled"
+        available_dir = Path(nginx_config_path) / "sites-available"
+
+        for config_dir, source_type in [(enabled_dir, "nginx_sites_enabled"), (available_dir, "nginx_sites_available")]:
+            if config_dir.exists() and config_dir.is_dir():
+                for config_file in sorted(config_dir.glob("**/*")):
+                    if config_file.is_file():
+                        try:
+                            with open(config_file, 'r', errors='ignore') as f:
+                                content = f.read()
+                            logs.append({
+                                "source_type": source_type,
+                                "content": content,
+                                "file_path": str(config_file),
+                                "timestamp": datetime.now().isoformat()
+                            })
+                            print(f"  ✓ Collected Nginx site config: {config_file}")
+                        except Exception as e:
+                            print(f"  ✗ Error reading {config_file}: {e}")
+
+        self.collected_logs.extend(logs)
+        return logs
+
+    def collect_open_ports(self) -> List[Dict[str, Any]]:
+        """Collect open TCP/UDP listening ports and service mapping"""
+        logs = []
+        commands = [
+            ["ss", "-tulpn"],
+            ["netstat", "-tulpn"]
+        ]
+
+        for cmd in commands:
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.stdout:
+                    logs.append({
+                        "source_type": "system_open_ports",
+                        "content": f"Command: {' '.join(cmd)}\n\n{result.stdout}",
+                        "file_path": f"system://open_ports/{cmd[0]}",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    print(f"  ✓ Collected open port map from {cmd[0]}")
+                    break
+            except Exception:
+                continue
+
+        self.collected_logs.extend(logs)
+        return logs
+
+    def daemon(self, interval: int = 60) -> None:
+        """Run the agent forever, collecting logs and ingesting periodically"""
+        print(f"▶ Starting Brainbox CLI daemon, interval={interval}s")
+        self.load_config()
+        while True:
+            try:
+                print(f"\n[{datetime.now().isoformat()}] Collecting agent data...")
+                self.collected_logs = []
+                self.collect_docker_logs()
+                self.collect_system_logs()
+                self.collect_postgres_logs()
+                self.collect_nginx_logs()
+                self.collect_nginx_sites()
+                self.collect_service_status()
+                self.collect_system_resources()
+                self.collect_open_ports()
+
+                if self.health_check():
+                    self.ingest_logs()
+                else:
+                    print("✗ Skipping ingest because backend is unreachable")
+            except KeyboardInterrupt:
+                print("✱ Daemon stopped by user")
+                break
+            except Exception as e:
+                print(f"✗ Daemon error: {e}")
+
+            time.sleep(interval)
 
     def ingest_logs(self, auto_send: bool = False) -> bool:
         """Ingest collected logs to backend"""
@@ -392,6 +508,10 @@ def main():
     collect_parser.add_argument("--postgres-path", default="/var/log/postgresql/")
     collect_parser.add_argument("--nginx-path", default="/var/log/nginx/")
 
+    # Daemon command
+    daemon_parser = subparsers.add_parser("daemon", help="Run the agent continuously and ingest logs")
+    daemon_parser.add_argument("--interval", type=int, default=60, help="Seconds between collection cycles")
+
     # Ingest command
     ingest_parser = subparsers.add_parser("ingest", help="Ingest collected logs")
     ingest_parser.add_argument("--auto-send", action="store_true", help="Send immediately")
@@ -415,6 +535,9 @@ def main():
     if args.command == "init":
         cli = BrainboxCLI(args.api_url, args.api_key, args.tenant_id)
         cli.save_config()
+
+    elif args.command == "daemon":
+        cli.daemon(interval=args.interval)
 
     elif args.command == "collect":
         log_types = args.type.split(",")

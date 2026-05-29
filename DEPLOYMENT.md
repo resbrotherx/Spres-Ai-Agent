@@ -12,8 +12,8 @@ Brainbox consists of 5 SDKs that customers install to automatically collect serv
 |-----|------|--------------|---------|
 | Python SDK | Main | `pip install brainbox-sdk` | Python apps + function locator |
 | Node.js SDK | Main | `npm install brainbox-sdk` | Node.js apps + function locator |
-| React SDK | Main | `npm install brainbox-sdk` | React apps + function locator |
-| CLI SDK | Service | `pip install brainbox-cli` | Auto-running log collection |
+| React SDK | Main | `npm install brainbox-react-sdk` / `yarn add brainbox-react-sdk` | React apps + function locator |
+| CLI SDK | Service | `pip install brainbox-cli` or `sudo apt install brainbox-cli-1.0.0.deb` | Auto-running Linux log collection |
 | Database SDK | Library | `pip install brainbox-db` | Safe database queries |
 
 ---
@@ -35,21 +35,39 @@ python -c "from brainbox_sdk import BrainboxPythonSDK; print('✓ Installed')"
 **You build and publish:**
 ```bash
 cd sdk-cli
-python -m build
+chmod +x build-deb.sh
+./build-deb.sh
 # Creates: brainbox-cli-1.0.0.deb
 ```
 
-**Customer installs:**
+**Or build RPM for CentOS/RHEL:**
 ```bash
-sudo apt install brainbox-cli-1.0.0.deb
+cd sdk-cli
+chmod +x build-rpm.sh
+./build-rpm.sh
+# Creates: brainbox-cli-1.0.0-1.x86_64.rpm
+```
+
+**Customer installs .deb:**
+```bash
+sudo apt install ./brainbox-cli-1.0.0.deb
+sudo systemctl enable --now brainbox-cli
+sudo systemctl status brainbox-cli
+```
+
+**Customer installs .rpm:**
+```bash
+sudo rpm -ivh brainbox-cli-1.0.0-1.x86_64.rpm
+sudo systemctl enable --now brainbox-cli
 sudo systemctl status brainbox-cli
 ```
 
 **What happens automatically:**
-- Service starts on boot
-- Collects logs every 5 minutes
-- Sends to your backend
-- Auto-running (no manual intervention)
+- The service starts on boot
+- The agent runs continuously every 60 seconds
+- Collects Docker, Nginx, PostgreSQL, system, SSL and service status
+- Sends data to your backend automatically
+- Monitored services are restarted by the agent itself if they are down, during the next collection cycle
 
 ### 3. Linux System Package (.rpm)
 
@@ -78,8 +96,162 @@ FROM python:3.9
 RUN pip install brainbox-cli
 ENV BRAINBOX_API_KEY=sk_xxx
 ENV BRAINBOX_API_URL=https://api.brainbox.ai
-CMD ["python", "-m", "brainbox_cli", "daemon"]
+CMD ["brainbox-cli", "daemon", "--interval", "60"]
 ```
+
+---
+
+## React SDK Publishing
+
+### Publish to npm
+```bash
+cd sdk-react
+npm install
+npm test
+npm login
+npm publish --access public
+```
+
+### Install with npm or Yarn
+```bash
+npm install brainbox-react-sdk
+# or
+yarn add brainbox-react-sdk
+```
+
+### Notes
+- Yarn uses the npm registry by default, so publishing to npm makes the package available to Yarn users.
+- If the package is not visible in Yarn's site, ensure the package has been published successfully to npm first.
+
+## React UI deployment
+
+`npm install brainbox-react-sdk` installs the React SDK library into a project. It does not automatically deploy a live UI to a server.
+
+To make the React UI live:
+
+1. Install the package in your React application.
+2. Import `ChatWidget`, `ChatPanel`, or `useBrainboxChat`.
+3. Build the application (`npm run build`, `yarn build`, etc.).
+4. Deploy the built frontend to your hosting platform, static site host, or CDN.
+
+The React SDK is client-side code and must be served as part of your own app.
+
+## SDK runtime model
+
+Not every SDK package is a running service. Most SDKs are libraries that are installed into apps:
+
+- `sdk-react`: a React web library. Deploy the built frontend to a web host or CDN.
+- `sdk-web`: a browser script library. Host the JS asset and include it in the page.
+- `sdk-react-native`: a native mobile library. Install it in a React Native app and build/distribute that app.
+- `sdk-python`: a Python client library. Import it into Python code or services as needed.
+- `sdk-node`: a Node.js client library. Import it into Node apps or backend code.
+- `sdk-database`: utility library or scripts for database integration.
+- `sdk-cli`: a command-line tool. If you want it to run continuously for ingestion or monitoring, run it as a service; otherwise it can be used manually.
+
+The only core service that must be deployed and running on a server is your Brainbox backend/API.
+
+## What needs to be live
+
+- Brainbox backend server (`brainBox/`): yes. This is the API service that handles chat, session, ingest, and health requests.
+- React web app using `sdk-react`: yes, the built web app must be hosted.
+- Web UI using `sdk-web`: yes, the page and JS asset must be served by a web host.
+- React Native app using `sdk-react-native`: yes, the mobile app must be built and distributed to devices.
+- Python/Node code using `sdk-python` or `sdk-node`: no separate service unless you build a server application with them.
+- CLI tool (`sdk-cli`): optional service. Only if you want it running continuously for ingestion or monitoring.
+
+## SDK deployment summary
+
+| SDK | Type | Needs live hosting/app deployment? | Notes |
+|---|---|---|---|
+| `sdk-react` | React web UI library | Yes | Build and host the web frontend. |
+| `sdk-web` | Browser JS widget | Yes | Host the JS asset and page. |
+| `sdk-react-native` | React Native mobile library | Yes | Install into a mobile app and distribute the app. |
+| `sdk-python` | Python client library | No* | Used in Python apps; deploy only if the app is a running service. |
+| `sdk-node` | Node.js client library | No* | Used in Node apps; deploy only if the app runs as a service. |
+| `sdk-database` | Database utility library | No* | Library only; deploy if the containing service runs. |
+| `sdk-cli` | Command-line tool | Optional | Can be run manually or as a background service. |
+| `brainBox/` backend | API service | Yes | Must be deployed and running for all SDKs. |
+
+*Client libraries themselves do not require hosting unless used by a running service.
+
+NPM/Yarn publish is only for distributing the package. It does not make an SDK automatically live by itself.
+
+## Deployment examples
+
+### Deploy the Brainbox backend
+
+From `brainBox/`:
+
+```bash
+cd brainBox
+docker compose up -d --build
+```
+
+Then confirm the service is running and reachable:
+
+```bash
+docker compose ps
+curl https://your-server/api/health
+```
+
+### Deploy a React web app using `sdk-react`
+
+In your React app project:
+
+```bash
+npm install brainbox-react-sdk
+npm run build
+```
+
+Then deploy the generated build folder to your hosting provider, static host, or CDN.
+
+Example hosts:
+
+- Vercel / Netlify / Cloudflare Pages
+- AWS S3 + CloudFront
+- Azure Static Web Apps
+- Any web server that can serve static files
+
+### Deploy a plain HTML / Odoo page using `sdk-web`
+
+Host `sdk-web/brainbox-web-sdk.js` as a static asset and include it in your page with a `<script>` tag.
+
+For Odoo, add the script to the XML template or page HTML so the browser loads it when the page renders.
+
+### Deploy a React Native app using `sdk-react-native`
+
+In your React Native app project:
+
+```bash
+npm install brainbox-react-native-sdk
+```
+
+Then build and distribute the mobile app:
+
+- Android: `npx react-native run-android`, or build an AAB/APK
+- iOS: `npx react-native run-ios`, or build an IPA/TestFlight release
+
+The mobile app contains the SDK as a library, but the app itself must be built and deployed.
+
+### Run `sdk-cli` as a service (optional)
+
+If you want the CLI to run continuously for ingestion or monitoring, run it as a background service:
+
+```bash
+cd sdk-cli
+python brainbox_cli.py
+```
+
+Or use a system service manager to keep it alive.
+
+## Plain web and Odoo support
+
+For non-React apps and Odoo users, use the `sdk-web` package:
+
+- `sdk-web/brainbox-web-sdk.js` — plain JS client for `/api/chat`, `/api/chat/session`, `/api/ingest`, `/api/health`
+- `sdk-web/widget-example.html` — copy/paste chat widget for HTML/CSS/jQuery sites
+
+This approach allows legacy HTML sites, Odoo templates, AngularJS, and other non-React frontends to embed the chat UI and call your backend endpoints directly.
 
 Customer runs:
 ```bash
@@ -99,13 +271,14 @@ docker run -d \
 
 ```ini
 [Unit]
-Description=Brainbox - Automatic Log Collection
+Description=Brainbox CLI SDK Agent
 After=network.target
 
 [Service]
 Type=simple
-User=brainbox
-ExecStart=/usr/bin/python3 -m brainbox_cli daemon
+User=root
+WorkingDirectory=/opt/brainbox-cli
+ExecStart=/usr/local/bin/brainbox-cli daemon --interval 60
 Restart=always
 RestartSec=10
 StandardOutput=journal

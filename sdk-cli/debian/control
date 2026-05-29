@@ -1,0 +1,10 @@
+Package: brainbox-cli
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: all
+Maintainer: Brainbox Team <support@brainbox.ai>
+Depends: python3, python3-requests
+Description: Brainbox CLI Linux log collection agent
+ A lightweight Python daemon that collects logs, system metrics,
+ and service status and sends the data to the Brainbox backend.

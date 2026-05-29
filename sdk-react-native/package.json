@@ -1,0 +1,17 @@
+{
+  "name": "brainbox-react-native-sdk",
+  "version": "1.0.0",
+  "description": "React Native SDK for Brainbox chat and support UI",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "ChatScreen.js",
+    "README.md"
+  ],
+  "keywords": ["brainbox", "react-native", "sdk", "chat", "ai"],
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-native": ">=0.70.0"
+  },
+  "license": "MIT"
+}

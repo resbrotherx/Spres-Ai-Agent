@@ -9,6 +9,30 @@ Terminal SDK for collecting server logs, Docker logs, database logs, SSL logs, a
 pip install brainbox-cli
 ```
 
+### From APT / .deb package
+```bash
+sudo apt install ./brainbox-cli.deb
+sudo systemctl enable --now brainbox-cli
+```
+
+### Build a .deb package locally
+```bash
+chmod +x build-deb.sh
+./build-deb.sh
+sudo apt install ./brainbox-cli-1.0.0.deb
+sudo systemctl enable --now brainbox-cli
+```
+
+### Build an RPM package locally
+```bash
+chmod +x build-rpm.sh
+./build-rpm.sh
+sudo rpm -ivh brainbox-cli-1.0.0-1.x86_64.rpm
+sudo systemctl enable --now brainbox-cli
+```
+
+> Note: `build-rpm.sh` uses `fpm`. Install it with `gem install fpm` if it is not already available.
+
 ### From Source
 ```bash
 git clone https://github.com/brainbox-ai/brainbox-sdk-cli.git
@@ -56,6 +80,24 @@ brainbox-cli ingest
 # Or collect and send in one command
 brainbox-cli collect --type docker,postgres && brainbox-cli ingest
 ```
+
+### Step 5: Run the service daemon
+
+```bash
+# Run once as a long-running agent
+brainbox-cli daemon --interval 60
+```
+
+For production, use systemd to run the agent automatically:
+
+```bash
+sudo systemctl enable --now brainbox-cli
+sudo systemctl status brainbox-cli
+```
+
+The agent is designed to run a single Python process in a loop. It checks logs and services every 60 seconds, and it restarts monitored services by itself when they are found down.
+
+The systemd unit does not forcibly restart the Python process, so the agent is responsible for self-healing on each cycle.
 
 ## What Gets Collected
 

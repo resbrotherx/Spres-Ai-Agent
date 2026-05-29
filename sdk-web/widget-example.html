@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brainbox Web Widget Example</title>
+  </head>
+  <body>
+    <h1>Brainbox Web Widget</h1>
+    <p>This example shows how to embed the Brainbox chat widget in a plain HTML page.</p>
+
+    <script src="brainbox-web-sdk.js"></script>
+    <script>
+      const sdk = new BrainboxWebSDK(
+        'https://api.yourbackend.com',
+        'YOUR_API_KEY',
+        'tenant-123'
+      );
+
+      new BrainboxWebWidget({
+        sdk,
+        position: 'bottom-right',
+        primaryColor: '#2563EB',
+        accentColor: '#111827',
+        buttonText: 'Support Chat',
+        placeholder: 'Ask a question',
+        width: '360px',
+        height: '520px'
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+[Unit]
+Description=Brainbox CLI SDK Agent
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/brainbox-cli
+ExecStart=/usr/local/bin/brainbox-cli daemon --interval 60
+Restart=no
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
