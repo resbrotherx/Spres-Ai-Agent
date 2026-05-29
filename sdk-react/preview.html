@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brainbox React SDK Preview</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #f3f4f6;
+      }
+      #root {
+        min-height: 100vh;
+        padding: 24px;
+      }
+      .preview-card {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px;
+        border-radius: 20px;
+        background: #ffffff;
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+      }
+      h1 {
+        margin: 0 0 12px;
+      }
+      p {
+        color: #4b5563;
+        margin-top: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="preview-card">
+        <h1>Brainbox React SDK Preview</h1>
+        <p>This page shows the React chat widget design. The backend URL is a placeholder, so chat will only work if the backend is running.</p>
+      </div>
+    </div>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18.3.1",
+          "react-dom/": "https://esm.sh/react-dom@18.3.1/"
+        }
+      }
+    </script>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { BrainboxReactSDK, ChatWidget } from './dist/index.js';
+
+      const sdk = new BrainboxReactSDK(
+        'https://localhost:8000',
+        'demo_api_key',
+        'demo_tenant'
+      );
+
+      function App() {
+        return React.createElement(
+          React.Fragment,
+          null,
+          React.createElement('div', { style: { position: 'relative', minHeight: '680px' } },
+            React.createElement(ChatWidget, {
+              sdk,
+              position: 'bottom-right',
+              primaryColor: '#2563EB',
+              accentColor: '#111827',
+              backgroundColor: '#F8FAFC',
+              buttonText: 'Support',
+              placeholder: 'Ask a question...',
+              width: '360px',
+              height: '520px',
+              design: 'support'
+            })
+          )
+        );
+      }
+
+      const container = document.getElementById('root');
+      const root = createRoot(container);
+      root.render(React.createElement(App));
+    </script>
+  </body>
+</html>
