@@ -27,16 +27,16 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="brainbox-sdk",
+    name="spres-ai",
     version="1.0.0",
     author="Your Name",
     author_email="your.email@example.com",
     description="Official Brainbox AI SDK for Python",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/brainbox-sdk-python",
+    url="https://github.com/yourusername/spres-ai-python",
     project_urls={
-        "Bug Tracker": "https://github.com/yourusername/brainbox-sdk-python/issues",
+        "Bug Tracker": "https://github.com/yourusername/spres-ai-python/issues",
         "Documentation": "https://docs.brainbox.ai/python",
     },
     classifiers=[
@@ -67,7 +67,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "brainbox-sdk"
+name = "spres-ai"
 version = "1.0.0"
 description = "Official Brainbox AI SDK for Python"
 readme = "README.md"
@@ -90,15 +90,16 @@ dependencies = [
 dev = ["pytest", "black", "flake8"]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/brainbox-sdk-python"
+Homepage = "https://github.com/yourusername/spres-ai-python"
 Documentation = "https://docs.brainbox.ai/python"
-Repository = "https://github.com/yourusername/brainbox-sdk-python.git"
+Repository = "https://github.com/yourusername/spres-ai-python.git"
 ```
 
 ### Step 4: Create `~/.pypirc` Configuration
 
 ```ini
-# ~/.pypirc (or %APPDATA%\.pypirc on Windows)
+# ~/.pypirc (or %APPDATA%\.pypirc on Windows) // nano ~/.pypirc
+
 [distutils]
 index-servers =
     pypi
@@ -141,10 +142,10 @@ twine upload dist/*
 
 ```bash
 # Test installation from PyPI
-pip install brainbox-sdk
+pip install spres-ai
 
 # Import and test
-python -c "from brainbox_sdk import BrainboxPythonSDK; print('Success!')"
+python -c "from spres-ai import BrainboxPythonSDK; print('Success!')"
 ```
 
 ### Step 7: Update Version for Future Releases
@@ -177,7 +178,7 @@ twine upload dist/*
 
 ```json
 {
-  "name": "brainbox-sdk",
+  "name": "spres-ai",
   "version": "1.0.0",
   "description": "Official Brainbox AI SDK for Node.js",
   "main": "index.js",
@@ -202,12 +203,12 @@ twine upload dist/*
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/brainbox-sdk-node.git"
+    "url": "https://github.com/yourusername/spres-ai-node.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/brainbox-sdk-node/issues"
+    "url": "https://github.com/yourusername/spres-ai-node/issues"
   },
-  "homepage": "https://github.com/yourusername/brainbox-sdk-node",
+  "homepage": "https://github.com/yourusername/spres-ai-node",
   "dependencies": {
     "axios": "^1.4.0"
   },
@@ -229,13 +230,13 @@ twine upload dist/*
 
 ```bash
 # Option 1: Create ~/.npmrc file
-echo "//registry.npmjs.org/:_authToken=YOUR_NPM_TOKEN" > ~/.npmrc
+echo "//registry.npmjs.org/:_authToken=YOUR_TOKEN" > ~/.npmrc
 
 # Option 2: Log in via CLI
 npm login
 
 # Option 3: Use environment variable (CI/CD)
-export NPM_TOKEN=YOUR_NPM_TOKEN
+export NPM_TOKEN=YOUR_TOKEN
 ```
 
 ### Step 4: Prepare Files
@@ -281,7 +282,7 @@ npm whoami  # Should show your username
 npm publish
 
 # If you have 2FA enabled, you'll need to provide OTP:
-npm publish --otp YOUR_OTP_CODE
+npm publish --otp YOUR_TOKEN
 
 # Or interactively:
 npm publish
@@ -292,13 +293,13 @@ npm publish
 
 ```bash
 # Test installation from NPM
-npm install brainbox-sdk
+npm install spres-ai
 
 # Test import
-node -e "const SDK = require('brainbox-sdk'); console.log('Success!');"
+node -e "const SDK = require('spres-ai'); console.log('Success!');"
 
 # Or for TypeScript
-import { BrainboxNodeSDK } from 'brainbox-sdk';
+import { BrainboxNodeSDK } from 'spres-ai';
 ```
 
 ### Step 8: Update Version for Future Releases
@@ -324,7 +325,7 @@ npm publish
 Yarn uses NPM registry by default. Once published to NPM, users can install via:
 
 ```bash
-yarn add brainbox-sdk
+yarn add spres-ai
 ```
 
 ### Option 2: Private Yarn Registry
@@ -481,7 +482,7 @@ twine upload --repository testpypi dist/*
 twine upload dist/*
 
 # Check version on PyPI
-pip index versions brainbox-sdk
+pip index versions spres-ai
 ```
 
 ### Node.js (NPM)
@@ -499,23 +500,23 @@ npm version minor
 npm version major
 
 # Check package on NPM
-npm view brainbox-sdk
+npm view spres-ai
 
 # Test install
-npm install brainbox-sdk
+npm install spres-ai
 ```
 
 ### General
 
 ```bash
 # List all versions
-npm view brainbox-sdk versions
+npm view spres-ai versions
 
 # Search package
 npm search brainbox
 
 # Get package info
-npm info brainbox-sdk
+npm info spres-ai
 ```
 
 ---
@@ -541,7 +542,7 @@ npm info brainbox-sdk
 - Try `npm login` again
 
 **Error: "Package name already in use"**
-- Use scoped name: `@yourname/brainbox-sdk`
+- Use scoped name: `@yourname/spres-ai`
 - Or rename package
 
 **OTP Error**

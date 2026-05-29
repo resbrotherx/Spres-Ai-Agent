@@ -1,0 +1,9 @@
+README.md
+brainbox_sdk.py
+pyproject.toml
+setup.py
+spres_ai.egg-info/PKG-INFO
+spres_ai.egg-info/SOURCES.txt
+spres_ai.egg-info/dependency_links.txt
+spres_ai.egg-info/requires.txt
+spres_ai.egg-info/top_level.txt

@@ -1,3 +1,28 @@
+Metadata-Version: 2.4
+Name: spres-ai
+Version: 1.0.0
+Summary: Official Spres-Ai-Agent SDK for Python
+Home-page: https://github.com/resbrotherx/Spres-Ai-Agent/tree/main/sdk-python
+Author: Resbrotherx
+Author-email: resbrotherx <spres-ai@resbrotherx.com>
+License: MIT
+Project-URL: Homepage, https://github.com/resbrotherx/Spres-Ai-Agent/tree/main/sdk-python
+Project-URL: Documentation, https://docs.brainbox.ai/python
+Project-URL: Repository, https://github.com/resbrotherx/Spres-Ai-Agent/tree/main/sdk-python.git
+Keywords: brainbox,spres-ai,spres-ai-agent,spres,logs,search,sdk
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: requests>=2.28.0
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: flake8; extra == "dev"
+Dynamic: author
+Dynamic: home-page
+Dynamic: requires-python
+
 # Brainbox Python SDK
 
 Python client library for Brainbox AI Backend.
@@ -11,7 +36,7 @@ pip install requests
 ## Quick Start
 
 ```python
-from spres-ai import BrainboxPythonSDK
+from brainbox_sdk import BrainboxPythonSDK
 
 sdk = BrainboxPythonSDK(
     api_url="http://localhost:8000",

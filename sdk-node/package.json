@@ -1,19 +1,42 @@
 {
-  "name": "brainbox-node-sdk",
+  "name": "spres-ai",
   "version": "1.0.0",
-  "description": "Node.js SDK for Brainbox AI Backend",
+  "description": "Official Spres AI SDK for Node.js",
   "main": "brainbox-sdk.js",
+  "types": "index.d.ts",
   "scripts": {
-    "test": "node test.js",
-    "example": "node example.js"
+    "test": "node test.js jest",
+    "example": "node example.js",
+    "build": "tsc",
+    "prepublishOnly": "npm test && npm run build"
   },
   "keywords": ["ai", "sdk", "brainbox", "node"],
-  "author": "REST AI Team",
+  "author": {
+    "name": "Resbrotherx",
+    "email": "francisdaniel140@gmail.com",
+    "url": "https://github.com/resbrotherx"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/resbrotherx/Spres-Ai-Agent/tree/main/sdk-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/resbrotherx/Spres-Ai-Agent/tree/main/sdk-node/issues"
+  },
+  "homepage": "https://github.com/resbrotherx/Spres-Ai-Agent/tree/main/sdk-node",
   "dependencies": {
     "axios": "^1.6.2"
   },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "@types/node": "^20.0.0"
+  },
   "engines": {
     "node": ">=14.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

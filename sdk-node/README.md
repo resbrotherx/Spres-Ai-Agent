@@ -5,7 +5,7 @@ npm install axios
 ## Quick Start
 
 ```javascript
-const BrainboxNodeSDK = require('./brainbox-sdk');
+const BrainboxNodeSDK = require('./spres-ai');
 
 const sdk = new BrainboxNodeSDK(
   'http://localhost:8000',

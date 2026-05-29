@@ -1,18 +1,20 @@
+version: '3.8'
+
 services:
 
   postgres:
     image: pgvector/pgvector:pg16
     container_name: brainbox-postgres
     environment:
-      POSTGRES_DB: restai
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: spres_ai
+      POSTGRES_USER: spres
+      POSTGRES_PASSWORD: Francis1
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U spres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,7 +45,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/restai
+      DATABASE_URL: postgresql://spres:Francis1@postgres:5432/spres_ai
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
@@ -66,7 +68,7 @@ services:
     container_name: brainbox-celery
     command: celery -A app.celery_app.celery worker --loglevel=info
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/restai
+      DATABASE_URL: postgresql://spres:Francis1@postgres:5432/spres_ai
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
@@ -90,11 +92,23 @@ services:
       - OLLAMA_HOST=0.0.0.0:11434
     networks:
       - brainbox
-
+  # portainer:
+  #   image: portainer/portainer-ce:latest
+  #   container_name: brainbox-ui
+  #   command: -H unix:///var/run/docker.sock
+  #   ports:
+  #     - "9443:9443"
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - portainer_data:/data
+  #   restart: always
+  #   networks:
+  #     - brainbox /
 volumes:
   postgres_data:
   redis_data:
   ollama_data:
+  portainer_data:
 
 networks:
   brainbox:

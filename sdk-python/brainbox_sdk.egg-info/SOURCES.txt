@@ -1,0 +1,9 @@
+README.md
+brainbox_sdk.py
+pyproject.toml
+setup.py
+brainbox_sdk.egg-info/PKG-INFO
+brainbox_sdk.egg-info/SOURCES.txt
+brainbox_sdk.egg-info/dependency_links.txt
+brainbox_sdk.egg-info/requires.txt
+brainbox_sdk.egg-info/top_level.txt

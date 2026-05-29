@@ -1,0 +1,32 @@
+# sdk-python/pyproject.toml
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spres-ai"
+version = "1.0.0"
+description = "Official Spres-Ai-Agent SDK for Python"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "resbrotherx", email = "spres-ai@resbrotherx.com"}
+]
+keywords = ["brainbox","spres-ai", "spres-ai-agent", "spres", "logs", "search", "sdk"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+]
+
+dependencies = [
+    "requests>=2.28.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "flake8"]
+
+[project.urls]
+Homepage = "https://github.com/resbrotherx/Spres-Ai-Agent/tree/main/sdk-python"
+Documentation = "https://docs.brainbox.ai/python"
+Repository = "https://github.com/resbrotherx/Spres-Ai-Agent/tree/main/sdk-python.git"

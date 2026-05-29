@@ -1,0 +1,13 @@
+# .npmignore
+node_modules/
+.git
+.github
+tests/
+examples/
+*.test.js
+.env
+.env.example
+.eslintrc
+.prettierrc
+tsconfig.json
+jest.config.js
