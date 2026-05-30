@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrainboxReactSDK, ChatWidget } from '../dist/index.js';
+import { BrainboxReactSDK, ChatPanel, ChatWidget } from '../../dist/index.js';
 
 const sdk = new BrainboxReactSDK(
   'https://demo.brainbox.example',
@@ -25,6 +25,7 @@ export default function App() {
           height="520px"
           design="support"
         />
+        <ChatPanel/>
       </div>
     </div>
   );
