@@ -1,5 +1,5 @@
 {
-  "name": "brainbox-react-sdk",
+  "name": "spres-react",
   "version": "1.0.0",
   "description": "React SDK and customizable chat UI for Brainbox AI Backend",
   "main": "dist/index.js",
