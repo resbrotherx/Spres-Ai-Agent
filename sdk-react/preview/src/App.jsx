@@ -2,7 +2,7 @@ import React from 'react';
 import { BrainboxReactSDK, ChatPanel, ChatWidget } from 'spres-react';
 
 const sdk = new BrainboxReactSDK(
-  'http://165.227.77.33:8000',
+  'https://demo.brainbox.example',
   'demo_api_key',
   'demo_tenant'
 );

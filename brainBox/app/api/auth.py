@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import Annotated
 import secrets
 
 from app.db.session import get_db
@@ -10,6 +11,17 @@ from app.utils.hashing import create_hash
 from app.utils.logging import logger
 
 router = APIRouter()
+
+class SignupRequest(BaseModel):
+    username: str
+    password: str
+    email: str
+
+class SignupResponse(BaseModel):
+    user_id: int
+    username: str
+    email: str
+    message: str
 
 class LoginRequest(BaseModel):
     username: str
@@ -22,6 +34,52 @@ class LoginResponse(BaseModel):
 class APIKeyResponse(BaseModel):
     api_key: str
     tenant_id: str
+
+@router.post("/signup", response_model=SignupResponse)
+async def signup(
+    request: SignupRequest,
+    db: Session = Depends(get_db)
+):
+    try:
+        existing_user = db.query(User).filter(
+            User.username == request.username
+        ).first()
+
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already exists"
+            )
+
+        hashed_password = hash_password(request.password)
+
+        new_user = User(
+            username=request.username,
+            email=request.email,
+            hashed_password=hashed_password,
+            is_active=True
+        )
+
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+
+        return SignupResponse(
+            user_id=new_user.id,
+            username=new_user.username,
+            email=new_user.email,
+            message="User created successfully"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Signup error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Signup failed"
+        )
 
 @router.post("/login", response_model=LoginResponse)
 async def login(
