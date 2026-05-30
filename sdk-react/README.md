@@ -5,14 +5,14 @@ A React UI SDK for Brainbox that includes built-in chat designs, a support bot, 
 ## Installation
 
 ```bash
-npm install brainbox-react-sdk
+npm install spres-react
 # or
-yarn add brainbox-react-sdk
+yarn add spres-react
 ```
 
 ## Deployment
 
-`npm install brainbox-react-sdk` or `yarn add brainbox-react-sdk` only installs the library into your React project. It does not automatically deploy a live chat UI to a server.
+`npm install spres-react` or `yarn add spres-react` only installs the library into your React project. It does not automatically deploy a live chat UI to a server.
 
 To use the React UI:
 
@@ -34,7 +34,7 @@ The SDK provides client-side chat components. Your app must be served to users i
 ## Quick Start
 
 ```tsx
-import { BrainboxReactSDK, ChatWidget } from 'brainbox-react-sdk';
+import { BrainboxReactSDK, ChatWidget } from 'spres-react';
 
 const sdk = new BrainboxReactSDK(
   'https://api.yourbackend.com',
@@ -71,7 +71,7 @@ export function App() {
 `ChatPanel` delivers a larger ChatGPT-style conversation experience with a sidebar for session status and history.
 
 ```tsx
-import { ChatPanel } from 'brainbox-react-sdk';
+import { ChatPanel } from 'spres-react';
 
 <ChatPanel
   sdk={sdk}
@@ -134,7 +134,7 @@ If streaming is unavailable, the SDK falls back to a standard chat request and s
 ## Using the SDK class directly
 
 ```tsx
-import { BrainboxReactSDK } from 'brainbox-react-sdk';
+import { BrainboxReactSDK } from 'spres-react';
 
 const sdk = new BrainboxReactSDK(
   'https://api.yourbackend.com',
@@ -152,7 +152,7 @@ const session = await sdk.createChatSession('Support Session');
 `useBrainboxChat` is useful when you want to build a custom chat UI while reusing Brainbox chat state.
 
 ```tsx
-import { useBrainboxChat, BrainboxReactSDK } from 'brainbox-react-sdk';
+import { useBrainboxChat, BrainboxReactSDK } from 'spres-react';
 
 const sdk = new BrainboxReactSDK('https://api.yourbackend.com', 'YOUR_API_KEY', 'tenant-1');
 
@@ -185,9 +185,9 @@ npm publish --access public
 ### Install in a project
 
 ```bash
-npm install brainbox-react-sdk
+npm install spres-react
 # or
-yarn add brainbox-react-sdk
+yarn add spres-react
 ```
 
 ## Notes
