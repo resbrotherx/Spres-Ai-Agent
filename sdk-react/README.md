@@ -83,7 +83,7 @@ import { ChatPanel } from 'spres-react';
   initialSessionId="session-123"
   design="cloud"
 />
-```
+````
 
 ## Customization options
 
