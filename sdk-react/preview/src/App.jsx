@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrainboxReactSDK, ChatPanel, ChatWidget } from 'spres-react';
+import { BrainboxReactSDK, ChatPanel, ChatWidget } from '../../dist/index.js';
 
 const sdk = new BrainboxReactSDK(
   'https://demo.brainbox.example',
