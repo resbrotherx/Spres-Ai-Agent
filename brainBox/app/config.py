@@ -9,7 +9,7 @@ class Settings:
 
     DATABASE_URL = os.getenv(
         "DATABASE_URL",
-        "postgresql://brainbox:brainbox123@localhost:5432/spres_ai"
+        "postgresql://spres:Francis1@postgres:5432/spres_ai"
     )
 
     REDIS_URL = os.getenv(
@@ -29,7 +29,7 @@ class Settings:
 
     OLLAMA_BASE_URL = os.getenv(
         "OLLAMA_BASE_URL",
-        "http://localhost:11434"
+        "http://165.227.77.33:11434"
     )
 
     OLLAMA_MODEL = os.getenv(
