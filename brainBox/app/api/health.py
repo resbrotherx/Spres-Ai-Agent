@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import text  # Added this import
 from app.db.session import get_db
 from app.utils.logging import logger
 import redis
@@ -17,7 +18,8 @@ async def health_check():
 @router.get("/health/db")
 async def health_check_db(db: Session = Depends(get_db)):
     try:
-        db.execute("SELECT 1")
+        # Wrapped "SELECT 1" with text()
+        db.execute(text("SELECT 1"))
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         logger.error(f"Database health check failed: {str(e)}")
