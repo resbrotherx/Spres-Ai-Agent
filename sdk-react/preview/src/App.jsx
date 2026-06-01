@@ -1,17 +1,16 @@
 import React from 'react';
-import { BrainboxReactSDK, ChatPanel, ChatWidget } from 'spres-react';
+import { BrainboxReactSDK, ChatPanel, ChatWidget } from '../../dist';
 
 const sdk = new BrainboxReactSDK(
-  'https://demo.brainbox.example',
+  'http://165.227.77.33:8000/',
   'demo_api_key',
   'demo_tenant'
 );
 
 export default function App() {
   return (
-    <div style={{ minHeight: '100vh', background: '#F3F4F6', padding: '24px' }}>
-      <h1 style={{ marginBottom: '16px' }}>Brainbox React SDK Preview</h1>
-      <p>Preview the chat widget design. The backend URL is a placeholder, so chat will fail unless your backend is running.</p>
+    <div style={{ minHeight: '100vh', background: '#F3F4F6'}}>
+
       <div style={{ marginTop: '24px' }}>
         <ChatWidget
           sdk={sdk}
@@ -25,7 +24,18 @@ export default function App() {
           height="520px"
           design="support"
         />
-        <ChatPanel/>
+        <ChatPanel
+          sdk={sdk}
+          position="bottom-right"
+          primaryColor="#2563EB"
+          accentColor="#111827"
+          backgroundColor="#F8FAFC"
+          buttonText="Support"
+          placeholder="Ask a question..."
+          // width="360px"
+          // height="520px"
+          design="support"
+        />
       </div>
     </div>
   );

@@ -34,3 +34,5 @@ Pillow==10.1.0
 asyncpg
 
 passlib[bcrypt]
+
+aiofiles

@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from uuid import uuid4
+from datetime import datetime, timedelta
 
 from app.db.session import get_db
 from app.db.models import ChatSession, ChatMessage as ChatMessageModel
-from app.schemas.chat import ChatPayload, ChatResponse, ChatSessionCreate, ChatSessionResponse
+from app.schemas.chat import (
+    ChatPayload, ChatResponse, ChatSessionCreate, ChatSessionResponse,
+    ChatMessageDetail, ChatSessionDetail, SessionsGroupedByDate
+)
 from app.agents.graph import graph
 from app.utils.logging import logger
 from app.redis_cache.cache import get_cache, set_cache, cache_key
@@ -94,6 +98,110 @@ async def create_chat_session(
 
     except Exception as e:
         logger.error(f"Error creating chat session: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/sessions", response_model=SessionsGroupedByDate)
+async def list_sessions(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    db: Session = Depends(get_db)
+):
+    try:
+        now = datetime.utcnow()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_start = today_start - timedelta(days=1)
+        week_start = today_start - timedelta(days=7)
+
+        sessions = db.query(ChatSession).filter(
+            ChatSession.tenant_id == tenant_id
+        ).order_by(ChatSession.created_at.desc()).all()
+
+        grouped = {
+            "today": [],
+            "yesterday": [],
+            "this_week": [],
+            "older": []
+        }
+
+        for session in sessions:
+            session_response = ChatSessionResponse(
+                session_id=session.session_id,
+                title=session.title,
+                created_at=session.created_at.isoformat()
+            )
+
+            created = session.created_at.replace(tzinfo=None)
+
+            if created >= today_start:
+                grouped["today"].append(session_response)
+            elif created >= yesterday_start:
+                grouped["yesterday"].append(session_response)
+            elif created >= week_start:
+                grouped["this_week"].append(session_response)
+            else:
+                grouped["older"].append(session_response)
+
+        return SessionsGroupedByDate(**grouped)
+
+    except Exception as e:
+        logger.error(f"Error listing sessions: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/session/{session_id}/messages", response_model=ChatSessionDetail)
+async def get_session_messages(
+    session_id: str,
+    db: Session = Depends(get_db)
+):
+    try:
+        session = db.query(ChatSession).filter(
+            ChatSession.session_id == session_id
+        ).first()
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found"
+            )
+
+        messages = db.query(ChatMessageModel).filter(
+            ChatMessageModel.session_id == session_id
+        ).order_by(ChatMessageModel.created_at.asc()).all()
+
+        message_details = []
+        for msg in messages:
+            user_initials = None
+            if msg.role == "user":
+                user_initials = "U"
+            else:
+                user_initials = "A"
+
+            message_details.append(ChatMessageDetail(
+                id=msg.id,
+                role=msg.role,
+                content=msg.content,
+                created_at=msg.created_at.isoformat(),
+                user_initials=user_initials,
+                metadata={
+                    "context_used": msg.context is not None and len(msg.context) > 0
+                }
+            ))
+
+        return ChatSessionDetail(
+            session_id=session.session_id,
+            title=session.title,
+            messages=message_details,
+            created_at=session.created_at.isoformat()
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting session messages: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)

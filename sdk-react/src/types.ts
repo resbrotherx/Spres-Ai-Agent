@@ -7,28 +7,50 @@ export interface ChatMessage {
   role: ChatRole;
   text: string;
   timestamp: string;
+  userInitials?: string;
+  metadata?: {
+    context_used?: boolean;
+    [key: string]: any;
+  };
 }
 
-export interface ChatWidgetProps {
-  sdk: BrainboxReactSDK;
-  position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'center';
+export interface CustomizationProps {
+  // Colors
   primaryColor?: string;
   accentColor?: string;
   backgroundColor?: string;
+
+  // Branding
+  logoUrl?: string;
+  logoText?: string;
+
+  // Text customization
+  headerText?: string;
+  sidebarTitle?: string;
+  newChatButtonText?: string;
+  searchPlaceholder?: string;
+  sendButtonText?: string;
+
+  // Features
+  showExportButton?: boolean;
+  showVoiceInput?: boolean;
+  showFileUpload?: boolean;
+  showImageUpload?: boolean;
+}
+
+export interface ChatWidgetProps extends CustomizationProps {
+  sdk: BrainboxReactSDK;
+  position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'center';
   buttonText?: string;
   placeholder?: string;
   width?: string;
   height?: string;
   design?: 'support' | 'assistant';
+  defaultOpen?: boolean;
 }
 
-export interface ChatPanelProps {
+export interface ChatPanelProps extends CustomizationProps {
   sdk: BrainboxReactSDK;
-  primaryColor?: string;
-  accentColor?: string;
-  backgroundColor?: string;
-  headerText?: string;
-  sidebarTitle?: string;
   initialSessionId?: string;
   design?: 'cloud' | 'classic';
 }
@@ -38,15 +60,26 @@ export interface UseBrainboxChatHook {
   loading: boolean;
   error: string | null;
   sessionId: string | null;
+  sessions?: ChatSession[];
   sendMessage: (text: string) => Promise<void>;
-  sendVoiceNote: (note: string) => Promise<void>;
+  sendVoiceNote: (note: Blob) => Promise<void>;
+  uploadFile: (file: File) => Promise<void>;
+  uploadImage: (image: File) => Promise<void>;
   createSession: (title?: string) => Promise<void>;
+  loadSession: (sessionId: string) => Promise<void>;
+  exportChat: (format: 'json' | 'pdf') => Promise<void>;
   reset: () => void;
 }
 
 export interface BrainboxChatResponse {
   response: string;
   session_id?: string;
+}
+
+export interface ChatSession {
+  session_id: string;
+  title: string;
+  created_at: string;
 }
 
 export interface ChatSessionPayload {
@@ -66,4 +99,11 @@ export interface IngestPayload {
   content: string;
   file_path?: string;
   metadata?: Record<string, any>;
+}
+
+export interface SessionsGroupedByDate {
+  today: ChatSession[];
+  yesterday: ChatSession[];
+  this_week: ChatSession[];
+  older: ChatSession[];
 }
