@@ -10,7 +10,7 @@
     "axios": "^1.16.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "spres-react": "^1.0.2"
+    "spres-react": "^1.0.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",

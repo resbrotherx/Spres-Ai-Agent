@@ -1,10 +1,10 @@
 import React from 'react';
-import { BrainboxReactSDK, ChatPanel, ChatWidget } from '../../dist';
+import { BrainboxReactSDK, ChatPanel, ChatWidget } from 'spres-react';
 
 const sdk = new BrainboxReactSDK(
   'http://165.227.77.33:8000/',
   'demo_api_key',
-  'demo_tenant'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpcmVzIiwidXNlcl9pZCI6MywiZXhwIjoxNzgwMjUwOTIxfQ.nLQZyweDAyD5g67mWBAijbnNOMNwuKQTzb2rFvxqjJs'
 );
 
 export default function App() {
