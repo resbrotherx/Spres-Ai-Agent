@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { ChatPayload, ChatSessionPayload, IngestPayload, BrainboxChatResponse } from './types';
+import { ChatPayload, ChatSessionPayload, IngestPayload, BrainboxChatResponse, SessionsGroupedByDate } from './types';
 
 export class BrainboxReactSDK {
   private apiUrl: string;
@@ -65,7 +65,7 @@ export class BrainboxReactSDK {
 
     try {
       if (typeof fetch !== 'undefined') {
-        const response = await fetch(`${this.apiUrl}/api/chat/stream`, {
+        const response = await fetch(`${this.apiUrl}/api/chat/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -121,6 +121,50 @@ export class BrainboxReactSDK {
     };
 
     const response = await this.client.post('/api/chat/session', payload);
+    return response.data;
+  }
+
+  async listSessions(): Promise<SessionsGroupedByDate> {
+    const response = await this.client.get('/api/chat/sessions', {
+      params: { tenant_id: this.tenantId }
+    });
+    return response.data;
+  }
+
+  async getSessionMessages(sessionId: string): Promise<any> {
+    const response = await this.client.get(`/api/chat/session/${sessionId}/messages`);
+    return response.data;
+  }
+
+  async uploadFile(file: File, sessionId?: string): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('tenant_id', this.tenantId);
+    if (sessionId) {
+      formData.append('session_id', sessionId);
+    }
+
+    const response = await this.client.post('/api/chat/upload/file', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  }
+
+  async uploadImage(image: File, sessionId?: string): Promise<any> {
+    const formData = new FormData();
+    formData.append('image', image);
+    formData.append('tenant_id', this.tenantId);
+    if (sessionId) {
+      formData.append('session_id', sessionId);
+    }
+
+    const response = await this.client.post('/api/chat/upload/image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
     return response.data;
   }
 

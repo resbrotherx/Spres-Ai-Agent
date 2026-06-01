@@ -2,7 +2,6 @@
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBrainboxChat } from "./useBrainboxChat";
-
 const defaultChatPanelData = {
   brand: {
     name: "Cortex",
@@ -14,6 +13,33 @@ const defaultChatPanelData = {
     { icon: "library", label: "Library" },
     { icon: "files", label: "Files" },
     { icon: "history", label: "History" }
+  ],
+  historyGroups: [
+    {
+      label: "Today",
+      items: [
+        "Create a detailed 7-day sprint plan for launch",
+        "Draft a concise email to stakeholders",
+        "Analyze the 'Eisenhower Matrix' and priorities"
+      ]
+    },
+    {
+      label: "Yesterday",
+      items: [
+        "Summarize the main differences between plans",
+        "I need to negotiate an extension for delivery"
+      ]
+    },
+    {
+      label: "7 days",
+      items: [
+        "Generate 5 effective morning habits",
+        "As a non-technical PM, list 5 crucial risks",
+        "Help me allocate 8 hours tomorrow",
+        "We need a creative name for our new workspace",
+        "Write a 100-word positive feedback note"
+      ]
+    }
   ],
   user: {
     name: "Emerson Sterling",
@@ -52,7 +78,6 @@ const defaultChatPanelData = {
     href: "#"
   }
 };
-
 const chatPanelCss = `
 .bb-cortex-panel {
   --bb-panel-primary: #0d0d0f;
@@ -79,7 +104,6 @@ const chatPanelCss = `
   background: #f1f1f2;
   border-right: 1px solid #e5e3ea;
   box-sizing: border-box;
-  overflow-y: auto;
 }
 .bb-cortex-brand-row,
 .bb-cortex-nav-item,
@@ -129,7 +153,6 @@ const chatPanelCss = `
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  animation: logoWiggle 3s ease-in-out infinite;
 }
 .bb-cortex-small-logo {
   width: 26px;
@@ -155,11 +178,6 @@ const chatPanelCss = `
   background: rgba(255,255,255,.82);
   box-shadow: 0 0 0 999px transparent;
   transform: rotate(90deg);
-}
-@keyframes logoWiggle {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(2deg); }
-  75% { transform: rotate(-2deg); }
 }
 .bb-cortex-new-chat {
   width: 100%;
@@ -215,27 +233,19 @@ const chatPanelCss = `
   font-size: 14px;
   font-weight: 620;
 }
-.bb-cortex-sessions {
+.bb-cortex-history {
   border-top: 1px solid #e4e3e8;
   padding-top: 16px;
   display: grid;
-  gap: 12px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  gap: 17px;
+  overflow: hidden;
 }
-.bb-cortex-session-group {
-  display: grid;
-  gap: 8px;
-}
-.bb-cortex-session-label {
+.bb-cortex-history-label {
   color: #aaa7af;
   font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  margin-bottom: 4px;
+  margin-bottom: 9px;
 }
-.bb-cortex-session-item {
+.bb-cortex-history-item {
   width: 100%;
   display: block;
   overflow: hidden;
@@ -243,23 +253,13 @@ const chatPanelCss = `
   text-overflow: ellipsis;
   color: #1c1c1f;
   background: transparent;
-  border: 1px solid transparent;
+  border: 0;
   text-align: left;
-  padding: 8px 10px;
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.3;
+  padding: 0;
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.35;
   cursor: pointer;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-.bb-cortex-session-item:hover {
-  background: rgba(255,255,255,.6);
-  border-color: #e8e7eb;
-}
-.bb-cortex-session-item.active {
-  background: var(--bb-panel-accent);
-  color: #fff;
 }
 .bb-cortex-profile {
   margin-top: auto;
@@ -362,9 +362,6 @@ const chatPanelCss = `
 .bb-cortex-export-button {
   padding: 0 14px;
 }
-.bb-cortex-export-button:hover {
-  background: #f5f5f5;
-}
 .bb-cortex-upgrade-button {
   padding: 0 18px;
   color: #fff;
@@ -373,13 +370,8 @@ const chatPanelCss = `
 }
 .bb-cortex-hero {
   width: min(100%, 760px);
-  margin: 0 auto;
+  margin: 72px auto 0;
   text-align: center;
-  display: none;
-}
-.bb-cortex-hero.empty {
-  display: block;
-  margin-top: 72px;
 }
 .bb-cortex-orb {
   width: 128px;
@@ -488,10 +480,6 @@ const chatPanelCss = `
   color: #17171a;
   border-radius: 8px;
   cursor: pointer;
-  position: relative;
-}
-.bb-cortex-tool-button input {
-  display: none;
 }
 .bb-cortex-mic-button {
   width: 40px;
@@ -566,43 +554,15 @@ const chatPanelCss = `
   margin: 42px auto 0;
   display: grid;
   gap: 12px;
-  flex: 1;
-  overflow-y: auto;
-  max-height: 400px;
 }
 .bb-cortex-message {
   display: flex;
-  gap: 12px;
 }
 .bb-cortex-message.is-user {
   justify-content: flex-end;
 }
-.bb-cortex-message-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  font-size: 12px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #164b7a, #f6b26b);
-  color: #fff;
-}
-.bb-cortex-message.is-user .bb-cortex-message-avatar {
-  background: linear-gradient(135deg, var(--bb-panel-accent), #7f52e5);
-}
-.bb-cortex-message-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 60%;
-}
-.bb-cortex-message-time {
-  font-size: 11px;
-  color: #999;
-}
 .bb-cortex-message-bubble {
+  max-width: min(72%, 560px);
   padding: 13px 15px;
   border-radius: 18px 18px 18px 6px;
   background: #f8f5ff;
@@ -654,30 +614,6 @@ const chatPanelCss = `
   font-size: 13px;
   text-align: left;
 }
-.bb-cortex-recording {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #dc2626;
-  animation: pulse 2s infinite;
-}
-.bb-cortex-recording::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #dc2626;
-  animation: pulseDot 2s infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-@keyframes pulseDot {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.2); }
-}
 @media (max-width: 980px) {
   .bb-cortex-panel {
     min-height: 720px;
@@ -715,7 +651,6 @@ const chatPanelCss = `
   }
 }
 `;
-
 function mergeData(base, overrides) {
   if (!overrides) return base;
   const output = { ...base };
@@ -728,7 +663,6 @@ function mergeData(base, overrides) {
   });
   return output;
 }
-
 function Icon({ name, size = 18, strokeWidth = 1.9 }) {
   const paths = {
     plus: /* @__PURE__ */ jsx("path", { d: "M12 5v14M5 12h14" }),
@@ -841,33 +775,14 @@ function Icon({ name, size = 18, strokeWidth = 1.9 }) {
     }
   );
 }
-
 function Avatar({ person }) {
   const initials = ((person == null ? void 0 : person.name) || "AI").split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
   return /* @__PURE__ */ jsx("span", { className: "bb-cortex-avatar", children: (person == null ? void 0 : person.avatarUrl) ? /* @__PURE__ */ jsx("img", { src: person.avatarUrl, alt: "" }) : initials });
 }
-
-function formatTime(timestamp) {
-  try {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  } catch {
-    return '';
-  }
-}
-
 function PanelMessage({ message }) {
   const isUser = message.role === "user";
-  const initials = message.userInitials || (isUser ? "U" : "A");
-  return /* @__PURE__ */ jsxs("div", { className: `bb-cortex-message ${isUser ? "is-user" : ""}`, children: [
-    /* @__PURE__ */ jsx("div", { className: "bb-cortex-message-avatar", children: initials }),
-    /* @__PURE__ */ jsxs("div", { className: "bb-cortex-message-content", children: [
-      /* @__PURE__ */ jsx("div", { className: "bb-cortex-message-bubble", children: message.text }),
-      /* @__PURE__ */ jsx("div", { className: "bb-cortex-message-time", children: formatTime(message.timestamp) })
-    ] })
-  ] }, message.id);
+  return /* @__PURE__ */ jsx("div", { className: `bb-cortex-message ${isUser ? "is-user" : ""}`, children: /* @__PURE__ */ jsx("div", { className: "bb-cortex-message-bubble", children: message.text }) }, message.id);
 }
-
 function ChatPanel({
   sdk,
   primaryColor = "#0d0d0f",
@@ -878,14 +793,7 @@ function ChatPanel({
   initialSessionId = void 0,
   design = "cortex",
   data = void 0,
-  manualData = void 0,
-  logoUrl = void 0,
-  logoText = void 0,
-  newChatButtonText = "New chat",
-  showExportButton = true,
-  showFileUpload = true,
-  showImageUpload = true,
-  showVoiceInput = true
+  manualData = void 0
 }) {
   const {
     messages,
@@ -893,99 +801,29 @@ function ChatPanel({
     error,
     sendMessage,
     createSession,
-    loadSession,
-    uploadFile,
-    uploadImage,
-    exportChat,
-    sessionId,
-    sessions
-  } = useBrainboxChat(sdk, initialSessionId);
+    sessionId
+  } = useBrainboxChat(sdk);
   const [input, setInput] = useState("");
-  const [recording, setRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
   const endRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const imageInputRef = useRef(null);
   const ui = useMemo(() => mergeData(defaultChatPanelData, manualData || data), [manualData, data]);
-
+  useEffect(() => {
+    if (initialSessionId) {
+    }
+  }, [initialSessionId]);
   useEffect(() => {
     var _a;
     (_a = endRef.current) == null ? void 0 : _a.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
   const handleSend = async () => {
     if (!input.trim()) return;
     await sendMessage(input.trim());
     setInput("");
   };
-
-  const handleFileUpload = async (event) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      await uploadFile(file);
-    }
-  };
-
-  const handleImageUpload = async (event) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      await uploadImage(file);
-    }
-  };
-
-  const startVoiceRecording = async () => {
-    if (!recording) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const recorder = new MediaRecorder(stream);
-        const chunks = [];
-
-        recorder.onstart = () => setRecording(true);
-        recorder.ondataavailable = (e) => chunks.push(e.data);
-        recorder.onstop = async () => {
-          setRecording(false);
-          const blob = new Blob(chunks, { type: 'audio/webm' });
-          await uploadFile(new File([blob], 'voice.webm', { type: 'audio/webm' }));
-        };
-
-        setMediaRecorder(recorder);
-        recorder.start();
-      } catch (err) {
-        console.error("Microphone access denied:", err);
-      }
-    } else {
-      mediaRecorder?.stop();
-    }
-  };
-
-  const handleExport = () => {
-    exportChat('json');
-  };
-
   const usePrompt = (prompt) => {
     setInput(prompt || "");
   };
-
   const displayHeader = headerText || `How can I assist you today?`;
   const displaySidebarTitle = sidebarTitle || ui.brand.name;
-  const sessionGroups = sessions ? {
-    today: sessions.filter(s => {
-      const date = new Date(s.created_at);
-      const today = new Date();
-      return date.toDateString() === today.toDateString();
-    }),
-    yesterday: sessions.filter(s => {
-      const date = new Date(s.created_at);
-      const yesterday = new Date(Date.now() - 86400000);
-      return date.toDateString() === yesterday.toDateString();
-    }),
-    older: sessions.filter(s => {
-      const date = new Date(s.created_at);
-      const week = new Date(Date.now() - 604800000);
-      return date < week;
-    })
-  } : { today: [], yesterday: [], older: [] };
-
   return /* @__PURE__ */ jsxs(
     "div",
     {
@@ -1001,13 +839,13 @@ function ChatPanel({
         /* @__PURE__ */ jsx("style", { children: chatPanelCss }),
         /* @__PURE__ */ jsxs("aside", { className: "bb-cortex-sidebar", "aria-label": displaySidebarTitle, children: [
           /* @__PURE__ */ jsxs("div", { className: "bb-cortex-brand-row", children: [
-            logoUrl ? /* @__PURE__ */ jsx("img", { src: logoUrl, alt: "", style: { width: "34px", height: "34px", borderRadius: "8px" } }) : /* @__PURE__ */ jsx("span", { className: "bb-cortex-logo", "aria-hidden": "true" }),
-            /* @__PURE__ */ jsx("div", { className: "bb-cortex-brand-name", children: logoText || ui.brand.name }),
+            /* @__PURE__ */ jsx("span", { className: "bb-cortex-logo", "aria-hidden": "true" }),
+            /* @__PURE__ */ jsx("div", { className: "bb-cortex-brand-name", children: ui.brand.name }),
             /* @__PURE__ */ jsx("button", { className: "bb-cortex-sidebar-toggle", type: "button", "aria-label": "Collapse sidebar", children: /* @__PURE__ */ jsx(Icon, { name: "panel", size: 20 }) })
           ] }),
-          /* @__PURE__ */ jsxs("button", { className: "bb-cortex-new-chat", type: "button", onClick: () => createSession(newChatButtonText), children: [
+          /* @__PURE__ */ jsxs("button", { className: "bb-cortex-new-chat", type: "button", onClick: () => createSession("Cortex chat"), children: [
             /* @__PURE__ */ jsx(Icon, { name: "plus", size: 18 }),
-            newChatButtonText
+            "New chat"
           ] }),
           /* @__PURE__ */ jsxs("label", { className: "bb-cortex-search", children: [
             /* @__PURE__ */ jsx(Icon, { name: "search", size: 17 }),
@@ -1018,20 +856,10 @@ function ChatPanel({
             /* @__PURE__ */ jsx(Icon, { name: item.icon, size: 18 }),
             item.label
           ] }, item.label)) }),
-          /* @__PURE__ */ jsx("div", { className: "bb-cortex-sessions", children: /* @__PURE__ */ jsxs(Fragment, { children: [
-            sessionGroups.today.length > 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-session-group", children: [
-              /* @__PURE__ */ jsx("div", { className: "bb-cortex-session-label", children: "Today" }),
-              sessionGroups.today.map((session) => /* @__PURE__ */ jsx("button", { className: `bb-cortex-session-item ${session.session_id === sessionId ? "active" : ""}`, type: "button", onClick: () => loadSession(session.session_id), children: session.title }, session.session_id))
-            ] }),
-            sessionGroups.yesterday.length > 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-session-group", children: [
-              /* @__PURE__ */ jsx("div", { className: "bb-cortex-session-label", children: "Yesterday" }),
-              sessionGroups.yesterday.map((session) => /* @__PURE__ */ jsx("button", { className: `bb-cortex-session-item ${session.session_id === sessionId ? "active" : ""}`, type: "button", onClick: () => loadSession(session.session_id), children: session.title }, session.session_id))
-            ] }),
-            sessionGroups.older.length > 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-session-group", children: [
-              /* @__PURE__ */ jsx("div", { className: "bb-cortex-session-label", children: "Older" }),
-              sessionGroups.older.map((session) => /* @__PURE__ */ jsx("button", { className: `bb-cortex-session-item ${session.session_id === sessionId ? "active" : ""}`, type: "button", onClick: () => loadSession(session.session_id), children: session.title }, session.session_id))
-            ] })
-          ] }) }),
+          /* @__PURE__ */ jsx("div", { className: "bb-cortex-history", children: ui.historyGroups.map((group) => /* @__PURE__ */ jsxs("div", { children: [
+            /* @__PURE__ */ jsx("div", { className: "bb-cortex-history-label", children: group.label }),
+            group.items.map((item) => /* @__PURE__ */ jsx("button", { className: "bb-cortex-history-item", type: "button", onClick: () => usePrompt(item), children: item }, item))
+          ] }, group.label)) }),
           /* @__PURE__ */ jsxs("div", { className: "bb-cortex-profile", children: [
             /* @__PURE__ */ jsx(Avatar, { person: ui.user }),
             /* @__PURE__ */ jsxs("div", { className: "bb-cortex-profile-copy", children: [
@@ -1051,81 +879,75 @@ function ChatPanel({
             /* @__PURE__ */ jsxs("div", { className: "bb-cortex-toolbar-right", children: [
               /* @__PURE__ */ jsx("button", { className: "bb-cortex-sidebar-toggle", type: "button", "aria-label": "More actions", children: /* @__PURE__ */ jsx(Icon, { name: "more", size: 20 }) }),
               /* @__PURE__ */ jsx("button", { className: "bb-cortex-icon-button", type: "button", "aria-label": "Copy link", children: /* @__PURE__ */ jsx(Icon, { name: "link", size: 18 }) }),
-              showExportButton && /* @__PURE__ */ jsxs("button", { className: "bb-cortex-export-button", type: "button", onClick: handleExport, children: [
+              /* @__PURE__ */ jsxs("button", { className: "bb-cortex-export-button", type: "button", children: [
                 /* @__PURE__ */ jsx(Icon, { name: "download", size: 17 }),
-                "Export"
+                "Export chat"
               ] }),
               /* @__PURE__ */ jsx("button", { className: "bb-cortex-upgrade-button", type: "button", children: "Upgrade" })
             ] })
           ] }),
-          messages.length === 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-hero empty", children: [
+          /* @__PURE__ */ jsxs("div", { className: "bb-cortex-hero", children: [
             /* @__PURE__ */ jsx("div", { className: "bb-cortex-orb", "aria-hidden": "true" }),
             /* @__PURE__ */ jsxs("h1", { className: "bb-cortex-hello", children: [
               "Hello, ",
               ui.brand.greetingName
             ] }),
-            /* @__PURE__ */ jsx("h2", { className: "bb-cortex-title", children: displayHeader })
-          ] }),
-          /* @__PURE__ */ jsxs("div", { className: "bb-cortex-composer", children: [
-            /* @__PURE__ */ jsx(
-              "textarea",
-              {
-                value: input,
-                onChange: (event) => setInput(event.target.value),
-                onKeyDown: (event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    handleSend();
-                  }
-                },
-                placeholder: ui.composer.placeholder
-              }
-            ),
-            /* @__PURE__ */ jsxs("div", { className: "bb-cortex-composer-tools", children: [
-              /* @__PURE__ */ jsxs("div", { className: "bb-cortex-chip-row", children: [
-                /* @__PURE__ */ jsxs("button", { className: "bb-cortex-research-chip", type: "button", children: [
-                  /* @__PURE__ */ jsx(Icon, { name: "atom", size: 17 }),
-                  ui.composer.researchLabel
+            /* @__PURE__ */ jsx("h2", { className: "bb-cortex-title", children: displayHeader }),
+            /* @__PURE__ */ jsxs("div", { className: "bb-cortex-composer", children: [
+              /* @__PURE__ */ jsx(
+                "textarea",
+                {
+                  value: input,
+                  onChange: (event) => setInput(event.target.value),
+                  onKeyDown: (event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      handleSend();
+                    }
+                  },
+                  placeholder: ui.composer.placeholder
+                }
+              ),
+              /* @__PURE__ */ jsxs("div", { className: "bb-cortex-composer-tools", children: [
+                /* @__PURE__ */ jsxs("div", { className: "bb-cortex-chip-row", children: [
+                  /* @__PURE__ */ jsxs("button", { className: "bb-cortex-research-chip", type: "button", children: [
+                    /* @__PURE__ */ jsx(Icon, { name: "atom", size: 17 }),
+                    ui.composer.researchLabel
+                  ] }),
+                  /* @__PURE__ */ jsx("button", { className: "bb-cortex-tool-button", type: "button", "aria-label": "Add image", children: /* @__PURE__ */ jsx(Icon, { name: "image", size: 18 }) }),
+                  /* @__PURE__ */ jsx("button", { className: "bb-cortex-tool-button", type: "button", "aria-label": "Ideas", children: /* @__PURE__ */ jsx(Icon, { name: "bulb", size: 18 }) })
                 ] }),
-                showImageUpload && /* @__PURE__ */ jsxs("button", { className: "bb-cortex-tool-button", type: "button", "aria-label": "Add image", onClick: () => imageInputRef.current?.click(), children: [
-                  /* @__PURE__ */ jsx(Icon, { name: "image", size: 18 }),
-                  /* @__PURE__ */ jsx("input", { ref: imageInputRef, type: "file", accept: "image/*", onChange: handleImageUpload })
-                ] }),
-                /* @__PURE__ */ jsx("button", { className: "bb-cortex-tool-button", type: "button", "aria-label": "Ideas", children: /* @__PURE__ */ jsx(Icon, { name: "bulb", size: 18 }) })
+                /* @__PURE__ */ jsxs("div", { className: "bb-cortex-chip-row", children: [
+                  /* @__PURE__ */ jsx("button", { className: "bb-cortex-tool-button", type: "button", "aria-label": "Settings", children: /* @__PURE__ */ jsx(Icon, { name: "settings", size: 18 }) }),
+                  /* @__PURE__ */ jsx("button", { className: "bb-cortex-tool-button", type: "button", "aria-label": "Language", children: /* @__PURE__ */ jsx(Icon, { name: "globe", size: 18 }) }),
+                  /* @__PURE__ */ jsx("button", { className: "bb-cortex-mic-button", type: "button", onClick: handleSend, "aria-label": "Send message", children: /* @__PURE__ */ jsx(Icon, { name: "mic", size: 18 }) })
+                ] })
               ] }),
-              /* @__PURE__ */ jsxs("div", { className: "bb-cortex-chip-row", children: [
-                /* @__PURE__ */ jsx("button", { className: "bb-cortex-tool-button", type: "button", "aria-label": "Settings", children: /* @__PURE__ */ jsx(Icon, { name: "settings", size: 18 }) }),
-                showFileUpload && /* @__PURE__ */ jsxs("button", { className: "bb-cortex-tool-button", type: "button", "aria-label": "Attach file", onClick: () => fileInputRef.current?.click(), children: [
-                  /* @__PURE__ */ jsx(Icon, { name: "paperclip", size: 18 }),
-                  /* @__PURE__ */ jsx("input", { ref: fileInputRef, type: "file", onChange: handleFileUpload })
+              /* @__PURE__ */ jsxs("div", { className: "bb-cortex-saved-row", children: [
+                /* @__PURE__ */ jsxs("span", { className: "bb-cortex-saved-left", children: [
+                  /* @__PURE__ */ jsx(Icon, { name: "sparkle", size: 18 }),
+                  ui.composer.savedPromptsLabel
                 ] }),
-                showVoiceInput && /* @__PURE__ */ jsx("button", { className: "bb-cortex-mic-button", type: "button", onClick: startVoiceRecording, "aria-label": recording ? "Stop recording" : "Start recording", children: /* @__PURE__ */ jsx(Icon, { name: "mic", size: 18 }) })
+                /* @__PURE__ */ jsxs("button", { className: "bb-cortex-file-button", type: "button", children: [
+                  /* @__PURE__ */ jsx(Icon, { name: "paperclip", size: 16 }),
+                  ui.composer.attachLabel
+                ] })
               ] })
             ] }),
-            /* @__PURE__ */ jsxs("div", { className: "bb-cortex-saved-row", children: [
-              /* @__PURE__ */ jsxs("span", { className: "bb-cortex-saved-left", children: [
-                /* @__PURE__ */ jsx(Icon, { name: "sparkle", size: 18 }),
-                recording ? /* @__PURE__ */ jsx("span", { className: "bb-cortex-recording", children: "Recording..." }) : ui.composer.savedPromptsLabel
-              ] }),
-              /* @__PURE__ */ jsxs("button", { className: "bb-cortex-file-button", type: "button", onClick: handleSend, children: [
-                /* @__PURE__ */ jsx(Icon, { name: "paperclip", size: 16 }),
-                "Send"
+            messages.length > 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-chatlog", children: [
+              messages.map((message) => /* @__PURE__ */ jsx(PanelMessage, { message }, message.id)),
+              /* @__PURE__ */ jsx("div", { ref: endRef })
+            ] }),
+            error && /* @__PURE__ */ jsx("div", { className: "bb-cortex-error", children: error }),
+            /* @__PURE__ */ jsx("div", { className: "bb-cortex-prompts", children: ui.promptCards.map((card) => /* @__PURE__ */ jsxs("button", { className: "bb-cortex-prompt-card", type: "button", onClick: () => usePrompt(card.prompt || card.title), children: [
+              /* @__PURE__ */ jsx(Icon, { name: card.icon, size: 22 }),
+              /* @__PURE__ */ jsxs("span", { children: [
+                /* @__PURE__ */ jsx("strong", { children: card.title }),
+                /* @__PURE__ */ jsx("span", { children: card.description })
               ] })
-            ] })
+            ] }, card.title)) })
           ] }),
-          messages.length > 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-chatlog", children: [
-            messages.map((message) => /* @__PURE__ */ jsx(PanelMessage, { message }, message.id)),
-            /* @__PURE__ */ jsx("div", { ref: endRef })
-          ] }),
-          error && /* @__PURE__ */ jsx("div", { className: "bb-cortex-error", children: error }),
-          messages.length === 0 && /* @__PURE__ */ jsx("div", { className: "bb-cortex-prompts", children: ui.promptCards.map((card) => /* @__PURE__ */ jsxs("button", { className: "bb-cortex-prompt-card", type: "button", onClick: () => usePrompt(card.prompt || card.title), children: [
-            /* @__PURE__ */ jsx(Icon, { name: card.icon, size: 22 }),
-            /* @__PURE__ */ jsxs("span", { children: [
-              /* @__PURE__ */ jsx("strong", { children: card.title }),
-              /* @__PURE__ */ jsx("span", { children: card.description })
-            ] })
-          ] }, card.title)) }),
-          messages.length > 0 && /* @__PURE__ */ jsxs("footer", { className: "bb-cortex-bottom", children: [
+          /* @__PURE__ */ jsxs("footer", { className: "bb-cortex-bottom", children: [
             /* @__PURE__ */ jsxs("span", { children: [
               ui.footer.text,
               " ",
@@ -1142,7 +964,6 @@ function ChatPanel({
     }
   );
 }
-
 export {
   ChatPanel,
   defaultChatPanelData
