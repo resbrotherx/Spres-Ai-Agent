@@ -65,7 +65,7 @@ export class BrainboxReactSDK {
 
     try {
       if (typeof fetch !== 'undefined') {
-        const response = await fetch(`${this.apiUrl}/api/chat/stream`, {
+        const response = await fetch(`${this.apiUrl}/api/chat`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
