@@ -36,3 +36,4 @@ asyncpg
 passlib[bcrypt]
 
 aiofiles
+python-multipart==0.0.6
