@@ -57,54 +57,7 @@ export class BrainboxReactSDK {
     onComplete?: (result: any) => void,
     onError?: (error: Error) => void
   ): Promise<void> {
-    const payload: ChatPayload = {
-      tenant_id: this.tenantId,
-      question,
-      session_id: sessionId
-    };
-
     try {
-      if (typeof fetch !== 'undefined') {
-        const response = await fetch(`${this.apiUrl}/api/chat/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.apiKey}`
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-          throw new Error(`Stream request failed: ${response.status}`);
-        }
-
-        if (!response.body || typeof response.body.getReader !== 'function') {
-          const text = await response.text();
-          let parsed: any;
-          try {
-            parsed = JSON.parse(text);
-          } catch {
-            parsed = { response: text };
-          }
-          onChunk(parsed.response || text || '');
-          onComplete?.(parsed);
-          return;
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          onChunk(chunk);
-        }
-
-        onComplete?.({ success: true });
-        return;
-      }
-
       const result = await this.chat(question, sessionId);
       onChunk(result.response || JSON.stringify(result));
       onComplete?.(result);
@@ -125,14 +78,16 @@ export class BrainboxReactSDK {
   }
 
   async listSessions(): Promise<SessionsGroupedByDate> {
-    const response = await this.client.get('/api/chat/sessions', {
-      params: { tenant_id: this.tenantId }
-    });
+    const response = await this.client.get(`/api/sessions?tenant_id=${this.tenantId}`, 
+    // {
+    //   tenant_id: this.tenantId
+    // }
+  );
     return response.data;
   }
 
   async getSessionMessages(sessionId: string): Promise<any> {
-    const response = await this.client.get(`/api/chat/session/${sessionId}/messages`);
+    const response = await this.client.get(`/api/session/${sessionId}/messages`);
     return response.data;
   }
 

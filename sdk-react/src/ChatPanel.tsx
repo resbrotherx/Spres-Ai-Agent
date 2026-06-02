@@ -113,6 +113,28 @@ const chatPanelCss = `
   cursor: pointer;
   padding: 0;
 }
+.bb-cortex-panel button {
+  -webkit-tap-highlight-color: transparent;
+  transform: translateY(0) scale(1);
+  transition:
+    transform 120ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    filter 160ms ease;
+}
+.bb-cortex-panel button:hover {
+  filter: brightness(0.98);
+}
+.bb-cortex-panel button:active {
+  transform: translateY(1px) scale(0.96);
+  filter: brightness(0.94);
+}
+.bb-cortex-panel button:focus-visible {
+  outline: 2px solid var(--bb-panel-accent);
+  outline-offset: 2px;
+}
 .bb-cortex-logo,
 .bb-cortex-small-logo {
   display: grid;
@@ -219,21 +241,20 @@ const chatPanelCss = `
   border-top: 1px solid #e4e3e8;
   padding-top: 16px;
   display: grid;
-  gap: 12px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  gap: 17px;
+  overflow: hidden;
 }
-.bb-cortex-session-group {
-  display: grid;
-  gap: 8px;
-}
+// .bb-cortex-session-group {
+//   display: grid;
+//   gap: 8px;
+// }
 .bb-cortex-session-label {
   color: #aaa7af;
   font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  margin-bottom: 4px;
+  margin-bottom: 9px;
+
+  // font-weight: 600;
+  // text-transform: uppercase;
 }
 .bb-cortex-session-item {
   width: 100%;
@@ -243,23 +264,32 @@ const chatPanelCss = `
   text-overflow: ellipsis;
   color: #1c1c1f;
   background: transparent;
-  border: 1px solid transparent;
+  border: 0;
   text-align: left;
-  padding: 8px 10px;
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.3;
+  padding: 0;
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.35;
   cursor: pointer;
-  border-radius: 6px;
-  transition: all 0.2s;
+
+  // border: 1px solid transparent;
+  // line-height: 1.3;
+  // border-radius: 6px;
+  // transition: all 0.2s;
 }
 .bb-cortex-session-item:hover {
   background: rgba(255,255,255,.6);
   border-color: #e8e7eb;
 }
+.bb-cortex-session-item:active {
+  background: rgba(168,130,247,.14);
+}
 .bb-cortex-session-item.active {
   background: var(--bb-panel-accent);
   color: #fff;
+  padding:5px;
+  border-radius: 4px;
+
 }
 .bb-cortex-profile {
   margin-top: auto;
@@ -490,6 +520,13 @@ const chatPanelCss = `
   cursor: pointer;
   position: relative;
 }
+.bb-cortex-tool-button:hover,
+.bb-cortex-icon-button:hover,
+.bb-cortex-workspace-picker:hover,
+.bb-cortex-round-footer:hover {
+  background: #f6f3fb;
+  border-color: #e2d8f7;
+}
 .bb-cortex-tool-button input {
   display: none;
 }
@@ -504,6 +541,14 @@ const chatPanelCss = `
   cursor: pointer;
   background: radial-gradient(circle at 35% 25%, #f3e8ff, #b087f7 64%, #8e57eb);
   box-shadow: 0 0 0 1px rgba(168,130,247,.25), 0 7px 18px rgba(158,111,238,.25);
+}
+.bb-cortex-mic-button:hover {
+  box-shadow: 0 0 0 3px rgba(168,130,247,.18), 0 9px 22px rgba(158,111,238,.28);
+}
+.bb-cortex-mic-button.is-recording {
+  background: radial-gradient(circle at 35% 25%, #fee2e2, #ef4444 64%, #b91c1c);
+  border-color: #fecaca;
+  box-shadow: 0 0 0 4px rgba(239,68,68,.18), 0 9px 22px rgba(220,38,38,.25);
 }
 .bb-cortex-saved-row {
   min-height: 45px;
@@ -549,6 +594,10 @@ const chatPanelCss = `
   box-shadow: 0 14px 30px rgba(17,17,20,.04);
   cursor: pointer;
   box-sizing: border-box;
+}
+.bb-cortex-prompt-card:hover {
+  border-color: #e5d9f8;
+  box-shadow: 0 16px 34px rgba(126,81,223,.08);
 }
 .bb-cortex-prompt-card strong {
   display: block;
@@ -892,6 +941,7 @@ function ChatPanel({
     loading,
     error,
     sendMessage,
+    sendVoiceNote,
     createSession,
     loadSession,
     uploadFile,
@@ -903,6 +953,7 @@ function ChatPanel({
   const [input, setInput] = useState("");
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [voiceError, setVoiceError] = useState("");
   const endRef = useRef(null);
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -915,6 +966,7 @@ function ChatPanel({
 
   const handleSend = async () => {
     if (!input.trim()) return;
+    setVoiceError("");
     await sendMessage(input.trim());
     setInput("");
   };
@@ -934,8 +986,17 @@ function ChatPanel({
   };
 
   const startVoiceRecording = async () => {
+    setVoiceError("");
     if (!recording) {
       try {
+        const canUseMicrophone = typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia;
+        if (!canUseMicrophone) {
+          const secureHint = typeof window !== "undefined" && !window.isSecureContext
+            ? " Microphone recording requires HTTPS or localhost."
+            : "";
+          throw new Error(`Microphone recording is not available in this browser context.${secureHint}`);
+        }
+
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const recorder = new MediaRecorder(stream);
         const chunks = [];
@@ -945,12 +1006,16 @@ function ChatPanel({
         recorder.onstop = async () => {
           setRecording(false);
           const blob = new Blob(chunks, { type: 'audio/webm' });
-          await uploadFile(new File([blob], 'voice.webm', { type: 'audio/webm' }));
+          stream.getTracks().forEach(track => track.stop());
+          await sendVoiceNote(blob);
         };
 
         setMediaRecorder(recorder);
         recorder.start();
-      } catch (err) {
+      } catch (err: any) {
+        const message = err?.message || "Microphone access was denied.";
+        setRecording(false);
+        setVoiceError(message);
         console.error("Microphone access denied:", err);
       }
     } else {
@@ -979,12 +1044,19 @@ function ChatPanel({
       const yesterday = new Date(Date.now() - 86400000);
       return date.toDateString() === yesterday.toDateString();
     }),
+    this_week: sessions.filter(s => {
+      const date = new Date(s.created_at);
+      const today = new Date();
+      const yesterday = new Date(Date.now() - 86400000);
+      const week = new Date(Date.now() - 604800000);
+      return date >= week && date.toDateString() !== today.toDateString() && date.toDateString() !== yesterday.toDateString();
+    }),
     older: sessions.filter(s => {
       const date = new Date(s.created_at);
       const week = new Date(Date.now() - 604800000);
       return date < week;
     })
-  } : { today: [], yesterday: [], older: [] };
+  } : { today: [], yesterday: [], this_week: [], older: [] };
 
   return /* @__PURE__ */ jsxs(
     "div",
@@ -1026,6 +1098,10 @@ function ChatPanel({
             sessionGroups.yesterday.length > 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-session-group", children: [
               /* @__PURE__ */ jsx("div", { className: "bb-cortex-session-label", children: "Yesterday" }),
               sessionGroups.yesterday.map((session) => /* @__PURE__ */ jsx("button", { className: `bb-cortex-session-item ${session.session_id === sessionId ? "active" : ""}`, type: "button", onClick: () => loadSession(session.session_id), children: session.title }, session.session_id))
+            ] }),
+            sessionGroups.this_week.length > 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-session-group", children: [
+              /* @__PURE__ */ jsx("div", { className: "bb-cortex-session-label", children: "This week" }),
+              sessionGroups.this_week.map((session) => /* @__PURE__ */ jsx("button", { className: `bb-cortex-session-item ${session.session_id === sessionId ? "active" : ""}`, type: "button", onClick: () => loadSession(session.session_id), children: session.title }, session.session_id))
             ] }),
             sessionGroups.older.length > 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-session-group", children: [
               /* @__PURE__ */ jsx("div", { className: "bb-cortex-session-label", children: "Older" }),
@@ -1099,7 +1175,7 @@ function ChatPanel({
                   /* @__PURE__ */ jsx(Icon, { name: "paperclip", size: 18 }),
                   /* @__PURE__ */ jsx("input", { ref: fileInputRef, type: "file", onChange: handleFileUpload })
                 ] }),
-                showVoiceInput && /* @__PURE__ */ jsx("button", { className: "bb-cortex-mic-button", type: "button", onClick: startVoiceRecording, "aria-label": recording ? "Stop recording" : "Start recording", children: /* @__PURE__ */ jsx(Icon, { name: "mic", size: 18 }) })
+                showVoiceInput && /* @__PURE__ */ jsx("button", { className: `bb-cortex-mic-button ${recording ? "is-recording" : ""}`, type: "button", onClick: startVoiceRecording, "aria-label": recording ? "Stop recording" : "Start recording", children: /* @__PURE__ */ jsx(Icon, { name: "mic", size: 18 }) })
               ] })
             ] }),
             /* @__PURE__ */ jsxs("div", { className: "bb-cortex-saved-row", children: [
@@ -1117,7 +1193,7 @@ function ChatPanel({
             messages.map((message) => /* @__PURE__ */ jsx(PanelMessage, { message }, message.id)),
             /* @__PURE__ */ jsx("div", { ref: endRef })
           ] }),
-          error && /* @__PURE__ */ jsx("div", { className: "bb-cortex-error", children: error }),
+          (error || voiceError) && /* @__PURE__ */ jsx("div", { className: "bb-cortex-error", children: error || voiceError }),
           messages.length === 0 && /* @__PURE__ */ jsx("div", { className: "bb-cortex-prompts", children: ui.promptCards.map((card) => /* @__PURE__ */ jsxs("button", { className: "bb-cortex-prompt-card", type: "button", onClick: () => usePrompt(card.prompt || card.title), children: [
             /* @__PURE__ */ jsx(Icon, { name: card.icon, size: 22 }),
             /* @__PURE__ */ jsxs("span", { children: [

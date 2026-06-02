@@ -141,6 +141,28 @@ const chatWidgetCss = `
   cursor: pointer;
   box-shadow: 0 18px 40px rgba(0,0,0,.22);
 }
+.bb-omago-root button {
+  -webkit-tap-highlight-color: transparent;
+  transform: translateY(0) scale(1);
+  transition:
+    transform 120ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    filter 160ms ease;
+}
+.bb-omago-root button:hover {
+  filter: brightness(0.98);
+}
+.bb-omago-root button:active {
+  transform: translateY(1px) scale(0.96);
+  filter: brightness(0.94);
+}
+.bb-omago-root button:focus-visible {
+  outline: 2px solid var(--bb-widget-purple);
+  outline-offset: 2px;
+}
 .bb-omago-close {
   width: 34px;
   height: 34px;
@@ -225,6 +247,13 @@ const chatWidgetCss = `
   font-weight: 780;
   cursor: pointer;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.34);
+}
+.bb-omago-action-pill:hover,
+.bb-omago-mode:hover,
+.bb-omago-tool:hover,
+.bb-omago-search:hover {
+  background: rgba(255,255,255,.42);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.55), 0 8px 20px rgba(156,71,216,.08);
 }
 .bb-omago-user {
   display: grid;
@@ -382,6 +411,10 @@ const chatWidgetCss = `
   color: #fff;
   background: radial-gradient(circle at 36% 28%, #efc3ff, var(--bb-widget-purple) 53%, #8120d2 100%);
   box-shadow: 0 0 30px rgba(181, 57, 255, .78), inset 0 0 13px rgba(255,255,255,.35);
+}
+.bb-omago-launcher:hover,
+.bb-omago-send:hover {
+  box-shadow: 0 0 36px rgba(181, 57, 255, .82), 0 16px 38px rgba(92, 28, 135, .24);
 }
 .bb-omago-error {
   color: #dc2626;

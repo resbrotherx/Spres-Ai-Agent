@@ -20,18 +20,22 @@ export function useBrainboxChat(sdk: BrainboxReactSDK, initialSessionId?: string
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
 
+  const refreshSessions = useCallback(async () => {
+    const groupedSessions = await sdk.listSessions();
+    const allSessions = [
+      ...groupedSessions.today,
+      ...groupedSessions.yesterday,
+      ...groupedSessions.this_week,
+      ...groupedSessions.older
+    ];
+    setSessions(allSessions);
+  }, [sdk]);
+
   // Fetch all sessions on mount
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const groupedSessions = await sdk.listSessions();
-        const allSessions = [
-          ...groupedSessions.today,
-          ...groupedSessions.yesterday,
-          ...groupedSessions.this_week,
-          ...groupedSessions.older
-        ];
-        setSessions(allSessions);
+        await refreshSessions();
       } catch (err) {
         console.error('Failed to fetch sessions:', err);
       }
@@ -40,7 +44,7 @@ export function useBrainboxChat(sdk: BrainboxReactSDK, initialSessionId?: string
     if (sdk) {
       fetchSessions();
     }
-  }, [sdk]);
+  }, [sdk, refreshSessions]);
 
   // Load initial session messages if provided
   useEffect(() => {
@@ -83,6 +87,7 @@ export function useBrainboxChat(sdk: BrainboxReactSDK, initialSessionId?: string
           if (result?.session_id) {
             setSessionId(result.session_id);
           }
+          refreshSessions().catch(err => console.error('Failed to refresh sessions:', err));
           setLoading(false);
         },
         err => {
@@ -94,20 +99,20 @@ export function useBrainboxChat(sdk: BrainboxReactSDK, initialSessionId?: string
       setError(err?.message || 'Chat failed');
       setLoading(false);
     }
-  }, [appendMessage, messages, sdk, sessionId]);
+  }, [appendMessage, refreshSessions, sdk, sessionId]);
 
   const sendVoiceNote = useCallback(async (note: Blob) => {
     setError(null);
     try {
-      // TODO: Convert blob to text or send as file
-      const text = 'Voice note sent';
-      const voiceMessage = createMessage('user', text, 'U');
+      const voiceFile = new File([note], 'voice.webm', { type: note.type || 'audio/webm' });
+      await sdk.uploadFile(voiceFile, sessionId || undefined);
+      const voiceMessage = createMessage('user', 'Voice note uploaded', 'U');
       appendMessage(voiceMessage);
-      await sendMessage(text);
+      await refreshSessions();
     } catch (err: any) {
       setError(err?.message || 'Failed to send voice note');
     }
-  }, [appendMessage, sendMessage]);
+  }, [appendMessage, refreshSessions, sdk, sessionId]);
 
   const uploadFile = useCallback(async (file: File) => {
     setError(null);
@@ -115,10 +120,11 @@ export function useBrainboxChat(sdk: BrainboxReactSDK, initialSessionId?: string
       await sdk.uploadFile(file, sessionId || undefined);
       const fileMessage = createMessage('user', `📎 Uploaded: ${file.name}`, 'U');
       appendMessage(fileMessage);
+      await refreshSessions();
     } catch (err: any) {
       setError(err?.message || 'Failed to upload file');
     }
-  }, [appendMessage, sdk, sessionId]);
+  }, [appendMessage, refreshSessions, sdk, sessionId]);
 
   const uploadImage = useCallback(async (image: File) => {
     setError(null);
@@ -126,10 +132,11 @@ export function useBrainboxChat(sdk: BrainboxReactSDK, initialSessionId?: string
       await sdk.uploadImage(image, sessionId || undefined);
       const imageMessage = createMessage('user', `🖼️ Uploaded: ${image.name}`, 'U');
       appendMessage(imageMessage);
+      await refreshSessions();
     } catch (err: any) {
       setError(err?.message || 'Failed to upload image');
     }
-  }, [appendMessage, sdk, sessionId]);
+  }, [appendMessage, refreshSessions, sdk, sessionId]);
 
   const createSession = useCallback(async (title?: string) => {
     setError(null);
@@ -138,20 +145,12 @@ export function useBrainboxChat(sdk: BrainboxReactSDK, initialSessionId?: string
       if (response?.session_id) {
         setSessionId(response.session_id);
         setMessages([]);
-        // Refresh sessions list
-        const groupedSessions = await sdk.listSessions();
-        const allSessions = [
-          ...groupedSessions.today,
-          ...groupedSessions.yesterday,
-          ...groupedSessions.this_week,
-          ...groupedSessions.older
-        ];
-        setSessions(allSessions);
+        await refreshSessions();
       }
     } catch (err: any) {
       setError(err?.message || 'Unable to create session');
     }
-  }, [sdk]);
+  }, [refreshSessions, sdk]);
 
   const loadSession = useCallback(async (sid: string) => {
     setError(null);

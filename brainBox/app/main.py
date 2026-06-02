@@ -21,23 +21,30 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 # app.add_middleware(
 #     CORSMiddleware,
-#     allow_origins=[
-#         "http://165.227.77.33:8000",
-#         "https://port.smartpowerbilling.com",       # Add your domain here later
-#     ],
+#     allow_origins=["*"],
 #     allow_credentials=True,
 #     allow_methods=["*"],
 #     allow_headers=["*"],
 # )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://165.227.77.33:8000",
+        "http://165.227.77.33",
+        "https://165.227.77.33",
+        "http://port.smartpowerbilling.com",
+        "https://port.smartpowerbilling.com",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(health_router, prefix="/api", tags=["health"])
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])

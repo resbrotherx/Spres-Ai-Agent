@@ -15,10 +15,14 @@ class ChatResponse(BaseModel):
     response: str
     reasoning: Optional[str] = None
     search_results: Optional[List] = None
+    session_id: Optional[str] = None
 
 class ChatSessionCreate(BaseModel):
     tenant_id: str
     title: Optional[str] = None
+
+class ChatSessionsListRequest(BaseModel):
+    tenant_id: str
 
 class ChatSessionResponse(BaseModel):
     session_id: str
