@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from uuid import uuid4
 
 from app.db.session import get_db
 from app.db.models import ProcessingTask
 from app.schemas.ingest import IngestPayload, IngestResponse, IngestionStatus
-from app.celery_app.tasks import process_ingestion_task
+from app.ingestion.pipeline import process_document
 from app.utils.logging import logger
 
 router = APIRouter()
@@ -13,6 +13,7 @@ router = APIRouter()
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest(
     payload: IngestPayload,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     try:
@@ -37,7 +38,7 @@ async def ingest(
             "metadata": payload.metadata
         }
 
-        process_ingestion_task.delay(ingest_payload)
+        background_tasks.add_task(process_document, ingest_payload)
 
         logger.info(f"Ingestion queued: {task_id}")
 

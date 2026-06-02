@@ -78,11 +78,9 @@ export class BrainboxReactSDK {
   }
 
   async listSessions(): Promise<SessionsGroupedByDate> {
-    const response = await this.client.get(`/api/sessions?tenant_id=${this.tenantId}`, 
-    // {
-    //   tenant_id: this.tenantId
-    // }
-  );
+    const response = await this.client.post('/api/chat/sessions', {
+      tenant_id: this.tenantId
+    });
     return response.data;
   }
 

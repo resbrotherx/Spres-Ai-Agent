@@ -104,8 +104,16 @@ export function useBrainboxChat(sdk: BrainboxReactSDK, initialSessionId?: string
   const sendVoiceNote = useCallback(async (note: Blob) => {
     setError(null);
     try {
+      let targetSessionId = sessionId;
+      if (!targetSessionId) {
+        const response = await sdk.createChatSession('Voice note');
+        targetSessionId = response?.session_id || null;
+        if (targetSessionId) {
+          setSessionId(targetSessionId);
+        }
+      }
       const voiceFile = new File([note], 'voice.webm', { type: note.type || 'audio/webm' });
-      await sdk.uploadFile(voiceFile, sessionId || undefined);
+      await sdk.uploadFile(voiceFile, targetSessionId || undefined);
       const voiceMessage = createMessage('user', 'Voice note uploaded', 'U');
       appendMessage(voiceMessage);
       await refreshSessions();
@@ -117,7 +125,15 @@ export function useBrainboxChat(sdk: BrainboxReactSDK, initialSessionId?: string
   const uploadFile = useCallback(async (file: File) => {
     setError(null);
     try {
-      await sdk.uploadFile(file, sessionId || undefined);
+      let targetSessionId = sessionId;
+      if (!targetSessionId) {
+        const response = await sdk.createChatSession(file.name || 'File upload');
+        targetSessionId = response?.session_id || null;
+        if (targetSessionId) {
+          setSessionId(targetSessionId);
+        }
+      }
+      await sdk.uploadFile(file, targetSessionId || undefined);
       const fileMessage = createMessage('user', `📎 Uploaded: ${file.name}`, 'U');
       appendMessage(fileMessage);
       await refreshSessions();
@@ -129,7 +145,15 @@ export function useBrainboxChat(sdk: BrainboxReactSDK, initialSessionId?: string
   const uploadImage = useCallback(async (image: File) => {
     setError(null);
     try {
-      await sdk.uploadImage(image, sessionId || undefined);
+      let targetSessionId = sessionId;
+      if (!targetSessionId) {
+        const response = await sdk.createChatSession(image.name || 'Image upload');
+        targetSessionId = response?.session_id || null;
+        if (targetSessionId) {
+          setSessionId(targetSessionId);
+        }
+      }
+      await sdk.uploadImage(image, targetSessionId || undefined);
       const imageMessage = createMessage('user', `🖼️ Uploaded: ${image.name}`, 'U');
       appendMessage(imageMessage);
       await refreshSessions();
@@ -140,17 +164,9 @@ export function useBrainboxChat(sdk: BrainboxReactSDK, initialSessionId?: string
 
   const createSession = useCallback(async (title?: string) => {
     setError(null);
-    try {
-      const response = await sdk.createChatSession(title);
-      if (response?.session_id) {
-        setSessionId(response.session_id);
-        setMessages([]);
-        await refreshSessions();
-      }
-    } catch (err: any) {
-      setError(err?.message || 'Unable to create session');
-    }
-  }, [refreshSessions, sdk]);
+    setMessages([]);
+    setSessionId(null);
+  }, []);
 
   const loadSession = useCallback(async (sid: string) => {
     setError(null);

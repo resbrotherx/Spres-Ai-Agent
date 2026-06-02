@@ -11,9 +11,17 @@ from app.schemas.chat import (
 )
 from app.agents.graph import graph
 from app.utils.logging import logger
-from app.redis_cache.cache import get_cache, set_cache, cache_key
+from app.redis_cache.cache import get_cache, set_cache, delete_cache, cache_key
 
 router = APIRouter()
+
+def is_invalid_cached_response(response: str) -> bool:
+    value = (response or "").strip().lower()
+    return (
+        not value
+        or value.startswith("error:")
+        or "temporary failure in name resolution" in value
+    )
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
@@ -37,6 +45,17 @@ async def chat(
 
         cache_k = cache_key(tenant_id, "chat", question[:50])
         cached_response = get_cache(cache_k)
+
+        if cached_response:
+            cached_text = (
+                cached_response.get("response", "")
+                if isinstance(cached_response, dict)
+                else str(cached_response)
+            )
+            if is_invalid_cached_response(cached_text):
+                logger.warning(f"Ignoring invalid cached chat response for question: {question[:50]}")
+                delete_cache(cache_k)
+                cached_response = None
 
         if cached_response:
             logger.info(f"Cache hit for question: {question[:50]}")
@@ -85,7 +104,8 @@ async def chat(
             "session_id": session_id
         }
 
-        set_cache(cache_k, cache_data, ttl=3600)
+        if not is_invalid_cached_response(cache_data["response"]):
+            set_cache(cache_k, cache_data, ttl=3600)
 
         if session_id:
             user_message = ChatMessageModel(
@@ -182,6 +202,7 @@ def get_sessions_grouped_by_date(tenant_id: str, db: Session) -> SessionsGrouped
     return SessionsGroupedByDate(**grouped)
 
 @router.post("/chat/sessions", response_model=SessionsGroupedByDate)
+@router.post("/sessions", response_model=SessionsGroupedByDate, include_in_schema=False)
 async def list_chat_sessions(
     payload: ChatSessionsListRequest,
     db: Session = Depends(get_db)

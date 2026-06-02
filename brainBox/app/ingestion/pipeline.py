@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+import json
 from app.chunkers.logs import chunk_logs
 from app.chunkers.code import chunk_code
 from app.chunkers.json import chunk_json
@@ -79,7 +80,7 @@ def process_document(payload: dict):
                         content=chunk,
                         content_hash=content_hash,
                         embedding=embedding,
-                        metadata=payload.get("metadata")
+                        doc_metadata=json.dumps(payload.get("metadata") or {})
                     )
 
                     db.add(document)

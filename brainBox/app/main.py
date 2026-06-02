@@ -21,26 +21,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"],
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:4173",
-        "http://127.0.0.1:4173",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://165.227.77.33:8000",
-        "http://165.227.77.33",
-        "https://165.227.77.33",
-        "http://port.smartpowerbilling.com",
-        "https://port.smartpowerbilling.com",
-    ],
+    # allow_origins=[
+    #     "http://localhost:4173",
+    #     "http://127.0.0.1:4173",
+    #     "http://localhost:5173",
+    #     "http://127.0.0.1:5173",
+    #     "http://165.227.77.33:8000",
+    #     "http://165.227.77.33",
+    #     "https://165.227.77.33",
+    #     "http://port.smartpowerbilling.com",
+    #     "https://port.smartpowerbilling.com",
+    # ],
+    allow_origins=["*"],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

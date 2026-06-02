@@ -44,6 +44,7 @@ def postgres_node(state: AgentState) -> AgentState:
 
 def response_node(state: AgentState) -> AgentState:
     from app.llm.ollama_client import ask_ollama_sync
+    from app.llm.openai_client import ask_openai_sync
 
     context = "\n".join(state["context"][:3]) if state["context"] else "No context found"
     question = state["question"]
@@ -58,9 +59,27 @@ User Question: {question}
 Provide a helpful, accurate response based on the context."""
 
     response = ask_ollama_sync(prompt)
+    reasoning = "Used semantic search and Ollama LLM for response"
+
+    if not response:
+        response = ask_openai_sync(prompt)
+        reasoning = "Used semantic search and OpenAI LLM for response"
+
+    if not response:
+        if state["context"]:
+            response = (
+                "I found relevant knowledge-base context, but the AI model service is currently "
+                "unavailable. Please check the Ollama/OpenAI configuration and try again."
+            )
+        else:
+            response = (
+                "I could not find matching knowledge-base context, and the AI model service is "
+                "currently unavailable. Please check the Ollama/OpenAI configuration and try again."
+            )
+        reasoning = "LLM unavailable; returned fallback instead of raw infrastructure error"
 
     return {
         **state,
         "response": response,
-        "reasoning": "Used semantic search and Ollama LLM for response"
+        "reasoning": reasoning
     }
