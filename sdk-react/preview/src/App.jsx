@@ -1,10 +1,10 @@
 import React from 'react';
-import { BrainboxReactSDK, ChatPanel, ChatWidget } from 'spres-react';
+import { BrainboxReactSDK, ChatPanel, ChatWidget } from '../../dist';
 
 const sdk = new BrainboxReactSDK(
-  'http://165.227.77.33:8000/',
-  'demo_api_key',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpcmVzIiwidXNlcl9pZCI6MywiZXhwIjoxNzgwMjUwOTIxfQ.nLQZyweDAyD5g67mWBAijbnNOMNwuKQTzb2rFvxqjJs'
+  'https://port.smartpowerbilling.com/',
+  'nrIotFZODcy7dEucAaHlzbVUgTisn_6VGt8EkakUjC4',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpcmVzIiwidXNlcl9pZCI6MSwiZXhwIjoxNzgwNDM3NDcxfQ.uZ9r_fLKR-IUE6x3qlvrYl1bkYrcqHD6ou7SZuueBhE'
 );
 
 export default function App() {
