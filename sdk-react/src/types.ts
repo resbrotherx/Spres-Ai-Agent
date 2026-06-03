@@ -19,10 +19,28 @@ export interface CustomizationProps {
   primaryColor?: string;
   accentColor?: string;
   backgroundColor?: string;
+  border?: string;
+  borderRadius?: string;
 
   // Branding
   logoUrl?: string;
   logoText?: string;
+  data?: Record<string, any>;
+  manualData?: Record<string, any>;
+  user?: {
+    name?: string;
+    email?: string;
+    username?: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+    [key: string]: any;
+  };
+  bot?: {
+    name?: string;
+    avatarUrl?: string;
+    [key: string]: any;
+  };
 
   // Text customization
   headerText?: string;

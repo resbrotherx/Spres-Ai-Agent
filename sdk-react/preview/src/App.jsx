@@ -11,7 +11,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', background: '#F3F4F6'}}>
 
-      <div style={{ marginTop: '24px' }}>
+   
         <ChatWidget
           sdk={sdk}
           position="bottom-right"
@@ -36,7 +36,6 @@ export default function App() {
           // height="520px"
           design="support"
         />
-      </div>
     </div>
   );
 }

@@ -236,6 +236,11 @@ const chatPanelCss = `
   color: #111113;
   font-size: 14px;
   font-weight: 620;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
 }
 .bb-cortex-sessions {
   border-top: 1px solid #e4e3e8;
@@ -243,6 +248,9 @@ const chatPanelCss = `
   display: grid;
   gap: 17px;
   overflow: hidden;
+}
+.bb-cortex-sessions.is-hidden {
+  display: none;
 }
 // .bb-cortex-session-group {
 //   display: grid;
@@ -343,11 +351,13 @@ const chatPanelCss = `
   flex: 1;
   padding: 22px;
   min-width: 0;
+  min-height: 0; /* important */
   box-sizing: border-box;
 }
 .bb-cortex-card {
   min-height: 716px;
-  height: 100%;
+  height: 100%
+  max-height: calc(180vh - 44px);
   border-radius: 18px;
   background: #fff;
   box-shadow: 0 18px 45px rgba(17,17,20,.06);
@@ -355,6 +365,7 @@ const chatPanelCss = `
   padding: 28px;
   box-sizing: border-box;
   display: flex;
+  overflow: hidden;
   flex-direction: column;
 }
 .bb-cortex-topbar {
@@ -467,6 +478,20 @@ const chatPanelCss = `
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+.bb-cortex-panel.has-messages .bb-cortex-composer {
+  order: 3;
+  margin-top: 18px;
+  min-height: 132px;
+  flex-shrink: 0;
+}
+.bb-cortex-panel.has-messages .bb-cortex-chatlog {
+  order: 2;
+  margin-top: 20px;
+  max-height: none;
+}
+.bb-cortex-panel.has-messages .bb-cortex-bottom {
+  order: 4;
 }
 .bb-cortex-composer textarea {
   flex: 1;
@@ -612,12 +637,21 @@ const chatPanelCss = `
 }
 .bb-cortex-chatlog {
   width: min(100%, 748px);
-  margin: 42px auto 0;
-  display: grid;
+  margin: 20px auto 0;
+
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+
   flex: 1;
+  min-height: 0;
+
   overflow-y: auto;
-  max-height: 400px;
+  overflow-x: hidden;
+
+  padding-right: 6px;
+
+  scroll-behavior: smooth;
 }
 .bb-cortex-message {
   display: flex;
@@ -673,6 +707,7 @@ const chatPanelCss = `
   position: relative;
   color: #b4b1ba;
   font-size: 12px;
+  flex-shrink: 0;
 }
 .bb-cortex-bottom a {
   color: var(--bb-panel-accent);
@@ -954,10 +989,24 @@ function ChatPanel({
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [voiceError, setVoiceError] = useState("");
+  const [sessionSearch, setSessionSearch] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(true);
   const endRef = useRef(null);
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
-  const ui = useMemo(() => mergeData(defaultChatPanelData, manualData || data), [manualData, data]);
+  const sdkUser = useMemo(() => sdk.getUserProfile?.(), [sdk]);
+  const ui = useMemo(() => {
+    const merged = mergeData(defaultChatPanelData, manualData || data);
+    return {
+      ...merged,
+      brand: {
+        ...merged.brand,
+        name: logoText || merged.brand.name,
+        workspaceName: logoText || merged.brand.workspaceName
+      },
+      user: { ...merged.user, ...(sdkUser || {}) }
+    };
+  }, [data, logoText, manualData, sdkUser]);
 
   useEffect(() => {
     var _a;
@@ -1033,25 +1082,28 @@ function ChatPanel({
 
   const displayHeader = headerText || `How can I assist you today?`;
   const displaySidebarTitle = sidebarTitle || ui.brand.name;
-  const sessionGroups = sessions ? {
-    today: sessions.filter(s => {
+  const filteredSessions = (sessions || []).filter(session =>
+    (session.title || "").toLowerCase().includes(sessionSearch.trim().toLowerCase())
+  );
+  const sessionGroups = filteredSessions ? {
+    today: filteredSessions.filter(s => {
       const date = new Date(s.created_at);
       const today = new Date();
       return date.toDateString() === today.toDateString();
     }),
-    yesterday: sessions.filter(s => {
+    yesterday: filteredSessions.filter(s => {
       const date = new Date(s.created_at);
       const yesterday = new Date(Date.now() - 86400000);
       return date.toDateString() === yesterday.toDateString();
     }),
-    this_week: sessions.filter(s => {
+    this_week: filteredSessions.filter(s => {
       const date = new Date(s.created_at);
       const today = new Date();
       const yesterday = new Date(Date.now() - 86400000);
       const week = new Date(Date.now() - 604800000);
       return date >= week && date.toDateString() !== today.toDateString() && date.toDateString() !== yesterday.toDateString();
     }),
-    older: sessions.filter(s => {
+    older: filteredSessions.filter(s => {
       const date = new Date(s.created_at);
       const week = new Date(Date.now() - 604800000);
       return date < week;
@@ -1061,7 +1113,7 @@ function ChatPanel({
   return /* @__PURE__ */ jsxs(
     "div",
     {
-      className: "bb-cortex-panel",
+      className: `bb-cortex-panel ${messages.length > 0 ? "has-messages" : ""}`,
       "data-design": design,
       "data-session-id": sessionId || "",
       style: {
@@ -1083,14 +1135,14 @@ function ChatPanel({
           ] }),
           /* @__PURE__ */ jsxs("label", { className: "bb-cortex-search", children: [
             /* @__PURE__ */ jsx(Icon, { name: "search", size: 17 }),
-            /* @__PURE__ */ jsx("input", { type: "search", placeholder: "Search", "aria-label": "Search chats" }),
+            /* @__PURE__ */ jsx("input", { type: "search", value: sessionSearch, onChange: (event) => setSessionSearch(event.target.value), placeholder: "Search", "aria-label": "Search chats" }),
             /* @__PURE__ */ jsx("span", { className: "bb-cortex-command-key", children: /* @__PURE__ */ jsx(Icon, { name: "command", size: 18, strokeWidth: 1.6 }) })
           ] }),
-          /* @__PURE__ */ jsx("nav", { className: "bb-cortex-nav", children: ui.navigation.map((item) => /* @__PURE__ */ jsxs("div", { className: "bb-cortex-nav-item", children: [
+          /* @__PURE__ */ jsx("nav", { className: "bb-cortex-nav", children: ui.navigation.map((item) => /* @__PURE__ */ jsxs("button", { className: "bb-cortex-nav-item", type: "button", onClick: item.icon === "history" ? () => setHistoryOpen(current => !current) : undefined, children: [
             /* @__PURE__ */ jsx(Icon, { name: item.icon, size: 18 }),
             item.label
           ] }, item.label)) }),
-          /* @__PURE__ */ jsx("div", { className: "bb-cortex-sessions", children: /* @__PURE__ */ jsxs(Fragment, { children: [
+          /* @__PURE__ */ jsx("div", { className: `bb-cortex-sessions ${historyOpen ? "" : "is-hidden"}`, children: /* @__PURE__ */ jsxs(Fragment, { children: [
             sessionGroups.today.length > 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-session-group", children: [
               /* @__PURE__ */ jsx("div", { className: "bb-cortex-session-label", children: "Today" }),
               sessionGroups.today.map((session) => /* @__PURE__ */ jsx("button", { className: `bb-cortex-session-item ${session.session_id === sessionId ? "active" : ""}`, type: "button", onClick: () => loadSession(session.session_id), children: session.title }, session.session_id))

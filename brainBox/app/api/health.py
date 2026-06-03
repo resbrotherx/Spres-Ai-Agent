@@ -34,3 +34,35 @@ async def health_check_cache():
     except Exception as e:
         logger.error(f"Cache health check failed: {str(e)}")
         return {"status": "unhealthy", "cache": "disconnected", "error": str(e)}
+
+@router.get("/health/vector")
+async def health_check_vector(db: Session = Depends(get_db)):
+    result = {
+        "status": "healthy",
+        "database": "connected",
+        "pgvector": "unknown",
+        "documents": 0,
+        "embedding": "unknown",
+        "embedding_dimension": None,
+    }
+
+    try:
+        extension = db.execute(
+            text("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
+        ).scalar()
+        result["pgvector"] = "installed" if extension else "missing"
+        result["pgvector_version"] = extension
+
+        result["documents"] = db.execute(text("SELECT COUNT(*) FROM documents")).scalar() or 0
+
+        from app.embeddings.generator import generate_embedding
+
+        embedding = generate_embedding("health check")
+        result["embedding"] = "working"
+        result["embedding_dimension"] = len(embedding or [])
+        return result
+    except Exception as e:
+        logger.error(f"Vector health check failed: {str(e)}")
+        result["status"] = "unhealthy"
+        result["error"] = str(e)
+        return result

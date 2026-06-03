@@ -78,7 +78,7 @@
           session_id: sessionId
         };
 
-        const response = await fetch(`${this.apiUrl}/api/chat/stream`, {
+        const response = await fetch(`${this.apiUrl}/api/chat/`, {
           method: 'POST',
           headers: buildHeaders(this.apiKey),
           body: JSON.stringify(payload)

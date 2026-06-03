@@ -5,7 +5,8 @@ import { useBrainboxChat } from "./useBrainboxChat";
 const defaultChatWidgetData = {
   brand: {
     name: "Omago Digital Teammate",
-    subtitle: "We help companies provide instant"
+    subtitle: "We help companies provide instant",
+    logoUrl: ""
   },
   bot: {
     name: "Omago",
@@ -28,7 +29,7 @@ const defaultChatWidgetData = {
   userReply: '"Yes, I am ready to chat with Omega Service."',
   modes: [
     { icon: "chat", label: "Chat" },
-    { icon: "voice", label: "Voise" }
+    { icon: "voice", label: "Voice" }
   ],
   composer: {
     placeholder: "Type message...",
@@ -53,16 +54,13 @@ const chatWidgetCss = `
   height: min(var(--bb-widget-height), calc(100vh - 82px));
   max-height: calc(100vh - 82px);
   min-height: 0;
-  border-radius: 22px;
+  border-radius: var(--bb-widget-radius);
   overflow: hidden;
   position: relative;
   display: flex;
   flex-direction: column;
-  border: 2px solid rgba(255, 255, 255, .82);
-  background:
-    radial-gradient(circle at 18% 0%, rgba(220, 170, 255, .32), transparent 28%),
-    radial-gradient(circle at 100% 90%, rgba(255, 255, 255, .9), transparent 28%),
-    linear-gradient(180deg, #fffaff 0%, #fbf1ff 42%, #f8e8ff 100%);
+  border: var(--bb-widget-border);
+  background: var(--bb-widget-panel);
   box-shadow:
     0 34px 90px rgba(82, 35, 108, .24),
     inset 0 0 0 1px rgba(255,255,255,.7);
@@ -113,6 +111,14 @@ const chatWidgetCss = `
     radial-gradient(circle at 50% 50%, #d987ff 0 14%, #b334ff 42%, #8e31dc 66%, rgba(142,49,220,.05) 71%);
   box-shadow: 0 0 31px rgba(181, 56, 255, .88), inset 0 0 18px rgba(255,255,255,.25);
 }
+.bb-omago-logo img,
+.bb-omago-avatar-logo img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  display: block;
+}
 .bb-omago-logo {
   width: 38px;
   height: 38px;
@@ -129,6 +135,10 @@ const chatWidgetCss = `
   border-radius: 999px;
   background: #fff;
   clip-path: polygon(0 50%, 53% 15%, 100% 0, 100% 100%, 53% 85%);
+}
+.bb-omago-logo.has-image::before,
+.bb-omago-avatar-logo.has-image::before {
+  display: none;
 }
 .bb-omago-close,
 .bb-omago-floating-close,
@@ -318,7 +328,7 @@ const chatWidgetCss = `
   font-weight: 760;
   cursor: pointer;
 }
-.bb-omago-mode:first-child {
+.bb-omago-mode.is-active {
   background: rgba(255,255,255,.42);
   box-shadow: 0 10px 30px rgba(156, 71, 216, .08);
 }
@@ -327,12 +337,36 @@ const chatWidgetCss = `
   gap: 12px;
 }
 .bb-omago-live-message {
-  display: flex;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
 }
 .bb-omago-live-message.is-user {
+  grid-template-columns: minmax(0, 1fr) 34px;
+}
+.bb-omago-live-copy {
+  min-width: 0;
+}
+.bb-omago-live-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 0 0 4px;
+  color: rgba(12,12,16,.72);
+  font-size: 12px;
+  font-weight: 800;
+}
+.bb-omago-live-meta time {
+  color: rgba(12,12,16,.42);
+  font-size: 10.5px;
+  font-weight: 720;
+}
+.bb-omago-live-message.is-user .bb-omago-live-meta {
   justify-content: flex-end;
 }
-.bb-omago-live-message span {
+.bb-omago-live-bubble {
+  display: block;
   max-width: min(76%, 230px);
   padding: 8px 10px;
   border-radius: 14px 14px 14px 6px;
@@ -341,10 +375,20 @@ const chatWidgetCss = `
   font-size: 12.5px;
   line-height: 1.45;
 }
-.bb-omago-live-message.is-user span {
+.bb-omago-live-message.is-user .bb-omago-live-bubble {
+  margin-left: auto;
   border-radius: 14px 14px 6px 14px;
   color: #fff;
   background: var(--bb-widget-purple);
+}
+.bb-omago-file-input {
+  display: none;
+}
+.bb-omago-recording {
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 760;
+  margin-top: 8px;
 }
 .bb-omago-composer {
   min-height: 88px;
@@ -559,6 +603,13 @@ function PersonAvatar({ person }) {
   const initials = ((person == null ? void 0 : person.name) || "KM").split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
   return /* @__PURE__ */ jsx("span", { className: "bb-omago-person-avatar", children: (person == null ? void 0 : person.avatarUrl) ? /* @__PURE__ */ jsx("img", { src: person.avatarUrl, alt: "" }) : initials });
 }
+function formatTime(timestamp) {
+  try {
+    return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  } catch {
+    return '';
+  }
+}
 function ManualTranscript({ ui, onQuickAction }) {
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsxs("div", { className: "bb-omago-assistant", children: [
@@ -584,10 +635,19 @@ function ManualTranscript({ ui, onQuickAction }) {
     ] })
   ] });
 }
-function LiveTranscript({ messages }) {
+function LiveTranscript({ messages, ui }) {
   return /* @__PURE__ */ jsx("div", { className: "bb-omago-live-list", children: messages.map((message) => {
     const isUser = message.role === "user";
-    return /* @__PURE__ */ jsx("div", { className: `bb-omago-live-message ${isUser ? "is-user" : ""}`, children: /* @__PURE__ */ jsx("span", { children: message.text }) }, message.id);
+    const person = isUser ? ui.user : ui.bot;
+    const avatar = /* @__PURE__ */ jsx(PersonAvatar, { person });
+    const copy = /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-copy", children: [
+      /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-meta", children: [
+        isUser ? (ui.user.name || "You") : (ui.bot.name || "AI Agent"),
+        /* @__PURE__ */ jsx("time", { children: formatTime(message.timestamp) })
+      ] }),
+      /* @__PURE__ */ jsx("span", { className: "bb-omago-live-bubble", children: message.text })
+    ] });
+    return /* @__PURE__ */ jsxs("div", { className: `bb-omago-live-message ${isUser ? "is-user" : ""}`, children: isUser ? [copy, avatar] : [avatar, copy] }, message.id);
   }) });
 }
 function ChatWidget({
@@ -600,16 +660,40 @@ function ChatWidget({
   placeholder = void 0,
   width = "320px",
   height = "480px",
+  borderRadius = "22px",
+  border = "2px solid rgba(255, 255, 255, .82)",
   defaultOpen = false,
   design = "omago",
+  logoUrl = void 0,
+  logoText = void 0,
+  user = void 0,
+  bot = void 0,
   data = void 0,
   manualData = void 0
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [input, setInput] = useState("");
-  const { messages, loading, error, sendMessage } = useBrainboxChat(sdk);
+  const [mode, setMode] = useState("chat");
+  const [recording, setRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [voiceError, setVoiceError] = useState("");
+  const { messages, loading, error, sendMessage, sendVoiceNote, uploadFile } = useBrainboxChat(sdk);
   const endRef = useRef(null);
-  const ui = useMemo(() => mergeData(defaultChatWidgetData, manualData || data), [manualData, data]);
+  const fileInputRef = useRef(null);
+  const sdkUser = useMemo(() => sdk.getUserProfile?.(), [sdk]);
+  const ui = useMemo(() => {
+    const merged = mergeData(defaultChatWidgetData, manualData || data);
+    return {
+      ...merged,
+      brand: {
+        ...merged.brand,
+        name: logoText || merged.brand.name,
+        logoUrl: logoUrl || merged.brand.logoUrl
+      },
+      bot: { ...merged.bot, ...(bot || {}) },
+      user: { ...merged.user, ...(sdkUser || {}), ...(user || {}) }
+    };
+  }, [bot, data, logoText, logoUrl, manualData, sdkUser, user]);
   const positionStyle = useMemo(() => {
     const base = {
       position: "fixed",
@@ -636,8 +720,45 @@ function ChatWidget({
   }, [messages, open]);
   const handleSend = async () => {
     if (!input.trim()) return;
+    setVoiceError("");
     await sendMessage(input.trim());
     setInput("");
+  };
+  const handleFileSelect = async (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      await uploadFile(file);
+      event.target.value = "";
+    }
+  };
+  const handleVoice = async () => {
+    setVoiceError("");
+    if (recording) {
+      mediaRecorder?.stop();
+      return;
+    }
+    try {
+      const canUseMicrophone = typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia;
+      if (!canUseMicrophone) {
+        const secureHint = typeof window !== "undefined" && !window.isSecureContext ? " Microphone recording requires HTTPS or localhost." : "";
+        throw new Error(`Microphone recording is not available in this browser context.${secureHint}`);
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+      recorder.onstart = () => setRecording(true);
+      recorder.ondataavailable = (event) => chunks.push(event.data);
+      recorder.onstop = async () => {
+        setRecording(false);
+        stream.getTracks().forEach(track => track.stop());
+        await sendVoiceNote(new Blob(chunks, { type: 'audio/webm' }));
+      };
+      setMediaRecorder(recorder);
+      recorder.start();
+    } catch (err) {
+      setRecording(false);
+      setVoiceError(err?.message || "Microphone access was denied.");
+    }
   };
   const fillComposer = (value) => {
     setInput(value.replace(/\\u\\{[0-9A-Fa-f]+\\}/g, "").trim());
@@ -653,6 +774,8 @@ function ChatWidget({
         "--bb-widget-purple": primaryColor,
         "--bb-widget-ink": accentColor,
         "--bb-widget-panel": backgroundColor,
+        "--bb-widget-radius": borderRadius,
+        "--bb-widget-border": border,
         "--bb-widget-height": height
       },
       children: [
@@ -660,7 +783,7 @@ function ChatWidget({
         open ? /* @__PURE__ */ jsxs(Fragment, { children: [
           /* @__PURE__ */ jsxs("section", { className: "bb-omago-panel", "aria-label": ui.brand.name, children: [
             /* @__PURE__ */ jsxs("header", { className: "bb-omago-header", children: [
-              /* @__PURE__ */ jsx("span", { className: "bb-omago-logo", "aria-hidden": "true" }),
+              /* @__PURE__ */ jsx("span", { className: `bb-omago-logo ${ui.brand.logoUrl ? "has-image" : ""}`, "aria-hidden": "true", children: ui.brand.logoUrl ? /* @__PURE__ */ jsx("img", { src: ui.brand.logoUrl, alt: "" }) : null }),
               /* @__PURE__ */ jsxs("div", { className: "bb-omago-header-copy", children: [
                 /* @__PURE__ */ jsx("h2", { className: "bb-omago-title", children: ui.brand.name }),
                 /* @__PURE__ */ jsx("div", { className: "bb-omago-subtitle", children: ui.brand.subtitle })
@@ -669,13 +792,13 @@ function ChatWidget({
             ] }),
             /* @__PURE__ */ jsxs("div", { className: "bb-omago-body", children: [
               /* @__PURE__ */ jsxs("div", { className: "bb-omago-transcript", children: [
-                messages.length > 0 ? /* @__PURE__ */ jsx(LiveTranscript, { messages }) : /* @__PURE__ */ jsx(ManualTranscript, { ui, onQuickAction: fillComposer }),
+                messages.length > 0 ? /* @__PURE__ */ jsx(LiveTranscript, { messages, ui }) : /* @__PURE__ */ jsx(ManualTranscript, { ui, onQuickAction: fillComposer }),
                 /* @__PURE__ */ jsx("div", { ref: endRef })
               ] }),
-              /* @__PURE__ */ jsx("div", { className: "bb-omago-mode-switch", role: "tablist", "aria-label": "Conversation mode", children: ui.modes.map((mode) => /* @__PURE__ */ jsxs("button", { className: "bb-omago-mode", type: "button", children: [
-                /* @__PURE__ */ jsx(Icon, { name: mode.icon, size: 20, strokeWidth: 1.9 }),
-                mode.label
-              ] }, mode.label)) }),
+              /* @__PURE__ */ jsx("div", { className: "bb-omago-mode-switch", role: "tablist", "aria-label": "Conversation mode", children: ui.modes.map((item) => /* @__PURE__ */ jsxs("button", { className: `bb-omago-mode ${mode === item.icon ? "is-active" : ""}`, type: "button", onClick: () => setMode(item.icon), children: [
+                /* @__PURE__ */ jsx(Icon, { name: item.icon, size: 20, strokeWidth: 1.9 }),
+                item.label
+              ] }, item.label)) }),
               /* @__PURE__ */ jsxs("div", { className: "bb-omago-composer", children: [
                 /* @__PURE__ */ jsx(
                   "textarea",
@@ -688,19 +811,23 @@ function ChatWidget({
                         handleSend();
                       }
                     },
-                    placeholder: composerPlaceholder
+                    placeholder: mode === "voice" ? "Voice mode ready..." : composerPlaceholder
                   }
                 ),
                 /* @__PURE__ */ jsxs("div", { className: "bb-omago-composer-bar", children: [
-                  /* @__PURE__ */ jsx("button", { className: "bb-omago-tool", type: "button", "aria-label": "Attach file", children: /* @__PURE__ */ jsx(Icon, { name: "paperclip", size: 22, strokeWidth: 1.8 }) }),
+                  /* @__PURE__ */ jsxs("button", { className: "bb-omago-tool", type: "button", onClick: () => fileInputRef.current?.click(), "aria-label": "Attach file", children: [
+                    /* @__PURE__ */ jsx(Icon, { name: "paperclip", size: 22, strokeWidth: 1.8 }),
+                    /* @__PURE__ */ jsx("input", { ref: fileInputRef, className: "bb-omago-file-input", type: "file", onChange: handleFileSelect })
+                  ] }),
                   /* @__PURE__ */ jsx("button", { className: "bb-omago-tool", type: "button", "aria-label": "Emoji", children: /* @__PURE__ */ jsx(Icon, { name: "smile", size: 22, strokeWidth: 1.8 }) }),
                   /* @__PURE__ */ jsxs("button", { className: "bb-omago-search", type: "button", children: [
                     /* @__PURE__ */ jsx(Icon, { name: "search", size: 21, strokeWidth: 2.2 }),
                     ui.composer.searchLabel
                   ] }),
-                  /* @__PURE__ */ jsx("button", { className: "bb-omago-send", type: "button", onClick: handleSend, "aria-label": "Send message", children: /* @__PURE__ */ jsx(Icon, { name: "send", size: 22, strokeWidth: 2.1 }) })
+                  /* @__PURE__ */ jsx("button", { className: "bb-omago-send", type: "button", onClick: mode === "voice" ? handleVoice : handleSend, "aria-label": mode === "voice" ? recording ? "Stop recording" : "Record voice note" : "Send message", children: /* @__PURE__ */ jsx(Icon, { name: mode === "voice" ? "voice" : "send", size: 22, strokeWidth: 2.1 }) })
                 ] }),
-                error && /* @__PURE__ */ jsx("div", { className: "bb-omago-error", children: error }),
+                recording && /* @__PURE__ */ jsx("div", { className: "bb-omago-recording", children: "Recording..." }),
+                (error || voiceError) && /* @__PURE__ */ jsx("div", { className: "bb-omago-error", children: error || voiceError }),
                 loading && /* @__PURE__ */ jsx("span", { style: { display: "none" }, children: "Sending..." })
               ] })
             ] })

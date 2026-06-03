@@ -125,4 +125,24 @@ export class BrainboxReactSDK {
     const response = await this.client.get('/api/health');
     return response.data;
   }
+
+  getUserProfile(): any {
+    try {
+      const token = this.apiKey;
+      const payload = token?.split?.('.')[1];
+      if (!payload) return null;
+      const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+      const name = decoded.name || decoded.full_name || decoded.username || decoded.sub || 'User';
+      return {
+        name,
+        email: decoded.email || '',
+        username: decoded.username || decoded.sub || name,
+        firstName: decoded.first_name || decoded.given_name || '',
+        lastName: decoded.last_name || decoded.family_name || '',
+        avatarUrl: decoded.avatar_url || decoded.picture || ''
+      };
+    } catch {
+      return null;
+    }
+  }
 }
