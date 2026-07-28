@@ -1,5 +1,5 @@
 # Brainbox Web SDK
-
+<script src="https://port.smartpowerbilling.com/sdk/brainbox-web-sdk.js"></script>
 A plain JavaScript SDK and embeddable chat widget for non-React websites.
 
 ## What this is for

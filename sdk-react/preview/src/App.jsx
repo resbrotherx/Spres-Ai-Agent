@@ -1,6 +1,6 @@
 import React from 'react';
-import { BrainboxReactSDK, ChatPanel, ChatWidget } from '../../dist';
-
+//import { BrainboxReactSDK, ChatPanel, ChatWidget } from '../../dist';
+import { BrainboxReactSDK, ChatPanel, ChatWidget } from 'spres-react';
 const sdk = new BrainboxReactSDK(
   'https://port.smartpowerbilling.com/',
   '603e5575e143fd7e19c2aa208e9e66ca6c3817bc1ad8aec58766ba1ff4dd640b',

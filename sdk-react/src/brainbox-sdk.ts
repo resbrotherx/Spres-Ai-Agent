@@ -16,7 +16,7 @@ export class BrainboxReactSDK {
       baseURL: this.apiUrl,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
+        Authorization: `Bearer ${this.apiKey}`
       }
     });
   }
