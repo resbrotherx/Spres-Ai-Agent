@@ -21,6 +21,7 @@ def is_invalid_cached_response(response: str) -> bool:
         not value
         or value.startswith("error:")
         or "temporary failure in name resolution" in value
+        or "ai model service is currently unavailable" in value
     )
 
 @router.post("/chat", response_model=ChatResponse)
