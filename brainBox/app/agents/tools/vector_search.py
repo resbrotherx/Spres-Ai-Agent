@@ -49,11 +49,11 @@ def hybrid_search(query: str, tenant_id: str, limit: int = 5) -> List[Tuple]:
             content,
             source_type,
             file_path,
-            (embedding <=> :embedding) AS distance
+            (embedding <=> CAST(:embedding AS vector) AS distance
         FROM documents
         WHERE tenant_id = :tenant_id
             AND (content ILIKE :query OR file_path ILIKE :query)
-        ORDER BY embedding <=> :embedding
+        ORDER BY embedding <=> CAST(:embedding AS vector)
         LIMIT :limit
         """)
 

@@ -1,7 +1,7 @@
 # Brainbox Platform - Complete Documentation
 
 Professional guide for deploying Brainbox to your customers.
-
+npm run dev
 ---
 
 ## 📚 Documentation
