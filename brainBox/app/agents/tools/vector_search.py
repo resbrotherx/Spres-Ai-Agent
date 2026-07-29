@@ -4,10 +4,14 @@ from app.embeddings.generator import generate_embedding
 from app.db.session import SessionLocal
 from app.utils.logging import logger
 
+def _embedding_to_pgvector_literal(embedding: List[float]) -> str:
+    return "[" + ",".join(str(x) for x in embedding) + "]"
+
 def semantic_search(query: str, tenant_id: str, limit: int = 5) -> List[Tuple]:
     try:
         db = SessionLocal()
         embedding = generate_embedding(query)
+        embedding_literal = _embedding_to_pgvector_literal(embedding)
 
         sql = text("""
         SELECT
@@ -25,7 +29,7 @@ def semantic_search(query: str, tenant_id: str, limit: int = 5) -> List[Tuple]:
         results = db.execute(
             sql,
             {
-                "embedding": embedding,
+                "embedding": embedding_literal,
                 "tenant_id": tenant_id,
                 "limit": limit
             }
@@ -42,6 +46,7 @@ def hybrid_search(query: str, tenant_id: str, limit: int = 5) -> List[Tuple]:
     try:
         db = SessionLocal()
         embedding = generate_embedding(query)
+        embedding_literal = _embedding_to_pgvector_literal(embedding)
 
         sql = text("""
         SELECT
@@ -60,7 +65,7 @@ def hybrid_search(query: str, tenant_id: str, limit: int = 5) -> List[Tuple]:
         results = db.execute(
             sql,
             {
-                "embedding": embedding,
+                "embedding": embedding_literal,
                 "tenant_id": tenant_id,
                 "query": f"%{query}%",
                 "limit": limit
