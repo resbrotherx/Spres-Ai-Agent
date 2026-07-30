@@ -7,7 +7,8 @@ Type=simple
 User=root
 WorkingDirectory=/opt/brainbox-cli
 ExecStart=/usr/local/bin/brainbox-cli daemon --interval 60
-Restart=no
+Restart=on-failure
+RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
