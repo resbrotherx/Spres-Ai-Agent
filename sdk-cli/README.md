@@ -17,6 +17,8 @@ sudo systemctl enable --now brainbox-cli
 
 ### Build a .deb package locally
 ```bash
+sudo apt update
+sudo apt install fakeroot -y
 chmod +x build-deb.sh
 ./build-deb.sh
 sudo apt install ./brainbox-cli-1.0.0.deb
@@ -25,6 +27,8 @@ sudo systemctl enable --now brainbox-cli
 
 ### Build an RPM package locally
 ```bash
+sudo apt update
+sudo apt install fakeroot -y
 chmod +x build-rpm.sh
 ./build-rpm.sh
 sudo rpm -ivh brainbox-cli-1.0.0-1.x86_64.rpm

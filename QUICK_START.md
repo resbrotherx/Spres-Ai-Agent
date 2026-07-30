@@ -79,6 +79,7 @@ docker-compose ps
 
 # View logs
 docker-compose logs -f
+docker logs -f brainbox-api
 
 # Restart services
 docker-compose restart
@@ -91,6 +92,9 @@ celery -A app.celery_app.celery worker --loglevel=info
 
 # Run tests
 pytest tests/
+
+# Then flush existing bad cache entries so old ones don't linger for their remaining TTL:
+docker exec -it brainbox-redis redis-cli --scan --pattern "*chat*" | xargs docker exec -i brainbox-redis redis-cli DEL
 ```
 
 ## 📦 SDK Usage
