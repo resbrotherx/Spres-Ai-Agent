@@ -12,8 +12,9 @@ DEBIAN_DIR=$BUILD_DIR/DEBIAN
 rm -rf "$BUILD_DIR"
 mkdir -p "$TARGET_DIR" "$BIN_DIR" "$SYSTEMD_DIR" "$DEBIAN_DIR"
 
-# Copy the package source to /opt/brainbox-cli
-cp -r . "$TARGET_DIR"
+# Copy the package source to /opt/brainbox-cli, excluding build artifacts
+rsync -a --exclude='build' --exclude='__pycache__' --exclude='.git' \
+  ./ "$TARGET_DIR/"
 
 # Create executable wrapper
 cat > "$BIN_DIR/$PACKAGE_NAME" <<'EOF'
@@ -27,7 +28,7 @@ cp brainbox-cli.service "$SYSTEMD_DIR/"
 chmod 644 "$SYSTEMD_DIR/brainbox-cli.service"
 
 # Debian control file
-cat > "$DEBIAN_DIR/control" <<'EOF'
+cat > "$DEBIAN_DIR/control" <<EOF
 Package: $PACKAGE_NAME
 Version: $PACKAGE_VERSION
 Section: utils
