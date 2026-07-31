@@ -46,7 +46,10 @@ def response_node(state: AgentState) -> AgentState:
     from app.llm.ollama_client import ask_ollama_sync
     from app.llm.openai_client import ask_openai_sync
 
-    context = "\n".join(state["context"][:3]) if state["context"] else "No context found"
+    MAX_CHUNK_CHARS = 800
+    truncated_context = [c[:MAX_CHUNK_CHARS] for c in state["context"][:3]]
+    context = "\n".join(truncated_context) if truncated_context else "No context found"
+    # context = "\n".join(state["context"][:3]) if state["context"] else "No context found"
     question = state["question"]
 
     prompt = f"""You are a server infrastructure AI assistant.

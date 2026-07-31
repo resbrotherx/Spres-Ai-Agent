@@ -13,16 +13,36 @@ pip install brainbox-cli
 ```bash
 sudo apt install ./brainbox-cli.deb
 sudo systemctl enable --now brainbox-cli
+
+#Check it's running:
+sudo systemctl status brainbox-cli
+
+#View live activity:
+sudo journalctl -u brainbox-cli -f
+
+brainbox-cli --help
+
+sudo systemctl restart brainbox-cli
+
+sudo systemctl stop brainbox-cli
+sudo systemctl disable brainbox-cli
+sudo apt remove brainbox-cli
+sudo rm -f /etc/systemd/system/brainbox-cli.service
+sudo systemctl daemon-reload
 ```
 
 ### Build a .deb package locally
 ```bash
 sudo apt update
 sudo apt install fakeroot -y
+which rsync
+sudo apt install rsync -y
 chmod +x build-deb.sh
 ./build-deb.sh
 sudo apt install ./brainbox-cli-1.0.0.deb
 sudo systemctl enable --now brainbox-cli
+/root/.pyenv/shims/python3 -m pip install requests
+brainbox-cli --help
 ```
 
 ### Build an RPM package locally
