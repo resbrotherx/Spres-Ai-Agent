@@ -59,13 +59,26 @@ export class BrainboxReactSDK {
   ): Promise<void> {
     try {
       const result = await this.chat(question, sessionId);
-      onChunk(result.response || JSON.stringify(result));
+      const fullText = result.response || JSON.stringify(result);
+      const words = fullText.split(" ");
+      let acc = "";
+      for (let i = 0; i < words.length; i++) {
+        acc += (i === 0 ? "" : " ") + words[i];
+        onChunk(i === 0 ? acc : " " + words[i]);
+        await new Promise(r => setTimeout(r, 18)); // typing speed
+      }
       onComplete?.(result);
     } catch (error: any) {
-      const message = error?.message || 'Unknown stream error';
-      onError?.(new Error(message));
+      onError?.(new Error(error?.message || 'Unknown stream error'));
     }
   }
+  //     onChunk(result.response || JSON.stringify(result));
+  //     onComplete?.(result);
+  //   } catch (error: any) {
+  //     const message = error?.message || 'Unknown stream error';
+  //     onError?.(new Error(message));
+  //   }
+  // }
 
   async createChatSession(title?: string): Promise<any> {
     const payload: ChatSessionPayload = {

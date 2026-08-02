@@ -2,6 +2,8 @@
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBrainboxChat } from "./useBrainboxChat";
+import { MessageContent } from "./MessageContent";
+import { TypingIndicator } from "./co/TypingIndicator";
 
 const defaultChatPanelData = {
   brand: {
@@ -10,7 +12,7 @@ const defaultChatPanelData = {
     greetingName: "Jackson"
   },
   navigation: [
-    { icon: "globe", label: "Explore" },
+    // { icon: "globe", label: "Explore" },
     { icon: "library", label: "Library" },
     { icon: "files", label: "Files" },
     { icon: "history", label: "History" }
@@ -47,8 +49,8 @@ const defaultChatPanelData = {
     }
   ],
   footer: {
-    text: "Join the valerius community for more insights",
-    linkText: "Join Discord",
+    text: "",
+    linkText: "",
     href: "#"
   }
 };
@@ -60,7 +62,9 @@ const chatPanelCss = `
   --bb-panel-soft: #f8f4ff;
   --bb-panel-bg: #f3f3f5;
   width: 100%;
+  height: 760px;
   min-height: 760px;
+  max-height: 100vh;
   display: flex;
   overflow: hidden;
   border-radius: 20px;
@@ -69,17 +73,85 @@ const chatPanelCss = `
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
 }
+
+.bb-cortex-orb {
+  width: 128px;
+  height: 128px;
+  margin: 0 auto 8px;
+  border-radius: 999px;
+  object-fit: cover;
+  display: block;
+}
+  .bb-msg-content p { margin: 0 0 8px; }
+.bb-msg-content p:last-child { margin-bottom: 0; }
+.bb-msg-list { margin: 6px 0; padding-left: 20px; }
+.bb-msg-list li { margin-bottom: 4px; }
+.bb-code-block {
+  margin: 10px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #1e1e2e;
+  border: 1px solid #2e2e3e;
+}
+.bb-code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: #14141e;
+  color: #9d9db3;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.bb-code-copy {
+  border: 0;
+  background: transparent;
+  color: #b8b8d1;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.bb-code-copy:hover { background: rgba(255,255,255,.08); }
+.bb-code-block pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  font-family: "Fira Code", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #e4e4f0;
+}
+.bb-msg-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12.5px; }
+.bb-msg-table th, .bb-msg-table td { border: 1px solid rgba(0,0,0,.1); padding: 6px 8px; text-align: left; }
+.bb-msg-table th { background: rgba(0,0,0,.04); font-weight: 700; }
+// .bb-cortex-sidebar {
+//   width: 268px;
+//   flex: 0 0 268px;
+//   display: flex;
+//   flex-direction: column;
+//   gap: 18px;
+//   height: 100vh;
+//   position: fixed;
+//   padding: 22px 20px;
+//   background: #f1f1f2;
+//   border-right: 1px solid #e5e3ea;
+//   box-sizing: border-box;
+//   overflow-x: hidden; /* Stops horizontal side-to-side scrolling completely */
+//     overflow-y: auto; 
+// }
 .bb-cortex-sidebar {
   width: 268px;
   flex: 0 0 268px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 22px 20px;
+  gap: 5px;
+  padding: 10px 3px;
   background: #f1f1f2;
   border-right: 1px solid #e5e3ea;
   box-sizing: border-box;
-  overflow-y: auto;
+  overflow: hidden;
 }
 .bb-cortex-brand-row,
 .bb-cortex-nav-item,
@@ -141,11 +213,12 @@ const chatPanelCss = `
   place-items: center;
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 30% 25%, rgba(255,255,255,.95) 0 11%, transparent 12%),
-    radial-gradient(circle at 68% 30%, rgba(255,255,255,.9) 0 10%, transparent 11%),
-    linear-gradient(135deg, #d8c4ff, #a678f6 58%, #cbb3ff);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.5), 0 8px 18px rgba(163, 111, 244, .25);
+  background: var(--bb-panel-accent);
+  // background:
+  //   radial-gradient(circle at 30% 25%, rgba(255,255,255,.95) 0 11%, transparent 12%),
+  //   radial-gradient(circle at 68% 30%, rgba(255,255,255,.9) 0 10%, transparent 11%),
+  //   linear-gradient(135deg, #d8c4ff, #a678f6 58%, #cbb3ff);
+  // box-shadow: inset 0 0 0 1px rgba(255,255,255,.5), 0 8px 18px rgba(163, 111, 244, .25);
 }
 .bb-cortex-logo {
   width: 34px;
@@ -158,31 +231,31 @@ const chatPanelCss = `
   height: 26px;
   border-radius: 9px;
 }
-.bb-cortex-logo::before,
-.bb-cortex-small-logo::before {
-  content: "";
-  width: 52%;
-  height: 52%;
-  border-radius: 5px;
-  border: 2px solid rgba(255,255,255,.9);
-  box-sizing: border-box;
-}
-.bb-cortex-logo::after,
-.bb-cortex-small-logo::after {
-  content: "";
-  position: absolute;
-  width: 4px;
-  height: 78%;
-  border-radius: 999px;
-  background: rgba(255,255,255,.82);
-  box-shadow: 0 0 0 999px transparent;
-  transform: rotate(90deg);
-}
-@keyframes logoWiggle {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(2deg); }
-  75% { transform: rotate(-2deg); }
-}
+// .bb-cortex-logo::before,
+// .bb-cortex-small-logo::before {
+//   content: "";
+//   width: 52%;
+//   height: 52%;
+//   border-radius: 5px;
+//   border: 2px solid rgba(255,255,255,.9);
+//   box-sizing: border-box;
+// }
+// .bb-cortex-logo::after,
+// .bb-cortex-small-logo::after {
+//   content: "";
+//   position: absolute;
+//   width: 4px;
+//   height: 78%;
+//   border-radius: 999px;
+//   background: rgba(255,255,255,.82);
+//   box-shadow: 0 0 0 999px transparent;
+//   transform: rotate(90deg);
+// }
+// @keyframes logoWiggle {
+//   0%, 100% { transform: rotate(0deg); }
+//   25% { transform: rotate(2deg); }
+//   75% { transform: rotate(-2deg); }
+// }
 .bb-cortex-new-chat {
   width: 100%;
   height: 44px;
@@ -245,9 +318,11 @@ const chatPanelCss = `
 .bb-cortex-sessions {
   border-top: 1px solid #e4e3e8;
   padding-top: 16px;
-  display: grid;
+  //display: grid;
   gap: 17px;
-  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .bb-cortex-sessions.is-hidden {
   display: none;
@@ -355,14 +430,14 @@ const chatPanelCss = `
   box-sizing: border-box;
 }
 .bb-cortex-card {
-  min-height: 716px;
-  height: 100%
+  min-height: 0;
+  height: 100%;
   max-height: calc(180vh - 44px);
   border-radius: 18px;
   background: #fff;
   box-shadow: 0 18px 45px rgba(17,17,20,.06);
   border: 1px solid #ebe9ef;
-  padding: 28px;
+  padding: 5px;
   box-sizing: border-box;
   display: flex;
   overflow: hidden;
@@ -481,7 +556,7 @@ const chatPanelCss = `
 }
 .bb-cortex-panel.has-messages .bb-cortex-composer {
   order: 3;
-  margin-top: 18px;
+  margin-top: 1px;
   min-height: 132px;
   flex-shrink: 0;
 }
@@ -495,11 +570,11 @@ const chatPanelCss = `
 }
 .bb-cortex-composer textarea {
   flex: 1;
-  min-height: 78px;
+ // min-height: 78px;
   border: 0;
   resize: none;
   outline: none;
-  padding: 18px 18px 8px;
+  padding: 8px 18px 8px;
   color: #19191c;
   font-size: 15px;
   font-family: inherit;
@@ -509,7 +584,7 @@ const chatPanelCss = `
   color: #bbb9c1;
 }
 .bb-cortex-composer-tools {
-  min-height: 52px;
+  //min-height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -576,7 +651,7 @@ const chatPanelCss = `
   box-shadow: 0 0 0 4px rgba(239,68,68,.18), 0 9px 22px rgba(220,38,38,.25);
 }
 .bb-cortex-saved-row {
-  min-height: 45px;
+  //min-height: 45px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -600,7 +675,7 @@ const chatPanelCss = `
 }
 .bb-cortex-prompts {
   width: min(100%, 748px);
-  margin: 22px auto 0;
+  margin: auto;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
@@ -679,7 +754,7 @@ const chatPanelCss = `
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-width: 60%;
+  max-width: 93%;
 }
 .bb-cortex-message-time {
   font-size: 11px;
@@ -754,6 +829,34 @@ const chatPanelCss = `
   background: #dc2626;
   animation: pulseDot 2s infinite;
 }
+// .bb-cortex-sidebar.is-collapsed{
+//   width: 0;
+//   flex: 0 0 0;
+//   padding: 22px 0;
+//   overflow: hidden;
+// }
+.bb-cortex-sidebar.is-collapsed {
+  width: 56px;
+  flex: 0 0 56px;
+  padding: 22px 10px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+
+}
+.bb-cortex-sidebar.is-collapsed .bb-cortex-new-chat span,
+.bb-cortex-sidebar.is-collapsed .bb-cortex-brand-name,
+.bb-cortex-sidebar.is-collapsed .bb-cortex-search,
+.bb-cortex-sidebar.is-collapsed .bb-cortex-nav-item span,
+.bb-cortex-sidebar.is-collapsed .bb-cortex-sessions,
+.bb-cortex-sidebar.is-collapsed .bb-cortex-profile-copy {
+  display: none;
+}
+.bb-cortex-sidebar.is-collapsed .bb-cortex-new-chat {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -764,22 +867,59 @@ const chatPanelCss = `
 }
 @media (max-width: 980px) {
   .bb-cortex-panel {
-    min-height: 720px;
+    min-height: 100vh;
+    flex-direction: column;
   }
   .bb-cortex-sidebar {
-    display: none;
+    width: 100%;
+    flex: 0 0 auto;
+    max-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid #e5e3ea;
   }
   .bb-cortex-stage {
     padding: 12px;
   }
   .bb-cortex-card {
-    padding: 18px;
+    padding: 16px;
+    min-height: auto;
   }
   .bb-cortex-hero {
-    margin-top: 52px;
+    margin-top: 32px;
   }
   .bb-cortex-prompts {
     grid-template-columns: 1fr;
+  }
+  .bb-cortex-message-content {
+    max-width: 80%;
+  }
+}
+@media (max-width: 640px) {
+  .bb-cortex-panel {
+    border-radius: 0;
+  }
+  .bb-cortex-toolbar-right .bb-cortex-export-button,
+  .bb-cortex-toolbar-right .bb-cortex-upgrade-button {
+    display: none;
+  }
+  .bb-cortex-title {
+    margin-bottom: 24px;
+    font-size: clamp(22px, 6vw, 30px);
+  }
+  .bb-cortex-composer {
+    min-height: 150px;
+  }
+  .bb-cortex-composer-tools,
+  .bb-cortex-saved-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bb-cortex-footer-actions {
+    display: none;
+  }
+  .bb-cortex-message-content {
+    max-width: 92%;
   }
 }
 @media (max-width: 640px) {
@@ -797,6 +937,90 @@ const chatPanelCss = `
   .bb-cortex-footer-actions {
     display: none;
   }
+  .bb-cortex-panel.is-dark {
+  --bb-panel-bg: #16161a;
+  color: #f2f2f5;
+}
+.bb-cortex-panel.is-dark .bb-cortex-sidebar {
+  background: #1c1c22;
+  border-right-color: #2a2a32;
+}
+.bb-cortex-panel.is-dark .bb-cortex-card {
+  background: #1e1e24;
+  border-color: #2a2a32;
+}
+.bb-cortex-panel.is-dark .bb-cortex-brand-name,
+.bb-cortex-panel.is-dark .bb-cortex-profile-name,
+.bb-cortex-panel.is-dark .bb-cortex-nav-item,
+.bb-cortex-panel.is-dark .bb-cortex-session-item,
+.bb-cortex-panel.is-dark .bb-cortex-title,
+.bb-cortex-panel.is-dark .bb-cortex-sidebar-toggle {
+  color: #f2f2f5;
+}
+.bb-cortex-panel.is-dark .bb-cortex-search input,
+.bb-cortex-panel.is-dark .bb-cortex-composer,
+.bb-cortex-panel.is-dark .bb-cortex-workspace-picker,
+.bb-cortex-panel.is-dark .bb-cortex-icon-button,
+.bb-cortex-panel.is-dark .bb-cortex-export-button,
+.bb-cortex-panel.is-dark .bb-cortex-tool-button,
+.bb-cortex-panel.is-dark .bb-cortex-prompt-card,
+.bb-cortex-panel.is-dark .bb-cortex-profile,
+.bb-cortex-panel.is-dark .bb-cortex-saved-item {
+  background: #24242c;
+  border-color: #33333d;
+  color: #f2f2f5;
+}
+.bb-cortex-panel.is-dark .bb-cortex-composer textarea,
+.bb-cortex-panel.is-dark .bb-cortex-saved-item-text {
+  color: #f2f2f5;
+}
+.bb-cortex-panel.is-dark .bb-cortex-message-bubble {
+  background: #2a2a33;
+  color: #f0f0f4;
+}
+.bb-cortex-panel.is-dark .bb-cortex-session-item:hover {
+  background: rgba(255,255,255,.06);
+}
+.bb-cortex-panel.is-dark .bb-cortex-profile-email {
+  color: #9a98a3;
+}
+  .bb-cortex-saved-list {
+  width: min(100%, 748px);
+  margin: 8px auto 0;
+  display: grid;
+  gap: 6px;
+}
+.bb-cortex-saved-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #eceaf0;
+  border-radius: 10px;
+  background: #fff;
+}
+.bb-cortex-saved-item-text {
+  flex: 1;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  color: #1c1c1f;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.bb-cortex-saved-item-remove {
+  border: 0;
+  background: transparent;
+  color: #b0aeb6;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.bb-cortex-saved-item-remove:hover { color: #dc2626; }
 }
 `;
 
@@ -815,6 +1039,7 @@ function mergeData(base, overrides) {
 
 function Icon({ name, size = 18, strokeWidth = 1.9 }) {
   const paths = {
+    bookmark: /* @__PURE__ */ jsx("path", { d: "M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" }),
     plus: /* @__PURE__ */ jsx("path", { d: "M12 5v14M5 12h14" }),
     search: /* @__PURE__ */ jsx("path", { d: "m21 21-4.3-4.3M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z" }),
     command: /* @__PURE__ */ jsx("path", { d: "M9 9H5.8a2.8 2.8 0 1 1 2.8-2.8V18a2.8 2.8 0 1 1-2.8-2.8H18a2.8 2.8 0 1 1-2.8 2.8V5.8A2.8 2.8 0 1 1 18 8.6H9Z" }),
@@ -822,9 +1047,18 @@ function Icon({ name, size = 18, strokeWidth = 1.9 }) {
       /* @__PURE__ */ jsx("circle", { cx: "12", cy: "12", r: "9" }),
       /* @__PURE__ */ jsx("path", { d: "M3 12h18M12 3c2.3 2.5 3.4 5.5 3.4 9S14.3 18.5 12 21M12 3c-2.3 2.5-3.4 5.5-3.4 9S9.7 18.5 12 21" })
     ] }),
+    sun: /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx("circle", { cx: "12", cy: "12", r: "4" }),
+      /* @__PURE__ */ jsx("path", { d: "M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" })
+    ] }),
+    moon: /* @__PURE__ */ jsx("path", { d: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" }),
     library: /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx("path", { d: "M4 19.5V6.8A2.8 2.8 0 0 1 6.8 4H20v14H6.8A2.8 2.8 0 0 0 4 20.8" }),
       /* @__PURE__ */ jsx("path", { d: "M8 4v14" })
+    ] }),
+    send: /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx("path", { d: "m22 2-7 20-4-9-9-4Z" }),
+      /* @__PURE__ */ jsx("path", { d: "M22 2 11 13" })
     ] }),
     files: /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx("path", { d: "M4 19.5V8.4A2.4 2.4 0 0 1 6.4 6h3.1l2 2H18a2.4 2.4 0 0 1 2.4 2.4v9.1Z" }),
@@ -946,7 +1180,8 @@ function PanelMessage({ message }) {
   return /* @__PURE__ */ jsxs("div", { className: `bb-cortex-message ${isUser ? "is-user" : ""}`, children: [
     /* @__PURE__ */ jsx("div", { className: "bb-cortex-message-avatar", children: initials }),
     /* @__PURE__ */ jsxs("div", { className: "bb-cortex-message-content", children: [
-      /* @__PURE__ */ jsx("div", { className: "bb-cortex-message-bubble", children: message.text }),
+      // /* @__PURE__ */ jsx("div", { className: "bb-cortex-message-bubble", children: message.text })
+       <div className="bb-cortex-message-bubble"><MessageContent text={message.text} /></div>,
       /* @__PURE__ */ jsx("div", { className: "bb-cortex-message-time", children: formatTime(message.timestamp) })
     ] })
   ] }, message.id);
@@ -965,6 +1200,9 @@ function ChatPanel({
   manualData = void 0,
   logoUrl = void 0,
   logoText = void 0,
+  companyName = void 0,
+  avatarGifUrl = void 0,
+  user = void 0,
   newChatButtonText = "New chat",
   showExportButton = true,
   showFileUpload = true,
@@ -991,22 +1229,70 @@ function ChatPanel({
   const [voiceError, setVoiceError] = useState("");
   const [sessionSearch, setSessionSearch] = useState("");
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+   const [savedPrompts, setSavedPrompts] = useState([]);
+  const [showSavedPrompts, setShowSavedPrompts] = useState(false);
+
   const endRef = useRef(null);
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
+  
   const sdkUser = useMemo(() => sdk.getUserProfile?.(), [sdk]);
+ 
   const ui = useMemo(() => {
-    const merged = mergeData(defaultChatPanelData, manualData || data);
-    return {
-      ...merged,
-      brand: {
-        ...merged.brand,
-        name: logoText || merged.brand.name,
-        workspaceName: logoText || merged.brand.workspaceName
-      },
-      user: { ...merged.user, ...(sdkUser || {}) }
+      const merged = mergeData(defaultChatPanelData, manualData || data);
+      return {
+        ...merged,
+        brand: {
+          ...merged.brand,
+          name: companyName || logoText || merged.brand.name,
+          workspaceName: companyName || logoText || merged.brand.workspaceName
+        },
+        user: { ...merged.user, ...(sdkUser || {}), ...(user || {}) }
+      };
+    }, [companyName, data, logoText, manualData, sdkUser]);
+
+  const savedPromptsKey = `bb-saved-prompts-${ui.user.email || ui.user.name || "guest"}`;
+
+  
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(savedPromptsKey);
+      setSavedPrompts(raw ? JSON.parse(raw) : []);
+    } catch {
+      setSavedPrompts([]);
+    }
+  }, [savedPromptsKey]);
+
+  const persistPrompts = (list) => {
+    setSavedPrompts(list);
+    try {
+      localStorage.setItem(savedPromptsKey, JSON.stringify(list));
+    } catch {}
+  };
+
+  const handleSavePrompt = () => {
+    if (!input.trim() || savedPrompts.includes(input.trim())) return;
+    const next = savedPrompts.length >= 3
+      ? [...savedPrompts.slice(1), input.trim()]
+      : [...savedPrompts, input.trim()];
+    persistPrompts(next);
+  };
+
+  const handleRemovePrompt = (prompt) => {
+    persistPrompts(savedPrompts.filter(p => p !== prompt));
+  };
+  const handleCopyLink = async () => {
+      const url = `${window.location.origin}${window.location.pathname}?session=${sessionId || ""}`;
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {}
     };
-  }, [data, logoText, manualData, sdkUser]);
+  const handleIdeas = () => {
+    const idea = ui.promptCards[Math.floor(Math.random() * ui.promptCards.length)];
+    usePrompt(idea?.prompt || idea?.title);
+  };
 
   useEffect(() => {
     var _a;
@@ -1113,7 +1399,7 @@ function ChatPanel({
   return /* @__PURE__ */ jsxs(
     "div",
     {
-      className: `bb-cortex-panel ${messages.length > 0 ? "has-messages" : ""}`,
+      className: `bb-cortex-panel ${messages.length > 0 ? "has-messages" : ""} ${darkMode ? "is-dark" : ""}`,
       "data-design": design,
       "data-session-id": sessionId || "",
       style: {
@@ -1123,15 +1409,23 @@ function ChatPanel({
       },
       children: [
         /* @__PURE__ */ jsx("style", { children: chatPanelCss }),
-        /* @__PURE__ */ jsxs("aside", { className: "bb-cortex-sidebar", "aria-label": displaySidebarTitle, children: [
+        /* @__PURE__ */ jsxs("aside", { className: `bb-cortex-sidebar ${sidebarCollapsed ? "is-collapsed" : ""}`, "aria-label": displaySidebarTitle, children: [
           /* @__PURE__ */ jsxs("div", { className: "bb-cortex-brand-row", children: [
-            logoUrl ? /* @__PURE__ */ jsx("img", { src: logoUrl, alt: "", style: { width: "34px", height: "34px", borderRadius: "8px" } }) : /* @__PURE__ */ jsx("span", { className: "bb-cortex-logo", "aria-hidden": "true" }),
-            /* @__PURE__ */ jsx("div", { className: "bb-cortex-brand-name", children: logoText || ui.brand.name }),
-            /* @__PURE__ */ jsx("button", { className: "bb-cortex-sidebar-toggle", type: "button", "aria-label": "Collapse sidebar", children: /* @__PURE__ */ jsx(Icon, { name: "panel", size: 20 }) })
-          ] }),
+                logoUrl ? /* @__PURE__ */ jsx("img", {
+                  src: logoUrl, alt: "",
+                  style: { width: "34px", height: "34px", borderRadius: "8px", cursor: sidebarCollapsed ? "pointer" : "default" },
+                  onClick: sidebarCollapsed ? () => setSidebarCollapsed(false) : undefined
+                }) : /* @__PURE__ */ jsx("span", {
+                  className: "bb-cortex-logo", "aria-hidden": "true",
+                  style: { cursor: sidebarCollapsed ? "pointer" : "default" },
+                  onClick: sidebarCollapsed ? () => setSidebarCollapsed(false) : undefined
+                }),
+              !sidebarCollapsed && /* @__PURE__ */ jsx("div", { className: "bb-cortex-brand-name", children: logoText || ui.brand.name }),
+              !sidebarCollapsed && /* @__PURE__ */ jsx("button", { className: "bb-cortex-sidebar-toggle", type: "button", onClick: () => setSidebarCollapsed(true), "aria-label": "Collapse sidebar", children: /* @__PURE__ */ jsx(Icon, { name: "panel", size: 20 }) })
+            ] }),
           /* @__PURE__ */ jsxs("button", { className: "bb-cortex-new-chat", type: "button", onClick: () => createSession(newChatButtonText), children: [
             /* @__PURE__ */ jsx(Icon, { name: "plus", size: 18 }),
-            newChatButtonText
+            /* @__PURE__ */ jsx("span", { children: newChatButtonText })
           ] }),
           /* @__PURE__ */ jsxs("label", { className: "bb-cortex-search", children: [
             /* @__PURE__ */ jsx(Icon, { name: "search", size: 17 }),
@@ -1140,7 +1434,7 @@ function ChatPanel({
           ] }),
           /* @__PURE__ */ jsx("nav", { className: "bb-cortex-nav", children: ui.navigation.map((item) => /* @__PURE__ */ jsxs("button", { className: "bb-cortex-nav-item", type: "button", onClick: item.icon === "history" ? () => setHistoryOpen(current => !current) : undefined, children: [
             /* @__PURE__ */ jsx(Icon, { name: item.icon, size: 18 }),
-            item.label
+            /* @__PURE__ */ jsx("span", { children: item.label })
           ] }, item.label)) }),
           /* @__PURE__ */ jsx("div", { className: `bb-cortex-sessions ${historyOpen ? "" : "is-hidden"}`, children: /* @__PURE__ */ jsxs(Fragment, { children: [
             sessionGroups.today.length > 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-session-group", children: [
@@ -1178,7 +1472,7 @@ function ChatPanel({
             ] }),
             /* @__PURE__ */ jsxs("div", { className: "bb-cortex-toolbar-right", children: [
               /* @__PURE__ */ jsx("button", { className: "bb-cortex-sidebar-toggle", type: "button", "aria-label": "More actions", children: /* @__PURE__ */ jsx(Icon, { name: "more", size: 20 }) }),
-              /* @__PURE__ */ jsx("button", { className: "bb-cortex-icon-button", type: "button", "aria-label": "Copy link", children: /* @__PURE__ */ jsx(Icon, { name: "link", size: 18 }) }),
+              /* @__PURE__ */ jsx("button", { className: "bb-cortex-icon-button", type: "button", onClick: () => setDarkMode(d => !d), "aria-label": darkMode ? "Switch to light mode" : "Switch to dark mode", children: /* @__PURE__ */ jsx(Icon, { name: darkMode ? "sun" : "moon", size: 18 }) }),
               showExportButton && /* @__PURE__ */ jsxs("button", { className: "bb-cortex-export-button", type: "button", onClick: handleExport, children: [
                 /* @__PURE__ */ jsx(Icon, { name: "download", size: 17 }),
                 "Export"
@@ -1187,13 +1481,17 @@ function ChatPanel({
             ] })
           ] }),
           messages.length === 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-hero empty", children: [
-            /* @__PURE__ */ jsx("div", { className: "bb-cortex-orb", "aria-hidden": "true" }),
-            /* @__PURE__ */ jsxs("h1", { className: "bb-cortex-hello", children: [
-              "Hello, ",
-              ui.brand.greetingName
+              /* @__PURE__ */ jsx("img", {
+                className: "bb-cortex-orb",
+                src: avatarGifUrl || "https://media.giphy.com/media/xTiTnxpQ3ghPiB2Hp6/giphy.gif",
+                alt: "AI assistant"
+              }),
+              /* @__PURE__ */ jsxs("h1", { className: "bb-cortex-hello", children: [
+                "Hello, ",
+                ui.brand.greetingName
+              ] }),
+              /* @__PURE__ */ jsx("h2", { className: "bb-cortex-title", children: displayHeader })
             ] }),
-            /* @__PURE__ */ jsx("h2", { className: "bb-cortex-title", children: displayHeader })
-          ] }),
           /* @__PURE__ */ jsxs("div", { className: "bb-cortex-composer", children: [
             /* @__PURE__ */ jsx(
               "textarea",
@@ -1219,7 +1517,7 @@ function ChatPanel({
                   /* @__PURE__ */ jsx(Icon, { name: "image", size: 18 }),
                   /* @__PURE__ */ jsx("input", { ref: imageInputRef, type: "file", accept: "image/*", onChange: handleImageUpload })
                 ] }),
-                /* @__PURE__ */ jsx("button", { className: "bb-cortex-tool-button", type: "button", "aria-label": "Ideas", children: /* @__PURE__ */ jsx(Icon, { name: "bulb", size: 18 }) })
+                /* @__PURE__ */ jsx("button", { className: "bb-cortex-tool-button", type: "button", onClick: handleIdeas, "aria-label": "Ideas", children: /* @__PURE__ */ jsx(Icon, { name: "bulb", size: 18 }) })
               ] }),
               /* @__PURE__ */ jsxs("div", { className: "bb-cortex-chip-row", children: [
                 /* @__PURE__ */ jsx("button", { className: "bb-cortex-tool-button", type: "button", "aria-label": "Settings", children: /* @__PURE__ */ jsx(Icon, { name: "settings", size: 18 }) }),
@@ -1227,22 +1525,39 @@ function ChatPanel({
                   /* @__PURE__ */ jsx(Icon, { name: "paperclip", size: 18 }),
                   /* @__PURE__ */ jsx("input", { ref: fileInputRef, type: "file", onChange: handleFileUpload })
                 ] }),
-                showVoiceInput && /* @__PURE__ */ jsx("button", { className: `bb-cortex-mic-button ${recording ? "is-recording" : ""}`, type: "button", onClick: startVoiceRecording, "aria-label": recording ? "Stop recording" : "Start recording", children: /* @__PURE__ */ jsx(Icon, { name: "mic", size: 18 }) })
+                (showVoiceInput || input.trim()) && /* @__PURE__ */ jsx("button", {
+                  className: `bb-cortex-mic-button ${recording ? "is-recording" : ""}`,
+                  type: "button",
+                  onClick: input.trim() ? handleSend : startVoiceRecording,
+                  "aria-label": input.trim() ? "Send message" : (recording ? "Stop recording" : "Start recording"),
+                  children: /* @__PURE__ */ jsx(Icon, { name: input.trim() ? "send" : "mic", size: 18 })
+                })
               ] })
             ] }),
             /* @__PURE__ */ jsxs("div", { className: "bb-cortex-saved-row", children: [
-              /* @__PURE__ */ jsxs("span", { className: "bb-cortex-saved-left", children: [
-                /* @__PURE__ */ jsx(Icon, { name: "sparkle", size: 18 }),
-                recording ? /* @__PURE__ */ jsx("span", { className: "bb-cortex-recording", children: "Recording..." }) : ui.composer.savedPromptsLabel
-              ] }),
+            /* @__PURE__ */ jsxs("button", { className: "bb-cortex-saved-left", type: "button", onClick: () => setShowSavedPrompts(s => !s), style: { border: 0, background: "transparent", cursor: "pointer" }, children: [
+              /* @__PURE__ */ jsx(Icon, { name: "sparkle", size: 18 }),
+              recording ? /* @__PURE__ */ jsx("span", { className: "bb-cortex-recording", children: "Recording..." }) : `${ui.composer.savedPromptsLabel} (${savedPrompts.length}/3)`
+            ] }),
+            /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 8 }, children: [
+              /* @__PURE__ */ jsx("button", { className: "bb-cortex-tool-button", type: "button", onClick: handleSavePrompt, "aria-label": "Save current prompt", title: "Save current prompt", children: /* @__PURE__ */ jsx(Icon, { name: "bookmark", size: 16 }) }),
               /* @__PURE__ */ jsxs("button", { className: "bb-cortex-file-button", type: "button", onClick: handleSend, children: [
                 /* @__PURE__ */ jsx(Icon, { name: "paperclip", size: 16 }),
                 "Send"
               ] })
             ] })
           ] }),
+          showSavedPrompts && savedPrompts.length > 0 && /* @__PURE__ */ jsx("div", { className: "bb-cortex-saved-list", children: savedPrompts.map((p, i) => /* @__PURE__ */ jsxs("div", { className: "bb-cortex-saved-item", children: [
+            /* @__PURE__ */ jsx("button", { type: "button", className: "bb-cortex-saved-item-text", onClick: () => { usePrompt(p); setShowSavedPrompts(false); }, children: p }),
+            /* @__PURE__ */ jsx("button", { type: "button", className: "bb-cortex-saved-item-remove", onClick: () => handleRemovePrompt(p), "aria-label": "Remove", children: "\u00D7" })
+          ] }, i)) }),
+          ] }),
           messages.length > 0 && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-chatlog", children: [
             messages.map((message) => /* @__PURE__ */ jsx(PanelMessage, { message }, message.id)),
+            loading && /* @__PURE__ */ jsxs("div", { className: "bb-cortex-message", children: [
+              /* @__PURE__ */ jsx("div", { className: "bb-cortex-message-avatar", children: "A" }),
+              /* @__PURE__ */ jsx("div", { className: "bb-cortex-message-content", children: /* @__PURE__ */ jsx(TypingIndicator, { label: "Searching knowledge base..." }) })
+            ] }),
             /* @__PURE__ */ jsx("div", { ref: endRef })
           ] }),
           (error || voiceError) && /* @__PURE__ */ jsx("div", { className: "bb-cortex-error", children: error || voiceError }),
@@ -1253,17 +1568,17 @@ function ChatPanel({
               /* @__PURE__ */ jsx("span", { children: card.description })
             ] })
           ] }, card.title)) }),
-          messages.length > 0 && /* @__PURE__ */ jsxs("footer", { className: "bb-cortex-bottom", children: [
-            /* @__PURE__ */ jsxs("span", { children: [
-              ui.footer.text,
-              " ",
-              /* @__PURE__ */ jsx("a", { href: ui.footer.href, children: ui.footer.linkText })
-            ] }),
-            /* @__PURE__ */ jsxs("div", { className: "bb-cortex-footer-actions", children: [
-              /* @__PURE__ */ jsx("button", { className: "bb-cortex-round-footer", type: "button", "aria-label": "Translate", children: /* @__PURE__ */ jsx(Icon, { name: "language", size: 18 }) }),
-              /* @__PURE__ */ jsx("button", { className: "bb-cortex-round-footer", type: "button", "aria-label": "Help", children: /* @__PURE__ */ jsx(Icon, { name: "question", size: 18 }) })
-            ] })
-          ] }),
+          // messages.length > 0 && /* @__PURE__ */ jsxs("footer", { className: "bb-cortex-bottom", children: [
+          //   /* @__PURE__ */ jsxs("span", { children: [
+          //     ui.footer.text,
+          //     " ",
+          //     /* @__PURE__ */ jsx("a", { href: ui.footer.href, children: ui.footer.linkText })
+          //   ] }),
+          //   /* @__PURE__ */ jsxs("div", { className: "bb-cortex-footer-actions", children: [
+          //     /* @__PURE__ */ jsx("button", { className: "bb-cortex-round-footer", type: "button", "aria-label": "Translate", children: /* @__PURE__ */ jsx(Icon, { name: "language", size: 18 }) }),
+          //     /* @__PURE__ */ jsx("button", { className: "bb-cortex-round-footer", type: "button", "aria-label": "Help", children: /* @__PURE__ */ jsx(Icon, { name: "question", size: 18 }) })
+          //   ] })
+          // ] }),
           loading && /* @__PURE__ */ jsx("span", { style: { display: "none" }, children: "Sending..." })
         ] }) })
       ]

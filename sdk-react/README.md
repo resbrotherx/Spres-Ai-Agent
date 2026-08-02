@@ -188,6 +188,9 @@ npm publish --access public
 npm install spres-react
 # or
 yarn add spres-react
+
+npm run dev
+npm run build
 ```
 
 ## Notes

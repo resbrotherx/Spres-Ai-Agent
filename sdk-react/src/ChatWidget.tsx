@@ -2,14 +2,17 @@
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBrainboxChat } from "./useBrainboxChat";
+import { MessageContent } from "./MessageContent";
+import { TypingIndicator } from "./co/TypingIndicator";
+
 const defaultChatWidgetData = {
   brand: {
-    name: "Omago Digital Teammate",
+    name: "Spres Ai",
     subtitle: "We help companies provide instant",
     logoUrl: ""
   },
   bot: {
-    name: "Omago",
+    name: "Spres Ai",
     time: "12:31 Pm",
     avatarUrl: ""
   },
@@ -19,21 +22,21 @@ const defaultChatWidgetData = {
     avatarUrl: ""
   },
   introMessages: [
-    "Hi\u{1F44B} King Mak! We help companies provide instant, accurate, and on-brand responses to their clients 24/7.",
+    "Hi\u{1F44B} {{name}}! We help companies provide instant, accurate, and on-brand responses to their clients 24/7.",
     "Here are a few ways I can assist you right now."
   ],
   quickActions: [
     "Learns your products & policies \u{1F449}",
-    "Chat with Omago services \u{1F5E8}"
+    "Chat with Spres Ai services \u{1F5E8}"
   ],
-  userReply: '"Yes, I am ready to chat with Omega Service."',
+  userReply: '"Yes, I am ready to chat with Spres Ai Service."',
   modes: [
     { icon: "chat", label: "Chat" },
     { icon: "voice", label: "Voice" }
   ],
   composer: {
     placeholder: "Type message...",
-    searchLabel: "Deep Search"
+    searchLabel: "History"
   }
 };
 const chatWidgetCss = `
@@ -49,6 +52,50 @@ const chatWidgetCss = `
   align-items: flex-end;
   gap: 16px;
 }
+  .bb-msg-content p { margin: 0 0 8px; }
+.bb-msg-content p:last-child { margin-bottom: 0; }
+.bb-msg-list { margin: 6px 0; padding-left: 20px; }
+.bb-msg-list li { margin-bottom: 4px; }
+.bb-code-block {
+  margin: 10px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #1e1e2e;
+  border: 1px solid #2e2e3e;
+}
+.bb-code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: #14141e;
+  color: #9d9db3;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.bb-code-copy {
+  border: 0;
+  background: transparent;
+  color: #b8b8d1;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.bb-code-copy:hover { background: rgba(255,255,255,.08); }
+.bb-code-block pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  font-family: "Fira Code", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #e4e4f0;
+}
+.bb-msg-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12.5px; }
+.bb-msg-table th, .bb-msg-table td { border: 1px solid rgba(0,0,0,.1); padding: 6px 8px; text-align: left; }
+.bb-msg-table th { background: rgba(0,0,0,.04); font-weight: 700; }
 .bb-omago-panel {
   width: 100%;
   height: min(var(--bb-widget-height), calc(100vh - 82px));
@@ -106,10 +153,11 @@ const chatWidgetCss = `
   place-items: center;
   flex: 0 0 auto;
   border-radius: 999px;
+ // background: var(--bb-widget-purple);
   background:
     radial-gradient(circle at 36% 28%, rgba(255,255,255,.95) 0 12%, transparent 13%),
     radial-gradient(circle at 50% 50%, #d987ff 0 14%, #b334ff 42%, #8e31dc 66%, rgba(142,49,220,.05) 71%);
-  box-shadow: 0 0 31px rgba(181, 56, 255, .88), inset 0 0 18px rgba(255,255,255,.25);
+  //box-shadow: 0 0 31px rgba(181, 56, 255, .88), inset 0 0 18px rgba(255,255,255,.25);
 }
 .bb-omago-logo img,
 .bb-omago-avatar-logo img {
@@ -149,7 +197,7 @@ const chatWidgetCss = `
   color: #fff;
   background: #050506;
   cursor: pointer;
-  box-shadow: 0 18px 40px rgba(0,0,0,.22);
+  // box-shadow: 0 18px 40px rgba(0,0,0,.22);
 }
 .bb-omago-root button {
   -webkit-tap-highlight-color: transparent;
@@ -217,6 +265,31 @@ const chatWidgetCss = `
   font-weight: 820;
   font-size: 15px;
   color: #0b0b0f;
+}
+  .bb-omago-emoji-pop {
+  position: absolute;
+  bottom: 42px;
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  z-index: 10;
+}
+.bb-omago-emoji-pop button {
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+.bb-omago-emoji-pop button:hover {
+  background: rgba(0,0,0,.05);
 }
 .bb-omago-author span {
   color: rgba(12, 12, 16, .45);
@@ -430,8 +503,9 @@ const chatWidgetCss = `
   border: 0;
   cursor: pointer;
   color: #07070a;
-  background: rgba(255,255,255,.25);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.38);
+  //background: var(--bb-widget-purple);
+   background: rgba(255,255,255,.25);
+  // box-shadow: inset 0 0 0 1px rgba(255,255,255,.38);
 }
 .bb-omago-tool {
   width: 34px;
@@ -453,12 +527,12 @@ const chatWidgetCss = `
   height: 38px;
   border-radius: 999px;
   color: #fff;
-  background: radial-gradient(circle at 36% 28%, #efc3ff, var(--bb-widget-purple) 53%, #8120d2 100%);
-  box-shadow: 0 0 30px rgba(181, 57, 255, .78), inset 0 0 13px rgba(255,255,255,.35);
+  background: radial-gradient(circle at 36% 28%, #c3d9ff, var(--bb-widget-purple) 53%, #8120d2 100%);
+ // box-shadow: 0 0 30px rgba(181, 57, 255, .78), inset 0 0 13px rgba(255,255,255,.35);
 }
 .bb-omago-launcher:hover,
 .bb-omago-send:hover {
-  box-shadow: 0 0 36px rgba(181, 57, 255, .82), 0 16px 38px rgba(92, 28, 135, .24);
+  box-shadow: 0 0 36px rgba(57, 74, 255, 0.82), 0 16px 38px rgba(92, 28, 135, .24);
 }
 .bb-omago-error {
   color: #dc2626;
@@ -480,7 +554,33 @@ const chatWidgetCss = `
   gap: 10px;
   font-weight: 760;
   background: radial-gradient(circle at 20% 20%, #efc3ff, var(--bb-widget-purple) 50%, #8120d2 100%);
-  box-shadow: 0 0 30px rgba(181, 57, 255, .7), 0 18px 40px rgba(92, 28, 135, .22);
+ // box-shadow: 0 0 30px rgba(181, 57, 255, .7), 0 18px 40px rgba(92, 28, 135, .22);
+}
+  .bb-omago-launcher-gif {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  border: 0;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+.bb-omago-launcher-gif img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bb-omago-launcher-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--bb-widget-purple);
+  cursor: pointer;
 }
 @media (max-width: 560px) {
   .bb-omago-root {
@@ -635,27 +735,62 @@ function ManualTranscript({ ui, onQuickAction }) {
     ] })
   ] });
 }
-function LiveTranscript({ messages, ui }) {
-  return /* @__PURE__ */ jsx("div", { className: "bb-omago-live-list", children: messages.map((message) => {
-    const isUser = message.role === "user";
-    const person = isUser ? ui.user : ui.bot;
-    const avatar = /* @__PURE__ */ jsx(PersonAvatar, { person });
-    const copy = /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-copy", children: [
-      /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-meta", children: [
-        isUser ? (ui.user.name || "You") : (ui.bot.name || "AI Agent"),
-        /* @__PURE__ */ jsx("time", { children: formatTime(message.timestamp) })
-      ] }),
-      /* @__PURE__ */ jsx("span", { className: "bb-omago-live-bubble", children: message.text })
-    ] });
-    return /* @__PURE__ */ jsxs("div", { className: `bb-omago-live-message ${isUser ? "is-user" : ""}`, children: isUser ? [copy, avatar] : [avatar, copy] }, message.id);
-  }) });
+// function LiveTranscript({ messages, ui }) {
+//   return /* @__PURE__ */ jsx("div", { className: "bb-omago-live-list", children: messages.map((message) => {
+//     const isUser = message.role === "user";
+//     const person = isUser ? ui.user : ui.bot;
+//     const avatar = /* @__PURE__ */ jsx(PersonAvatar, { person });
+//     const copy = /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-copy", children: [
+//       /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-meta", children: [
+//         isUser ? (ui.user.name || "You") : (ui.bot.name || "AI Agent"),
+//         /* @__PURE__ */ jsx("time", { children: formatTime(message.timestamp) })
+//       ] }),
+//       // /* @__PURE__ */ jsx("span", { className: "bb-omago-live-bubble", children: message.text })
+//       <span className="bb-omago-live-bubble"><MessageContent text={message.text} /></span>
+//     ] });
+//     return /* @__PURE__ */ jsxs("div", { className: `bb-omago-live-message ${isUser ? "is-user" : ""}`, children: isUser ? [copy, avatar] : [avatar, copy] }, message.id);
+//   }) });
+// }
+const EMOJI_SET = ["😀","😂","😍","👍","🙏","🎉","🔥","❤️","😢","🤔","👏","✅"];
+function EmojiPicker({ onSelect }) {
+  return (
+    <div className="bb-omago-emoji-pop">
+      {EMOJI_SET.map(e => (
+        <button key={e} type="button" onClick={() => onSelect(e)}>{e}</button>
+      ))}
+    </div>
+  );
+}
+function LiveTranscript({ messages, ui, loading }) {
+  return /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-list", children: [
+    messages.map((message) => {
+      const isUser = message.role === "user";
+      const person = isUser ? ui.user : ui.bot;
+      const avatar = /* @__PURE__ */ jsx(PersonAvatar, { person });
+      const copy = /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-copy", children: [
+        /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-meta", children: [
+          isUser ? (ui.user.name || "You") : (ui.bot.name || "AI Agent"),
+          /* @__PURE__ */ jsx("time", { children: formatTime(message.timestamp) })
+        ] }),
+        /* @__PURE__ */ jsx("span", { className: "bb-omago-live-bubble", children: /* @__PURE__ */ jsx(MessageContent, { text: message.text }) })
+      ] });
+      return /* @__PURE__ */ jsxs("div", { className: `bb-omago-live-message ${isUser ? "is-user" : ""}`, children: isUser ? [copy, avatar] : [avatar, copy] }, message.id);
+    }),
+    loading && /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-message", children: [
+      /* @__PURE__ */ jsx(PersonAvatar, { person: ui.bot }),
+      /* @__PURE__ */ jsx("div", { className: "bb-omago-live-copy", children: /* @__PURE__ */ jsx(TypingIndicator, { label: "Searching knowledge base..." }) })
+    ] })
+  ] });
 }
 function ChatWidget({
   sdk,
   position = "bottom-right",
   primaryColor = "#b93fff",
   accentColor = "#08080a",
+  launcherType = "button", // "button" | "icon" | "gif"
+  launcherGifUrl = void 0,
   backgroundColor = "#fbf1ff",
+  companyDescription = void 0,
   buttonText = "Chat",
   placeholder = void 0,
   width = "320px",
@@ -666,6 +801,7 @@ function ChatWidget({
   design = "omago",
   logoUrl = void 0,
   logoText = void 0,
+  companyName = void 0,
   user = void 0,
   bot = void 0,
   data = void 0,
@@ -677,23 +813,34 @@ function ChatWidget({
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [voiceError, setVoiceError] = useState("");
-  const { messages, loading, error, sendMessage, sendVoiceNote, uploadFile } = useBrainboxChat(sdk);
+  const { messages, loading, error, sendMessage, sendVoiceNote, uploadFile, sessions, loadSession } = useBrainboxChat(sdk);
   const endRef = useRef(null);
   const fileInputRef = useRef(null);
   const sdkUser = useMemo(() => sdk.getUserProfile?.(), [sdk]);
+  const [historyMode, setHistoryMode] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
+  
   const ui = useMemo(() => {
     const merged = mergeData(defaultChatWidgetData, manualData || data);
+    const resolvedName = user?.name || sdkUser?.name || merged.user.name;
+    const resolvedBotName = bot?.name || merged.bot.name;
+    const interpolate = (str) =>
+      str.replaceAll("{{name}}", resolvedName).replaceAll("{{botName}}", resolvedBotName);
+
     return {
       ...merged,
       brand: {
         ...merged.brand,
-        name: logoText || merged.brand.name,
+        name: companyName || logoText || merged.brand.name,
+        subtitle: companyDescription || merged.brand.subtitle,
         logoUrl: logoUrl || merged.brand.logoUrl
       },
       bot: { ...merged.bot, ...(bot || {}) },
-      user: { ...merged.user, ...(sdkUser || {}), ...(user || {}) }
+      user: { ...merged.user, ...(sdkUser || {}), ...(user || {}) },
+      introMessages: merged.introMessages.map(interpolate),
+      userReply: interpolate(merged.userReply)
     };
-  }, [bot, data, logoText, logoUrl, manualData, sdkUser, user]);
+  }, [bot, companyDescription, companyName, data, logoText, logoUrl, manualData, sdkUser, user]);
   const positionStyle = useMemo(() => {
     const base = {
       position: "fixed",
@@ -791,10 +938,33 @@ function ChatWidget({
               /* @__PURE__ */ jsx("button", { className: "bb-omago-close", type: "button", onClick: () => setOpen(false), "aria-label": "Close chat", children: /* @__PURE__ */ jsx(Icon, { name: "x", size: 22, strokeWidth: 1.8 }) })
             ] }),
             /* @__PURE__ */ jsxs("div", { className: "bb-omago-body", children: [
-              /* @__PURE__ */ jsxs("div", { className: "bb-omago-transcript", children: [
-                messages.length > 0 ? /* @__PURE__ */ jsx(LiveTranscript, { messages, ui }) : /* @__PURE__ */ jsx(ManualTranscript, { ui, onQuickAction: fillComposer }),
-                /* @__PURE__ */ jsx("div", { ref: endRef })
-              ] }),
+              // /* @__PURE__ */ jsxs("div", { className: "bb-omago-transcript", children: [
+                //  messages.length > 0 ? /* @__PURE__ */ jsx(LiveTranscript, { messages, ui, loading }) : /* @__PURE__ */ jsx(ManualTranscript, { ui, onQuickAction: fillComposer }),
+              //   /* @__PURE__ */ jsx("div", { ref: endRef })
+              // ] }),
+              <div className="bb-omago-transcript">
+                  {historyMode ? (
+                    <div className="bb-omago-history-list">
+                      {(sessions || []).length === 0 && <p style={{ fontSize: 12, opacity: .6 }}>No previous sessions yet.</p>}
+                      {(sessions || []).map(s => (
+                        <button
+                          key={s.session_id}
+                          className="bb-omago-action-pill"
+                          type="button"
+                          style={{ width: "100%", textAlign: "left" }}
+                          onClick={() => { loadSession(s.session_id); setHistoryMode(false); }}
+                        >
+                          {s.title}
+                        </button>
+                      ))}
+                    </div>
+                  ) : messages.length > 0 ? (
+                    <LiveTranscript messages={messages} ui={ui} loading={loading } />
+                  ) : (
+                    <ManualTranscript ui={ui} onQuickAction={fillComposer} />
+                  )}
+                  <div ref={endRef} />
+                </div>,
               /* @__PURE__ */ jsx("div", { className: "bb-omago-mode-switch", role: "tablist", "aria-label": "Conversation mode", children: ui.modes.map((item) => /* @__PURE__ */ jsxs("button", { className: `bb-omago-mode ${mode === item.icon ? "is-active" : ""}`, type: "button", onClick: () => setMode(item.icon), children: [
                 /* @__PURE__ */ jsx(Icon, { name: item.icon, size: 20, strokeWidth: 1.9 }),
                 item.label
@@ -819,11 +989,18 @@ function ChatWidget({
                     /* @__PURE__ */ jsx(Icon, { name: "paperclip", size: 22, strokeWidth: 1.8 }),
                     /* @__PURE__ */ jsx("input", { ref: fileInputRef, className: "bb-omago-file-input", type: "file", onChange: handleFileSelect })
                   ] }),
-                  /* @__PURE__ */ jsx("button", { className: "bb-omago-tool", type: "button", "aria-label": "Emoji", children: /* @__PURE__ */ jsx(Icon, { name: "smile", size: 22, strokeWidth: 1.8 }) }),
-                  /* @__PURE__ */ jsxs("button", { className: "bb-omago-search", type: "button", children: [
-                    /* @__PURE__ */ jsx(Icon, { name: "search", size: 21, strokeWidth: 2.2 }),
-                    ui.composer.searchLabel
-                  ] }),
+                  /* @__PURE__ */ jsxs("div", { style: { position: "relative" }, children: [
+                  /* @__PURE__ */ jsx("button", { className: "bb-omago-tool", type: "button", onClick: () => setShowEmoji(s => !s), "aria-label": "Emoji", children: /* @__PURE__ */ jsx(Icon, { name: "smile", size: 22, strokeWidth: 1.8 }) }),
+                    showEmoji && /* @__PURE__ */ jsx(EmojiPicker, { onSelect: (e) => { setInput(current => current + e); setShowEmoji(false); } })
+                   ] }),
+                  // /* @__PURE__ */ jsxs("button", { className: "bb-omago-search", type: "button", children: [
+                  //   /* @__PURE__ */ jsx(Icon, { name: "search", size: 21, strokeWidth: 2.2 }),
+                  //   ui.composer.searchLabel
+                  // ] }),
+                  <button className="bb-omago-search" type="button" onClick={() => setHistoryMode(h => !h)}>
+                  <Icon name="search" size={21} strokeWidth={2.2} />
+                  {historyMode ? "Back to chat" : ui.composer.searchLabel}
+                </button>,
                   /* @__PURE__ */ jsx("button", { className: "bb-omago-send", type: "button", onClick: mode === "voice" ? handleVoice : handleSend, "aria-label": mode === "voice" ? recording ? "Stop recording" : "Record voice note" : "Send message", children: /* @__PURE__ */ jsx(Icon, { name: mode === "voice" ? "voice" : "send", size: 22, strokeWidth: 2.1 }) })
                 ] }),
                 recording && /* @__PURE__ */ jsx("div", { className: "bb-omago-recording", children: "Recording..." }),
@@ -833,10 +1010,18 @@ function ChatWidget({
             ] })
           ] }),
           /* @__PURE__ */ jsx("button", { className: "bb-omago-floating-close", type: "button", onClick: () => setOpen(false), "aria-label": "Close chat", children: /* @__PURE__ */ jsx(Icon, { name: "x", size: 28, strokeWidth: 1.7 }) })
-        ] }) : /* @__PURE__ */ jsxs("button", { className: "bb-omago-launcher", type: "button", onClick: () => setOpen(true), "aria-label": "Open chat", children: [
-          /* @__PURE__ */ jsx(Icon, { name: "chat", size: 22 }),
-          buttonText
-        ] })
+        ] }) : (
+  launcherType === "gif" && launcherGifUrl ? (
+    /* @__PURE__ */ jsx("button", { className: "bb-omago-launcher-gif", type: "button", onClick: () => setOpen(true), "aria-label": "Open chat", children: /* @__PURE__ */ jsx("img", { src: launcherGifUrl, alt: "Open chat" }) })
+  ) : launcherType === "icon" ? (
+    /* @__PURE__ */ jsx("button", { className: "bb-omago-launcher-icon", type: "button", onClick: () => setOpen(true), "aria-label": "Open chat", children: /* @__PURE__ */ jsx(Icon, { name: "chat", size: 26 }) })
+  ) : (
+    /* @__PURE__ */ jsxs("button", { className: "bb-omago-launcher", type: "button", onClick: () => setOpen(true), "aria-label": "Open chat", children: [
+      /* @__PURE__ */ jsx(Icon, { name: "chat", size: 22 }),
+      buttonText
+    ] })
+  )
+)
       ]
     }
   );
