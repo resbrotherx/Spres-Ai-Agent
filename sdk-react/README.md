@@ -8,7 +8,12 @@ A React UI SDK for Brainbox that includes built-in chat designs, a support bot, 
 npm install spres-react
 # or
 yarn add spres-react
+
+npm run build
+npm run dev
 ```
+
+
 
 ## Deployment
 
