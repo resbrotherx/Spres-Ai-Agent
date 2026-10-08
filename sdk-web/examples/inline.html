@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brainbox - inline + floating</title>
+  <link rel="stylesheet" href="_host.css" />
+  <style>
+    #support-chat { height: 560px; max-width: 520px; }
+  </style>
+</head>
+<body>
+  <header class="demo"><a href="index.html">Examples</a> Inline panel + floating widget on one page</header>
+  <main class="demo">
+    <div class="demo-card">
+      <h1>Contact support</h1>
+      <p>The panel below is rendered inline in <code>#support-chat</code>. A separate floating widget (different
+         <code>storageKey</code>, so a separate conversation) lives in the bottom-left corner.</p>
+    </div>
+    <div id="support-chat"></div>
+  </main>
+
+  <script src="../brainbox-web-sdk.js"></script>
+  <script>
+    var common = {
+      apiUrl: window.BB_API || 'http://localhost:8787',
+      apiKey: 'YOUR_API_KEY',
+      tenantId: 'YOUR_TENANT_ID',
+      user: { id: 'demo-user-3', name: 'Alan Turing' }
+    };
+    var inline = Brainbox.init(Object.assign({}, common, {
+      mode: 'inline',
+      container: '#support-chat',
+      allowedModes: ['inline'],
+      branding: { botName: 'Support Bot', subtitle: 'Typically replies in a few seconds' },
+      quickActions: ['How do I reset my password?', 'Show me some code'],
+      storageKey: 'bb-demo-inline'
+    }));
+    var floating = Brainbox.init(Object.assign({}, common, {
+      mode: 'floating',
+      position: 'bottom-left',
+      launcher: { type: 'icon' },
+      theme: { primary: '#0f9d76', panel: '#effaf6' },
+      branding: { botName: 'Sales AI', subtitle: 'Questions about plans?' },
+      storageKey: 'bb-demo-floating-2'
+    }));
+  </script>
+</body>
+</html>

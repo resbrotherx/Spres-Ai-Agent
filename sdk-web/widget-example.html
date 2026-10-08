@@ -6,23 +6,24 @@
     <title>Brainbox Web Widget Example</title>
   </head>
   <body>
+    <!--
+      Never ship a real API key in public HTML. For production, point apiUrl at a
+      same-origin proxy on your server that adds the key (see README "Proxy mode").
+    -->
     <script src="https://port.smartpowerbilling.com/sdk/brainbox-web-sdk.js"></script>
     <script>
-      const sdk = new BrainboxWebSDK(
-        'https://port.smartpowerbilling.com/',
-        '603e5575e143fd7e19c2aa208e9e66ca6c3817bc1ad8aec58766ba1ff4dd640b',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpcmVzIiwidXNlcl9pZCI6MSwiZXhwIjoxNzgwNDM1MDQ4fQ.cSDyVXAAQoSXvaxIOEsRHbwoO9PAbCBp5URpfffk-T4'
-      );
-
-      new BrainboxWebWidget({
-        sdk,
+      const bb = Brainbox.init({
+        apiUrl: 'https://port.smartpowerbilling.com',
+        apiKey: 'YOUR_API_KEY',
+        tenantId: 'YOUR_TENANT_ID',
+        mode: 'floating',
         position: 'bottom-right',
-        primaryColor: '#2563EB',
-        accentColor: '#111827',
-        buttonText: 'Support Chat',
+        theme: { primary: '#2563EB', ink: '#111827' },
+        branding: { botName: 'Support', subtitle: "We're here to help" },
+        launcher: { type: 'button', text: 'Support Chat' },
         placeholder: 'Ask a question',
-        width: '360px',
-        height: '520px'
+        width: 360,
+        height: 520
       });
     </script>
   </body>

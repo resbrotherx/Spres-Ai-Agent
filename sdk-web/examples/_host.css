@@ -1,0 +1,11 @@
+/* Demo host-page styles. Deliberately "hostile" to check the widget's CSS isolation. */
+* { box-sizing: content-box; }
+body { margin: 0; font: 15px/1.6 Georgia, serif; color: #222; background: #f3f4f6; }
+button { text-transform: uppercase; letter-spacing: 2px; padding: 12px 30px; border: 3px solid red; background: yellow; }
+textarea, input { border: 2px dashed blue; padding: 10px; font-family: monospace; }
+p, ul, h1, h2 { margin: 1em 0; }
+header.demo { background: #111827; color: #fff; padding: 14px 24px; }
+header.demo a { color: #c4b5fd; margin-right: 14px; }
+main.demo { max-width: 860px; margin: 0 auto; padding: 24px; }
+.demo-card { background: #fff; border-radius: 12px; padding: 18px 22px; box-shadow: 0 2px 8px rgba(0,0,0,.06); margin-bottom: 18px; }
+code { background: #eee; padding: 1px 4px; }

@@ -4,14 +4,13 @@ from app.chunkers.logs import chunk_logs
 from app.chunkers.code import chunk_code
 from app.chunkers.json import chunk_json
 from app.chunkers.csv import chunk_csv
-
-from app.embeddings.generator import generate_embedding
+from app.chunkers.text import chunk_text
 
 from app.db.session import SessionLocal
 from app.db.models import Document, ProcessingTask
 
 from app.utils.hashing import create_hash
-from app.ingestion.dedupe import is_duplicate
+from app.ingestion.store import store_documents
 from app.utils.logging import logger
 
 def get_chunker(source_type: str):
@@ -23,6 +22,10 @@ def get_chunker(source_type: str):
         "postgres_logs": chunk_logs,
         "json": chunk_json,
         "csv": chunk_csv,
+        "text": chunk_text,
+        "txt": chunk_text,
+        "md": chunk_text,
+        "document": chunk_text,
     }
     return chunkers.get(source_type, chunk_logs)
 
@@ -49,73 +52,71 @@ def process_document(payload: dict):
                 logger.error(f"Task {task_id} not found in database")
 
         chunker = get_chunker(source_type)
-        chunks = chunker(content)
+        chunks = [c for c in chunker(content) if c and c.strip()]
 
         logger.info(f"Processing {len(chunks)} chunks for {source_type}")
 
-        documents_added = 0
-        embedding_errors = 0
+        # content_hash is globally UNIQUE while dedupe is per tenant: when the same text
+        # already exists for *another* tenant, use a tenant-scoped hash instead so the
+        # insert can't collide (existing rows keep their plain sha256 hashes).
+        plain_hashes = [create_hash(c) for c in chunks]
+        owners = {}
+        unique_hashes = list(set(plain_hashes))
+        for i in range(0, len(unique_hashes), 500):
+            for h, t in db.query(Document.content_hash, Document.tenant_id).filter(
+                Document.content_hash.in_(unique_hashes[i:i + 500])
+            ):
+                owners[h] = t
 
-        for i, chunk in enumerate(chunks):
-            try:
-                content_hash = create_hash(chunk)
-
-                if is_duplicate(db, content_hash, tenant_id):
-                    logger.debug(f"Duplicate chunk {i+1}/{len(chunks)}, skipping")
-                    continue
-
-                try:
-                    logger.debug(f"Generating embedding for chunk {i+1}/{len(chunks)}")
-                    embedding = generate_embedding(chunk)
-
-                    if embedding is None:
-                        logger.error(f"Embedding generation returned None for chunk {i+1}")
-                        embedding_errors += 1
-                        continue
-
-                    document = Document(
-                        tenant_id=tenant_id,
-                        source_type=source_type,
-                        file_path=file_path,
-                        content=chunk,
-                        content_hash=content_hash,
-                        embedding=embedding,
-                        doc_metadata=json.dumps(payload.get("metadata") or {})
-                    )
-
-                    db.add(document)
-                    documents_added += 1
-
-                    if documents_added % 5 == 0:
-                        db.commit()
-                        logger.info(f"Committed {documents_added} documents so far")
-
-                except Exception as e:
-                    logger.error(f"Error processing chunk {i+1}: {str(e)}", exc_info=True)
-                    embedding_errors += 1
-                    continue
-            except Exception as e:
-                logger.error(f"Error in chunk loop iteration {i+1}: {str(e)}", exc_info=True)
+        rows = []
+        duplicates = 0
+        for chunk, h in zip(chunks, plain_hashes):
+            owner = owners.get(h)
+            if owner == tenant_id:
+                duplicates += 1
                 continue
+            if owner is not None:
+                h = create_hash(f"{tenant_id}:{chunk}")
+            rows.append({
+                "tenant_id": tenant_id,
+                "source_type": source_type,
+                "file_path": file_path,
+                "content": chunk,
+                "content_hash": h,
+                "metadata": payload.get("metadata") or {},
+                "audience": payload.get("audience"),
+            })
 
-        db.commit()
-        logger.info(f"Final commit: Added {documents_added} documents, {embedding_errors} embedding errors")
+        documents_added, skipped, embedding_errors = store_documents(db, rows)
+        duplicates += skipped
+        logger.info(
+            f"Added {documents_added} documents, {duplicates} duplicates skipped, "
+            f"{embedding_errors} errors"
+        )
 
         if task_id:
             task = db.query(ProcessingTask).filter(
                 ProcessingTask.task_id == task_id
             ).first()
             if task:
-                task.status = "completed"
-                task.error_message = None if embedding_errors == 0 else f"{embedding_errors} embedding errors"
+                if embedding_errors and not documents_added:
+                    task.status = "failed"
+                    task.error_message = f"All {embedding_errors} chunks failed to embed/insert"
+                else:
+                    task.status = "completed"
+                    task.error_message = None if embedding_errors == 0 else f"{embedding_errors} embedding errors"
                 db.commit()
-                logger.info(f"Task {task_id} marked as completed")
+                logger.info(f"Task {task_id} marked as {task.status}")
 
         logger.info(f"Successfully added {documents_added} documents to database")
-        return {"status": "completed", "documents_added": documents_added, "errors": embedding_errors}
+        return {"status": "completed", "documents_added": documents_added, "duplicates": duplicates, "errors": embedding_errors}
 
     except Exception as e:
         logger.error(f"Error in process_document: {str(e)}", exc_info=True)
+        try:
+            db.rollback()  # a failed flush leaves the session unusable until rolled back
+        except Exception:
+            pass
         if task_id:
             try:
                 task = db.query(ProcessingTask).filter(

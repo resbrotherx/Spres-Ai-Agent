@@ -1,13 +1,27 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 class ChatMessage(BaseModel):
     role: str = Field(..., description="Role: user or assistant")
     content: str = Field(..., description="Message content")
 
-class ChatPayload(BaseModel):
-    tenant_id: str = Field(..., description="Tenant ID")
+class UserScope(BaseModel):
+    """Optional end-user identity supplied by an integrator (Odoo, website, ...).
+
+    When `user_id` is sent, sessions are stamped with it and only that user can list/read/write
+    them. When omitted, sessions are tenant-wide (legacy behaviour).
+    """
+    user_id: Optional[str] = Field(None, description='External user id, e.g. "odoo:mydb:7"')
+    user_name: Optional[str] = Field(None, description="Display name of the end user")
+    user_role: Optional[str] = Field(
+        None,
+        description="admin | internal | portal | customer | vendor | public. Only trusted with a "
+                    "secret API key; publishable keys are always treated as public.",
+    )
+
+class ChatPayload(UserScope):
+    tenant_id: Optional[str] = Field(None, description="Tenant ID (optional: defaults to the API key's tenant; must match it if sent)")
     question: str = Field(..., description="User question")
     session_id: Optional[str] = Field(None, description="Chat session ID")
 
@@ -16,18 +30,31 @@ class ChatResponse(BaseModel):
     reasoning: Optional[str] = None
     search_results: Optional[List] = None
     session_id: Optional[str] = None
+    # Ids of the stored messages (send message_id to POST /api/chat/feedback).
+    message_id: Optional[int] = None
+    user_message_id: Optional[int] = None
 
-class ChatSessionCreate(BaseModel):
-    tenant_id: str
+
+class FeedbackPayload(BaseModel):
+    tenant_id: Optional[str] = Field(None, description="Defaults to the API key's tenant; must match it if sent")
+    session_id: str = Field(..., min_length=1)
+    message_id: Optional[int] = Field(None, description="Assistant message id (defaults to the session's last answer)")
+    rating: Literal["up", "down"]
+    comment: Optional[str] = Field(None, max_length=2000)
+    user_id: Optional[str] = Field(None, description="External user id owning the session (optional)")
+
+class ChatSessionCreate(UserScope):
+    tenant_id: Optional[str] = Field(None, description="Tenant ID (optional: defaults to the API key's tenant; must match it if sent)")
     title: Optional[str] = None
 
-class ChatSessionsListRequest(BaseModel):
-    tenant_id: str
+class ChatSessionsListRequest(UserScope):
+    tenant_id: Optional[str] = Field(None, description="Tenant ID (optional: defaults to the API key's tenant; must match it if sent)")
 
 class ChatSessionResponse(BaseModel):
     session_id: str
     title: Optional[str]
     created_at: str
+    user_id: Optional[str] = None
 
 class ChatMessageDetail(BaseModel):
     id: int
@@ -45,6 +72,7 @@ class ChatSessionDetail(BaseModel):
     title: Optional[str]
     messages: List[ChatMessageDetail]
     created_at: str
+    user_id: Optional[str] = None
 
     class Config:
         from_attributes = True

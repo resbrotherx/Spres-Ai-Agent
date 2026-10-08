@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brainbox - v1 compatibility</title>
+  <link rel="stylesheet" href="_host.css" />
+</head>
+<body>
+  <header class="demo"><a href="index.html">Examples</a> v1 API (BrainboxWebSDK + BrainboxWebWidget)</header>
+  <main class="demo">
+    <div class="demo-card">
+      <p>This page uses the <strong>v1</strong> globals unchanged. They now run on top of the v2 widget.</p>
+      <pre id="out">health: ...</pre>
+    </div>
+  </main>
+  <script src="../brainbox-web-sdk.js"></script>
+  <script>
+    const sdk = new BrainboxWebSDK(window.BB_API || 'http://localhost:8787/', 'YOUR_API_KEY', 'YOUR_TENANT_ID');
+    new BrainboxWebWidget({
+      sdk,
+      position: 'bottom-right',
+      primaryColor: '#2563EB',
+      accentColor: '#111827',
+      buttonText: 'Support Chat',
+      title: 'Support',
+      subtitle: "We're here to help",
+      placeholder: 'Ask a question',
+      width: '360px',
+      height: '520px'
+    });
+    const out = document.getElementById('out');
+    sdk.healthCheck().then(function (r) {
+      out.textContent = 'health: ' + JSON.stringify(r);
+      return sdk.chat('hello from v1');
+    }).then(function (r) {
+      out.textContent += '\nchat.session_id: ' + r.session_id + '\nchat.response starts: ' + r.response.slice(0, 30);
+      return sdk.listSessions();
+    }).then(function (r) {
+      out.textContent += '\nlistSessions today: ' + r.today.length;
+    }).catch(function (e) {
+      out.textContent += '\nerror: ' + e.message;
+    });
+  </script>
+</body>
+</html>

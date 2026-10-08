@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brainbox - floating widget</title>
+  <link rel="stylesheet" href="_host.css" />
+</head>
+<body>
+  <header class="demo"><a href="index.html">Examples</a> Floating widget</header>
+  <main class="demo">
+    <div class="demo-card">
+      <h1>Acme Utilities</h1>
+      <p>This page hosts the floating chat widget. Click the launcher in the bottom-right corner.
+         Ask for <code>code</code> or a <code>table</code>, or type <code>fail</code> to see the error banner.</p>
+      <p><button id="open-btn" type="button">Open chat from page JS</button></p>
+    </div>
+  </main>
+
+  <script src="../brainbox-web-sdk.js"></script>
+  <script>
+    // Point apiUrl at your backend (or a same-origin proxy). The mock server listens on :8787.
+    var bb = Brainbox.init({
+      apiUrl: window.BB_API || 'http://localhost:8787',
+      apiKey: 'YOUR_API_KEY',
+      tenantId: 'YOUR_TENANT_ID',
+      user: { id: 'demo-user-1', name: 'Ada Lovelace', email: 'ada@example.com' },
+      mode: 'floating',
+      branding: { botName: 'Spres AI', title: 'Spres AI', subtitle: 'We help companies provide instant answers' },
+      welcomeMessages: [
+        "Hi {{name}}! I'm {{botName}}. We help companies provide instant, accurate, on-brand answers 24/7.",
+        'Here are a few ways I can assist you right now.'
+      ],
+      quickActions: ['Show me some code', 'Compare plans in a table'],
+      launcher: { type: 'button', text: 'Chat' },
+      storageKey: 'bb-demo-floating',
+      onEvent: function (name, detail) { console.log('[bb event]', name, detail); }
+    });
+    document.getElementById('open-btn').addEventListener('click', function () { bb.open(); });
+  </script>
+</body>
+</html>

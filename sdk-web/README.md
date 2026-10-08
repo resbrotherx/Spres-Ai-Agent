@@ -1,119 +1,248 @@
-# Brainbox Web SDK
-<script src="https://port.smartpowerbilling.com/sdk/brainbox-web-sdk.js"></script>
-A plain JavaScript SDK and embeddable chat widget for non-React websites.
+# Brainbox Web SDK (`spres-web`) v2
 
-## What this is for
+A single, dependency-free JavaScript file that adds the Brainbox AI chat assistant to any website:
+plain HTML, WordPress, Odoo, or any JavaScript app. It includes:
 
-Use this package when customers do not want React/Next.js/Angular, or when they need a simple copy-paste HTML/CSS/jQuery integration.
+- **`Brainbox.init()`**: an embeddable chat widget with four layouts (floating, sidebar, inline, page).
+- **`Brainbox.Client`**: a headless API client you can use without any UI. It works in the browser and in Node 18+.
+- **v1 compatibility**: `BrainboxWebSDK` and `BrainboxWebWidget` still work, so existing embeds keep running.
 
-It includes:
+The widget scopes all of its CSS under `.bb-web-root`, takes every theme value from CSS custom properties, and
+resets fonts, buttons and inputs inside its root. Host CSS such as Bootstrap or Odoo therefore does not leak in.
+Configuration strings are inserted with `textContent`, and assistant replies go through a safe markdown renderer
+that never uses `innerHTML`.
 
-- `BrainboxWebSDK` — lightweight JS client for `/api/chat`, `/api/chat/session`, `/api/ingest`, and `/api/health`
-- `BrainboxWebWidget` — a copy-paste support chat widget that works in plain HTML pages
+---
 
-## Usage
-
-### 1. Add the script
-
-```html
-<script src="/path/to/brainbox-web-sdk.js"></script>
-```
-
-### 2. Initialize the SDK
+## Quick start (plain HTML)
 
 ```html
+<script src="https://your-server.example.com/sdk/brainbox-web-sdk.js"></script>
+<!-- or from a CDN after publishing: https://cdn.jsdelivr.net/npm/spres-web@2 -->
 <script>
-  const sdk = new BrainboxWebSDK(
-    'https://api.yourbackend.com',
-    'YOUR_API_KEY',
-    'tenant-123'
-  );
-</script>
-```
-
-### 3. Create a widget
-
-```html
-<script>
-  new BrainboxWebWidget({
-    sdk,
-    position: 'bottom-right',
-    primaryColor: '#2563EB',
-    accentColor: '#111827',
-    buttonText: 'Help',
-    placeholder: 'Ask a question...',
-    width: '360px',
-    height: '520px'
+  const bb = Brainbox.init({
+    apiUrl: 'https://api.example.com',   // your Brainbox backend (or a same-origin proxy, see below)
+    apiKey: 'YOUR_API_KEY',              // omit when using a proxy
+    tenantId: 'YOUR_TENANT_ID',          // omit when the proxy injects it
+    user: { id: '42', name: 'Ada Lovelace', email: 'ada@example.com' },
+    branding: { botName: 'Acme Assistant', subtitle: 'Ask us anything' }
   });
 </script>
 ```
 
-## API endpoints
+A launcher button appears in the bottom-right corner. Clicking it opens the chat window.
 
-The web SDK talks to the backend directly over these REST endpoints:
+With npm, `npm install spres-web`, then `require('spres-web')` or `import Brainbox from 'spres-web'`.
+The module exports the same `Brainbox` object, and in a browser it also sets `window.Brainbox`.
 
-- `POST /api/chat` — send chat requests
-- `POST /api/chat/session` — create chat sessions
-- `POST /api/ingest` — ingest logs or data
-- `GET /api/health` — check backend health
-- `POST /api/chat/stream` — stream partial chat responses in real time
+---
 
-## How responses arrive
+## Modes
 
-This SDK uses browser `fetch` to call the API. It does not establish a WebSocket connection by default. When `/api/chat/stream` is available, the UI receives chunks from the backend and updates as they arrive, which gives a faster perceived response. If streaming is unavailable, it falls back to a regular chat response.
+| Mode | What it renders | Needs `container` |
+|---|---|---|
+| `floating` (default) | Launcher in a corner. The window opens above it. Below 576px it becomes a full-width bottom sheet. | no |
+| `sidebar` | A fixed panel on the right at full height. While open it pushes the page with `padding-right` (on viewports 992px and wider; below that it overlays the page). | no |
+| `inline` | The chat panel fills the container. There is no launcher and no close button. | yes |
+| `page` | Full layout: a conversation sidebar (New chat, search, sessions grouped Today / Yesterday / This week / Older) and the main chat with a hero greeting and prompt cards. Below 760px of container width, the sidebar becomes a drawer. | yes |
 
-## Copy-paste HTML example
+```js
+// Floating (default)
+Brainbox.init({ apiUrl, apiKey, tenantId });
 
-Use the widget in any HTML page, Odoo template, or legacy site.
+// Sidebar under a 46px top bar. Users can switch between sidebar and floating with the dock button.
+Brainbox.init({ apiUrl, apiKey, tenantId, mode: 'sidebar', sidebarTop: 46, defaultOpen: true,
+                allowedModes: ['sidebar', 'floating'] });
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Brainbox Widget</title>
-  </head>
-  <body>
-    <script src="brainbox-web-sdk.js"></script>
-    <script>
-      const sdk = new BrainboxWebSDK(
-        'https://api.yourbackend.com',
-        'YOUR_API_KEY',
-        'tenant-123'
-      );
+// Inline inside an element. The container needs a height.
+Brainbox.init({ apiUrl, apiKey, tenantId, mode: 'inline', container: '#support-chat', allowedModes: ['inline'] });
 
-      new BrainboxWebWidget({
-        sdk,
-        position: 'bottom-right',
-        primaryColor: '#2563EB',
-        accentColor: '#111827',
-        buttonText: 'Support Chat',
-        placeholder: 'Ask anything...'
-      });
-    </script>
-  </body>
-</html>
+// Full page
+Brainbox.init({ apiUrl, apiKey, tenantId, mode: 'page', container: '#assistant', allowedModes: ['page'],
+                quickActions: [{ title: 'Compare plans', description: 'Put the plans in a table', prompt: 'Compare the plans' }] });
 ```
 
-## Compatibility
+You can run several instances on one page, for example an inline panel plus a floating widget. Give each one its
+own `storageKey` so they keep separate conversations.
 
-- React / Next.js: the existing React SDK works in client-side React apps and Next.js pages/components when rendered on the client.
-- Angular / AngularJS: the React UI components are not compatible, but the underlying API endpoints and this web SDK can be used directly.
-- React Native: UI components are not compatible with React Native. The plain SDK client may work if `fetch` or `axios` is available, but native UI components are required for a full RN app.
-- Odoo / plain HTML: this SDK is designed to work in any browser environment, including Odoo template pages. In Odoo, add the script tags in your XML/HTML template so the browser loads the widget.
+---
 
-## Deployment
+## All options
 
-The `sdk-web` package is a client-side browser library. It does not automatically deploy the UI to a hosting provider.
+| Option | Default | Description |
+|---|---|---|
+| `apiUrl` | `''` | Backend base URL. The SDK calls `${apiUrl}/api/...`. It can be a same-origin proxy path such as `'/brainbox_ai/proxy'`. |
+| `apiKey` | – | Sent as `Authorization: Bearer <key>`. Omit it when you use a proxy. |
+| `tenantId` | – | Sent as `tenant_id`, but only when set. A proxy can inject it instead. |
+| `user` | `{}` | `{ id, name, email, avatarUrl }`. `id` is sent as `user_id` and `name` as `user_name`. The name is used in greetings and avatars. |
+| `headers` | `{}` | Extra headers on every request, for example a CSRF token or a proxy marker. |
+| `credentials` | `'same-origin'` | `fetch` credentials: `'omit'`, `'same-origin'` or `'include'`. |
+| `timeout` | `200000` | Request timeout in ms. `/api/chat` can take about 180s. |
+| `mode` | `'floating'` | One of `'floating'`, `'sidebar'`, `'inline'` or `'page'`. |
+| `container` | – | Element or selector. Required for `inline` and `page`. |
+| `position` | `'bottom-right'` | Floating launcher corner: `'bottom-right'` or `'bottom-left'`. |
+| `offset` | `{ x: 24, y: 24 }` | Distance from the corner, in px. |
+| `zIndex` | `9999` | z-index for the floating and sidebar layers. |
+| `width` / `height` | `360` / `560` | Floating window size. The window is always capped to the viewport. |
+| `sidebarWidth` | `380` | Sidebar width. |
+| `sidebarTop` | `0` | Top offset of the sidebar, for example a fixed navbar height. |
+| `sidebarPushContent` | `document.body` | Element or selector that gets `padding-right` while the sidebar is open. Use `null` to never push. |
+| `defaultOpen` | `false` | Open on first load. After that, the user's last open or closed state is remembered. |
+| `launcher` | `{ type: 'button', text: 'Chat' }` | `type` is `'button'` (pill), `'icon'` (round), `'gif'` (uses `gifUrl`) or `'none'` (open it from your own UI with `bb.open()`). |
+| `theme` | `{ primary: '#b93fff', panel: '#fbf1ff', ink: '#08080a', radius: 22 }` | Brand colour, panel background, text colour and corner radius. `fontFamily` is optional. Lighter and darker shades are derived from `primary` automatically. |
+| `branding` | `{ botName: 'Brainbox AI', subtitle: 'Your AI assistant' }` | Also accepts `title` (header, defaults to `botName`), `logoUrl` (header orb) and `botAvatarUrl` (bot avatar and page hero). |
+| `welcomeMessages` | `["Hi {{name}}! I'm {{botName}}. ..."]` | Intro bubbles shown before the first message. `{{name}}` is the user's first name, or "there" when no name is set. `{{botName}}` is also replaced. |
+| `quickActions` | `[]` | Strings, or `{ title, description, prompt, icon }` objects. Clicking one sends it. In `page` mode they render as prompt cards. |
+| `placeholder` | `'Type message...'` | Composer placeholder. |
+| `features` | `{ history: true, upload: true, emoji: true, modeSwitch: true, newChat: true, export: false }` | Turns UI features on or off. `export` downloads the conversation as a `.txt` file. |
+| `allowedModes` | `['floating', 'sidebar']` | Modes the user can cycle through with the header dock/undock button. The button appears only when the current mode is in this list and the list has at least two usable modes. |
+| `page` | `{ greeting: 'Hello, {{name}}', heading: 'How can I assist you today?' }` | Hero text for `page` mode. |
+| `context` | – | `() => string \| null` (it may also be async). The returned text is prepended to the question as `Context: ... Question: ...`, for example details of the record being viewed. Only the question is shown in the chat. |
+| `storageKey` | `'bb-web'` | localStorage namespace, combined with the tenant and user ID. It stores the last session ID, the open state and the user's mode choice. |
+| `locale` | browser default | Locale used to format times. |
+| `onEvent` | – | `(name, detail) => {}`. Receives every event (see below). |
 
-- Host `brainbox-web-sdk.js` as a static asset or include it through your website build.
-- Add the `<script>` tag to your HTML page or Odoo XML template.
-- Initialize the widget when the page loads.
+## Methods
 
-This package is best for simple web pages, legacy sites, and Odoo pages that render HTML in the browser.
+```js
+bb.open(); bb.close(); bb.toggle(); bb.isOpen();
+bb.setMode('sidebar'); bb.getMode();      // saves the user's choice when the mode is in allowedModes
+bb.send('Hello');                         // Promise resolving to the raw /api/chat response, or null on error or when busy
+bb.newChat();                             // cancels an in-flight request and starts a fresh conversation
+bb.loadSession(sessionId);                // loads a past conversation
+bb.updateConfig({ theme: { primary: '#0f9d76' } }); // re-renders and keeps the conversation and draft
+bb.destroy();                             // removes the DOM, listeners and sidebar padding
+const off = bb.on('response', d => {});   // returns an unsubscribe function
+bb.getSessionId(); bb.getMessages();      // read-only helpers
+bb.client;                                // the Brainbox.Client this widget uses
+```
 
-## Notes
+## Events
 
-- This package is for frontend embedding only.
-- It does not store chat history on the page by default.
-- It uses your backend API and API key for communication.
+Every event goes to `bb.on(name, fn)` listeners and to `onEvent(name, detail)`.
+
+| Event | Detail |
+|---|---|
+| `ready` | `{ mode }` |
+| `open` / `close` | `{ mode }` |
+| `message` | `{ text, sessionId }`: the user sent a message |
+| `response` | `{ text, sessionId, reasoning, searchResults, raw }` |
+| `error` | `{ message, action, status, code }`. `action` is `'chat'`, `'session'` or `'upload'`. |
+| `modechange` | `{ mode, previous }` |
+| `session` | `{ sessionId, title? }`: a new or loaded conversation. `sessionId` is `null` after `newChat()`. |
+| `upload` | `{ file: { name, size, type }, sessionId, raw }` |
+| `export`, `destroy` | – |
+
+## Behaviour
+
+- **No streaming.** The backend returns the whole answer at once, so the widget shows typing dots ("Thinking...",
+  then "Searching the knowledge base...") until the reply arrives. Only one request runs at a time: Send is
+  disabled while the widget waits. Starting a new chat or loading a session cancels the pending request.
+- **Errors** appear as a friendly inline banner with **Retry**. Raw JSON and stack traces are never shown. A network
+  failure shows "Can't reach the assistant right now."
+- **History.** The last session ID is saved and its messages are restored the first time the widget opens. The
+  history view lists your conversations, grouped by date and searchable.
+- **Uploads.** The paperclip button sends images (`jpeg`, `png`, `gif`, `webp`) to `/api/chat/upload/image` and
+  other files to `/api/chat/upload/file`. The maximum size is 10 MB. A session is created first if needed.
+- **Markdown.** Supports bold, italic, inline code, fenced code blocks (with a language label and a copy button),
+  bullet and numbered lists, headings, simple pipe tables, and links. Links open in a new tab with
+  `rel="noopener noreferrer"` and only `http`, `https` and `mailto` URLs are allowed.
+- **Accessibility.** Enter sends and Shift+Enter adds a new line. Escape closes the floating window or the sidebar.
+  The composer is focused when the widget opens. The message list is an `aria-live="polite"` log. Icon buttons have
+  aria-labels. `prefers-reduced-motion` is respected.
+- **Timestamps.** Backend timestamps without a timezone are treated as UTC.
+
+---
+
+## Proxy mode (recommended for production)
+
+Any `apiKey` you put in public HTML can be read by every visitor. In production, keep the key on your server:
+
+1. Add a small endpoint on your own domain, for example `/brainbox_ai/proxy/api/*`. It checks the logged-in user,
+   adds `Authorization: Bearer <secret key>` and `tenant_id` (and `user_id` if you want per-user history), then
+   forwards the request to the Brainbox backend.
+2. Point the widget at it and leave the secrets out:
+
+```js
+Brainbox.init({
+  apiUrl: '/brainbox_ai/proxy',            // same origin, so no CORS
+  headers: { 'X-CSRF-Token': csrfToken },  // whatever your proxy expects
+  credentials: 'same-origin',              // sends the session cookie
+  user: { name: currentUser.name }         // no id, so the proxy sets user_id from the session
+});
+```
+
+When `tenantId` or `user.id` is not set, the SDK does not send `tenant_id` or `user_id`, so the proxy decides
+their values. This also stops users from reading another user's history.
+
+## Headless client
+
+```js
+const client = new Brainbox.Client({ apiUrl, apiKey, tenantId, user, headers, credentials });
+const { response, session_id } = await client.chat('Hello', null /* sessionId */, 'optional context');
+await client.listSessions();             // { today, yesterday, this_week, older }
+await client.getSessionMessages(id);     // { session_id, title, created_at, messages: [...] }
+await client.createSession('Title');
+await client.uploadFile(file, sessionId); await client.uploadImage(file, sessionId);
+await client.health();
+await client.request('POST', '/api/custom', { body: {} });  // low-level helper
+```
+
+Errors are `Brainbox.BrainboxError` objects with a user-friendly `message`, plus `status`, `code`
+(`network`, `timeout`, `aborted`, `http_500`, ...), `detail` (the raw backend detail) and `retryable`.
+
+---
+
+## Migrating from v1
+
+v1 code keeps working, because the old globals are now a thin layer on top of v2:
+
+```js
+const sdk = new BrainboxWebSDK(apiUrl, apiKey, tenantId);  // ingest, chat, createChatSession, listSessions, healthCheck, streamChat
+new BrainboxWebWidget({ sdk, position: 'bottom-right', primaryColor: '#2563EB', buttonText: 'Help' });
+```
+
+What changed:
+
+- `BrainboxWebSDK` methods now **reject with a `BrainboxError`** on HTTP or network errors. In v1 they resolved with
+  the error JSON. Successful calls return the same JSON as before.
+- `streamChat()` never really streamed (the backend has no streaming endpoint). It now calls `onChunk` once with the
+  whole answer, then `onComplete`. There is no fake word-by-word delay.
+- `BrainboxWebWidget` options are mapped to v2: `primaryColor` to `theme.primary`, `accentColor` to `theme.ink`,
+  `backgroundColor` to `theme.panel` (pure white is ignored so the v2 look applies), `buttonText` to `launcher.text`,
+  `launcherType` to `launcher.type`, `title` and `subtitle` to `branding`, and `width`, `height` and `placeholder`
+  as-is. Use `position: 'inline'` together with `containerId` to render inline. Otherwise the widget floats as in v1.
+- Closing the window now hides it instead of destroying it, so the conversation survives. The widget also gains
+  history, new chat, uploads, an error banner with retry, and safe markdown.
+
+Moving to the v2 API:
+
+```js
+// v1
+const sdk = new BrainboxWebSDK(url, key, tenant);
+new BrainboxWebWidget({ sdk, primaryColor: '#2563EB', buttonText: 'Help', title: 'Support' });
+// v2
+Brainbox.init({ apiUrl: url, apiKey: key, tenantId: tenant,
+                theme: { primary: '#2563EB' }, launcher: { text: 'Help' }, branding: { botName: 'Support' } });
+```
+
+The README for v1 mentioned `POST /api/chat/stream`. That endpoint does not exist.
+
+---
+
+## Examples and local preview
+
+```bash
+node examples/mock-server.js        # mock backend + static files on http://localhost:8787
+# open http://localhost:8787/examples/  (floating, sidebar, inline + floating, page, v1-compat)
+```
+
+The mock implements every endpoint above using only Node built-ins. Some keywords in a question change its
+behaviour: `code`, `table`, `slow` (6 s), `fail` (500), `invalid` (422) and `auth` (401). To test cross-origin
+requests, serve the pages from a second port with `node examples/mock-server.js --static-only --port 8788`.
+
+## Build
+
+`brainbox-web-sdk.js` is the readable source and is served as-is. `npm run build` writes
+`dist/brainbox-web-sdk.min.js` with terser, and the `unpkg` and `jsdelivr` fields point to that file.
+Supports evergreen browsers (ES2018).

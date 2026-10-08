@@ -5,6 +5,8 @@ import os
 
 from app.db.session import get_db
 from app.db.models import ChatMessage as ChatMessageModel
+from app.api.chat import resolve_session
+from app.dependencies import AuthContext, require_api_key
 from app.utils.logging import logger
 
 router = APIRouter()
@@ -17,11 +19,22 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/chat/upload/file")
 async def upload_file(
     file: UploadFile = File(...),
-    tenant_id: str = Form(...),
+    tenant_id: str = Form(None),
     session_id: str = Form(None),
+    user_id: str = Form(None),
+    user_name: str = Form(None),
+    user_role: str = Form(None),
+    auth: AuthContext = Depends(require_api_key),
     db: Session = Depends(get_db)
 ):
+    tenant_id = auth.resolve_tenant(tenant_id)
     try:
+        if session_id:
+            # Before touching disk: unknown session -> created (stamped); foreign session -> 404.
+            resolve_session(
+                db, session_id, tenant_id,
+                user_id=user_id, user_name=user_name, user_role=auth.effective_role(user_role), create=True,
+            )
         if not file:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -82,11 +95,22 @@ async def upload_file(
 @router.post("/chat/upload/image")
 async def upload_image(
     image: UploadFile = File(...),
-    tenant_id: str = Form(...),
+    tenant_id: str = Form(None),
     session_id: str = Form(None),
+    user_id: str = Form(None),
+    user_name: str = Form(None),
+    user_role: str = Form(None),
+    auth: AuthContext = Depends(require_api_key),
     db: Session = Depends(get_db)
 ):
+    tenant_id = auth.resolve_tenant(tenant_id)
     try:
+        if session_id:
+            # Before touching disk: unknown session -> created (stamped); foreign session -> 404.
+            resolve_session(
+                db, session_id, tenant_id,
+                user_id=user_id, user_name=user_name, user_role=auth.effective_role(user_role), create=True,
+            )
         if not image:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

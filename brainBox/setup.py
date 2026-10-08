@@ -21,6 +21,11 @@ setup(
         "langgraph>=0.0.29",
         "pydantic>=2.5.0",
         "python-dotenv>=1.0.0",
+        "httpx>=0.25.0",
+        "python-multipart>=0.0.18",
+        "pypdf>=4.0.0",
+        "defusedxml>=0.7.1",
+        "python-docx>=1.1.0",
     ],
     entry_points={
         "console_scripts": [

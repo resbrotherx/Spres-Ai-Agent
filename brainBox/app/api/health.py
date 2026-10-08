@@ -1,21 +1,44 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text  # Added this import
 from app.db.session import get_db
+from app.apikeys import effective_key_type, resolve_key
+from app.dependencies import INVALID_KEY, extract_api_key, require_secret_key
+from app.staff import looks_like_jwt, user_from_jwt
 from app.utils.logging import logger
 import redis
 
 router = APIRouter()
 
 @router.get("/health")
-async def health_check():
-    return {
+def health_check(request: Request, db: Session = Depends(get_db)):
+    """Public liveness check. When an API key (X-API-Key / Authorization: Bearer) or a staff JWT
+    is sent it is validated too - 401 if invalid, else ``key: {valid, key_type, tenant_id}`` -
+    so integrations can offer a "Test connection" button. Independent of REQUIRE_API_KEY."""
+    body = {
         "status": "healthy",
         "service": "brainbox",
         "version": "1.0.0"
     }
+    raw = extract_api_key(request)
+    if raw is None and not (request.headers.get("authorization") or "").strip():
+        return body
+    key_info = None
+    if raw and looks_like_jwt(raw):
+        user = user_from_jwt(db, raw)
+        if user is not None:
+            key_info = {"valid": True, "key_type": "staff", "tenant_id": user.tenant_id}
+    elif raw:
+        record = resolve_key(db, raw)
+        if record is not None:
+            key_info = {"valid": True, "key_type": effective_key_type(record), "tenant_id": record.tenant_id}
+    if key_info is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_KEY,
+                            headers={"WWW-Authenticate": "Bearer"})
+    body["key"] = key_info
+    return body
 
-@router.get("/health/db")
+@router.get("/health/db", dependencies=[Depends(require_secret_key)])
 async def health_check_db(db: Session = Depends(get_db)):
     try:
         # Wrapped "SELECT 1" with text()
@@ -25,7 +48,7 @@ async def health_check_db(db: Session = Depends(get_db)):
         logger.error(f"Database health check failed: {str(e)}")
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
 
-@router.get("/health/cache")
+@router.get("/health/cache", dependencies=[Depends(require_secret_key)])
 async def health_check_cache():
     try:
         from app.redis_cache.cache import redis_client
@@ -35,7 +58,7 @@ async def health_check_cache():
         logger.error(f"Cache health check failed: {str(e)}")
         return {"status": "unhealthy", "cache": "disconnected", "error": str(e)}
 
-@router.get("/health/vector")
+@router.get("/health/vector", dependencies=[Depends(require_secret_key)])
 async def health_check_vector(db: Session = Depends(get_db)):
     result = {
         "status": "healthy",

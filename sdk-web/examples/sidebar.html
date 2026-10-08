@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brainbox - sidebar</title>
+  <link rel="stylesheet" href="_host.css" />
+  <style>
+    header.demo { position: sticky; top: 0; height: 46px; box-sizing: border-box; padding: 12px 24px; z-index: 5; }
+  </style>
+</head>
+<body>
+  <header class="demo"><a href="index.html">Examples</a> Sidebar mode (starts below this 46px bar)</header>
+  <main class="demo">
+    <div class="demo-card">
+      <h1>Account dashboard</h1>
+      <p>The sidebar is docked on the right and pushes this content (padding-right on <code>body</code>) on screens
+         992px and wider. On smaller screens it overlays the page.</p>
+      <p><button id="toggle" type="button">Toggle assistant</button></p>
+    </div>
+    <div class="demo-card"><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus.</p></div>
+  </main>
+
+  <script src="../brainbox-web-sdk.js"></script>
+  <script>
+    var bb = Brainbox.init({
+      apiUrl: window.BB_API || 'http://localhost:8787',
+      apiKey: 'YOUR_API_KEY',
+      tenantId: 'YOUR_TENANT_ID',
+      user: { id: 'demo-user-2', name: 'Grace Hopper' },
+      mode: 'sidebar',
+      sidebarTop: 46,
+      sidebarWidth: 380,
+      defaultOpen: true,
+      allowedModes: ['sidebar', 'floating'],
+      theme: { primary: '#2563eb', panel: '#f3f7ff' },
+      branding: { botName: 'Acme Assistant', subtitle: 'Ask about your account' },
+      context: function () { return 'The user is viewing the Account dashboard page.'; },
+      storageKey: 'bb-demo-sidebar'
+    });
+    document.getElementById('toggle').addEventListener('click', function () { bb.toggle(); });
+  </script>
+</body>
+</html>

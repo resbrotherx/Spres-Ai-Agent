@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brainbox - full page</title>
+  <link rel="stylesheet" href="_host.css" />
+  <style>
+    html, body { height: 100%; }
+    body { display: flex; flex-direction: column; }
+    #assistant { flex: 1; min-height: 0; padding: 12px; box-sizing: border-box; }
+  </style>
+</head>
+<body>
+  <header class="demo"><a href="index.html">Examples</a> Full-page assistant</header>
+  <div id="assistant"></div>
+
+  <script src="../brainbox-web-sdk.js"></script>
+  <script>
+    var bb = Brainbox.init({
+      apiUrl: window.BB_API || 'http://localhost:8787',
+      apiKey: 'YOUR_API_KEY',
+      tenantId: 'YOUR_TENANT_ID',
+      user: { id: 'demo-user-4', name: 'Katherine Johnson', email: 'katherine@example.com' },
+      mode: 'page',
+      container: '#assistant',
+      allowedModes: ['page'],
+      branding: { botName: 'Cortex', title: 'Cortex' },
+      page: { greeting: 'Hello, {{name}}', heading: 'How can I assist you today?' },
+      quickActions: [
+        { title: 'Synthesize data', description: 'Turn my notes into 5 key bullet points.', prompt: 'Turn my meeting notes into 5 key bullet points.', icon: 'pie' },
+        { title: 'Show code', description: 'How do I call the chat API from JavaScript?', prompt: 'Show me some code to call the API', icon: 'bulb' },
+        { title: 'Compare plans', description: 'Put the plans in a table.', prompt: 'Compare the plans in a table', icon: 'question' }
+      ],
+      features: { export: true },
+      storageKey: 'bb-demo-page'
+    });
+  </script>
+</body>
+</html>

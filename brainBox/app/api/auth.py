@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Annotated
-import secrets
+from typing import Annotated, Literal
+
+from app import apikeys
+from app.dependencies import require_admin_token
 
 from app.db.session import get_db
-from app.db.models import User, APIKey
+from app.db.models import User
 from app.utils.security import create_access_token, hash_password, verify_password
-from app.utils.hashing import create_hash
 from app.utils.logging import logger
 
 router = APIRouter()
@@ -34,6 +35,7 @@ class LoginResponse(BaseModel):
 class APIKeyResponse(BaseModel):
     api_key: str
     tenant_id: str
+    key_type: str
 
 @router.post("/signup", response_model=SignupResponse)
 async def signup(
@@ -119,33 +121,21 @@ async def login(
             detail="Login failed"
         )
 
-@router.post("/api-key", response_model=APIKeyResponse)
+@router.post("/api-key", response_model=APIKeyResponse, dependencies=[Depends(require_admin_token)])
 async def create_api_key(
     tenant_id: str,
+    key_type: Literal["publishable", "secret"] = "publishable",
     db: Session = Depends(get_db)
 ):
+    """Deprecated: use POST /api/admin/keys. Kept for compatibility; requires X-Admin-Token."""
     try:
-        api_key = secrets.token_urlsafe(32)
-        key_hash = create_hash(api_key)
-
-        api_key_record = APIKey(
-            user_id=1,
-            tenant_id=tenant_id,
-            key_hash=key_hash,
-            name=f"API Key for {tenant_id}"
-        )
-
-        db.add(api_key_record)
-        db.commit()
-
-        return APIKeyResponse(
-            api_key=api_key,
-            tenant_id=tenant_id
-        )
-
+        record, raw = apikeys.create_key(db, tenant_id, key_type)
+    except apikeys.KeyRequestError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except Exception as e:
         logger.error(f"Error creating API key: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create API key"
         )
+    return APIKeyResponse(api_key=raw, tenant_id=record.tenant_id, key_type=record.key_type)

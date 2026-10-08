@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brainbox AI for Odoo</title>
+<meta name="description" content="How the Brainbox AI add-on for Odoo works: architecture, keys, roles, configuration and file-by-file reference.">
+<style>
+:root{
+  --primary:#1d4ed8; --primary-dark:#1e3a8a; --accent:#0ea5e9; --navy:#0b1f44;
+  --callout:#eff6ff; --ink:#1e293b; --muted:#64748b; --line:#dbe3ef; --soft:#f8fafc;
+  --amber:#b45309; --amber-bg:#fffbeb; --green:#047857; --green-bg:#ecfdf5; --red:#b91c1c; --red-bg:#fef2f2;
+}
+@page{ size:A4; margin:17mm 16mm 19mm 16mm; }
+@page cover{ margin:0; }
+*{ box-sizing:border-box; }
+html,body{ background:#fff; }
+body{ margin:0; font-family:"Inter","Segoe UI",system-ui,-apple-system,Arial,sans-serif; color:var(--ink);
+  font-size:10pt; line-height:1.52; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+@media screen{ body{ max-width:210mm; margin:0 auto; padding:0 16px; } }
+
+/* ---------- cover ---------- */
+.cover{ page:cover; width:210mm; height:297mm; position:relative; overflow:hidden; color:#fff;
+  background:linear-gradient(155deg,#0b1f44 0%,#12306e 52%,#1d4ed8 100%); break-after:page; }
+@media screen{ .cover{ width:100%; height:auto; min-height:900px; } }
+.cover .inner{ position:absolute; inset:0; padding:30mm 22mm 24mm; display:flex; flex-direction:column; }
+.cover .brand{ display:flex; align-items:center; gap:12px; font-weight:600; letter-spacing:.14em; font-size:9.5pt;
+  text-transform:uppercase; color:#bae6fd; }
+.cover .brand .dot{ width:30px; height:30px; border-radius:50%; background:radial-gradient(circle at 35% 35%,#7dd3fc,#0ea5e9 55%,#1d4ed8); box-shadow:0 0 0 6px rgba(14,165,233,.18); }
+.cover h1{ font-size:38pt; line-height:1.08; margin:34mm 0 6mm; font-weight:800; letter-spacing:-.02em; }
+.cover h1 span{ color:#7dd3fc; }
+.cover .sub{ font-size:14pt; color:#dbeafe; max-width:150mm; line-height:1.45; margin:0; }
+.cover .meta{ margin-top:auto; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.cover .meta div{ border:1px solid rgba(186,230,253,.35); border-radius:10px; padding:10px 12px; background:rgba(255,255,255,.06); }
+.cover .meta b{ display:block; font-size:7.5pt; letter-spacing:.12em; text-transform:uppercase; color:#93c5fd; font-weight:600; }
+.cover .meta span{ font-size:11.5pt; font-weight:600; }
+.cover .fine{ margin-top:8mm; font-size:8.5pt; color:#93c5fd; }
+.cover svg.orb{ position:absolute; right:-40mm; top:60mm; width:150mm; opacity:.22; }
+
+/* ---------- headings ---------- */
+h2{ break-before:page; font-size:20pt; color:var(--navy); margin:0 0 4mm; line-height:1.15; letter-spacing:-.01em;
+  padding-bottom:3mm; border-bottom:3px solid var(--primary); }
+h2 .num{ color:var(--accent); margin-right:8px; }
+h3{ font-size:13pt; color:var(--navy); margin:6mm 0 2mm; break-after:avoid; }
+h4{ font-size:10.5pt; color:var(--primary-dark); margin:4mm 0 1.5mm; break-after:avoid; }
+p{ margin:0 0 2.6mm; }
+.lead{ font-size:11pt; color:#334155; }
+ul,ol{ margin:0 0 3mm; padding-left:6mm; }
+li{ margin:0 0 1mm; }
+code,.mono{ font-family:"Cascadia Code","Consolas","Courier New",monospace; font-size:8.6pt; }
+code{ background:#eef2f7; border-radius:4px; padding:0 3px; color:#0f2a5c; }
+pre{ font-family:"Cascadia Code","Consolas",monospace; font-size:8.3pt; line-height:1.45; background:#0b1f44; color:#e0f2fe;
+  border-radius:8px; padding:3.2mm 4mm; margin:0 0 3.5mm; white-space:pre-wrap; word-break:break-word; break-inside:avoid; }
+pre .c{ color:#7dd3fc; } pre .k{ color:#fcd34d; } pre .s{ color:#a7f3d0; }
+a{ color:var(--primary); text-decoration:none; }
+strong{ color:#0f172a; }
+
+/* ---------- callouts ---------- */
+.callout{ border-radius:8px; padding:3mm 4mm 2.2mm; margin:0 0 3.5mm; break-inside:avoid; border-left:4px solid var(--primary); background:var(--callout); }
+.callout .t{ display:block; font-weight:700; font-size:8.2pt; letter-spacing:.09em; text-transform:uppercase; margin-bottom:1mm; color:var(--primary); }
+.callout.dev{ background:#f1f5f9; border-left-color:#475569; } .callout.dev .t{ color:#334155; }
+.callout.imp{ background:var(--amber-bg); border-left-color:#f59e0b; } .callout.imp .t{ color:var(--amber); }
+.callout.ok{ background:var(--green-bg); border-left-color:#10b981; } .callout.ok .t{ color:var(--green); }
+.callout p:last-child,.callout ul:last-child{ margin-bottom:1mm; }
+
+/* ---------- tables ---------- */
+table{ width:100%; border-collapse:separate; border-spacing:0; margin:0 0 4mm; font-size:8.9pt; break-inside:auto; border:1px solid var(--line); }
+table.keep{ break-inside:avoid; border-radius:8px; overflow:hidden; }
+table.compact{ font-size:8.5pt; } table.compact tbody td{ padding:1.3mm 2.4mm; }
+thead th{ background:var(--navy); color:#fff; text-align:left; font-weight:600; padding:2mm 2.6mm; font-size:8.4pt; letter-spacing:.02em; }
+tbody td{ padding:1.8mm 2.6mm; border-top:1px solid var(--line); vertical-align:top; }
+tbody tr:nth-child(even) td{ background:#f8fafc; }
+tr{ break-inside:avoid; }
+td.k{ font-weight:600; color:var(--navy); white-space:nowrap; }
+td .mono, td code{ font-size:8pt; }
+tbody tr.group td{ background:#dbeafe !important; color:var(--primary-dark); font-weight:700; font-size:8.2pt; letter-spacing:.06em; text-transform:uppercase; padding:1.4mm 2.6mm; }
+
+/* ---------- figures ---------- */
+figure{ margin:0 0 4mm; break-inside:avoid; border:1px solid var(--line); border-radius:10px; padding:3mm 3mm 2mm; background:#fff; }
+figure svg{ width:100%; height:auto; display:block; }
+figcaption{ font-size:8.4pt; color:var(--muted); margin-top:1.5mm; text-align:center; }
+figcaption b{ color:var(--navy); }
+
+/* ---------- misc blocks ---------- */
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:4mm; margin-bottom:3.5mm; }
+.grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:3.5mm; margin-bottom:3.5mm; }
+.card{ border:1px solid var(--line); border-radius:10px; padding:3mm 3.5mm 2mm; break-inside:avoid; background:#fff; }
+.card h4{ margin-top:0; }
+.card.blue{ background:var(--callout); border-color:#bfdbfe; }
+.card .tag{ display:inline-block; font-size:7.5pt; font-weight:700; letter-spacing:.08em; text-transform:uppercase; border-radius:99px; padding:.4mm 2.4mm; margin-bottom:1.5mm; }
+.tag.pk{ background:#e0f2fe; color:#075985; } .tag.sk{ background:#dbeafe; color:#1e3a8a; } .tag.adm{ background:#fef3c7; color:#92400e; }
+.big3 .card{ text-align:left; }
+.big3 .ico{ width:34px; height:34px; border-radius:9px; display:grid; place-items:center; color:#fff; font-weight:800; font-size:13pt; margin-bottom:2mm; }
+.steps{ counter-reset:s; list-style:none; padding:0; margin:0 0 3mm; }
+.steps > li{ counter-increment:s; position:relative; padding:2.2mm 3mm 2.2mm 12mm; margin:0 0 2mm; border:1px solid var(--line); border-radius:8px; break-inside:avoid; background:#fff; }
+.steps > li::before{ content:counter(s); position:absolute; left:3mm; top:2.2mm; width:6.5mm; height:6.5mm; border-radius:50%; background:var(--primary); color:#fff; font-weight:700; font-size:9pt; display:grid; place-items:center; }
+.steps > li b.h{ color:var(--navy); }
+.steps .tech{ display:block; color:var(--muted); font-size:8.4pt; margin-top:.6mm; }
+.check{ list-style:none; padding:0; }
+.check li{ position:relative; padding-left:7mm; margin-bottom:1.6mm; break-inside:avoid; }
+.check li::before{ content:""; position:absolute; left:0; top:1mm; width:3.6mm; height:3.6mm; border:1.6px solid var(--primary); border-radius:3px; }
+.pill{ display:inline-block; font-size:8pt; border-radius:99px; padding:0 2.2mm; font-weight:600; }
+.pill.y{ background:var(--green-bg); color:var(--green); } .pill.n{ background:var(--red-bg); color:var(--red); }
+.pill.m{ background:#e0f2fe; color:#075985; }
+.tree{ background:var(--soft); color:var(--ink); border:1px solid var(--line); }
+.tree .d{ color:var(--primary); font-weight:700; } .tree .c{ color:var(--muted); }
+.filecard{ border:1px solid var(--line); border-radius:9px; margin:0 0 3mm; break-inside:avoid; overflow:hidden; }
+.filecard .fh{ background:var(--callout); padding:1.8mm 3.5mm; display:flex; justify-content:space-between; align-items:baseline; gap:4mm; border-bottom:1px solid #dbeafe; }
+.filecard .fh .l{ display:flex; flex-wrap:wrap; gap:1mm 3mm; }
+.filecard .fh code{ background:none; padding:0; font-weight:700; font-size:9pt; color:var(--navy); }
+.filecard .fh span{ font-size:8pt; color:var(--muted); text-align:right; }
+.filecard .fb{ padding:2mm 3.5mm 1mm; }
+.filecard .fb p{ margin-bottom:1.5mm; }
+.filecard .fb ul{ margin-bottom:1.5mm; font-size:9pt; }
+.toc{ list-style:none; padding:0; margin:2mm 0 0; }
+.toc li{ display:flex; align-items:baseline; gap:2mm; padding:1.9mm 0; border-bottom:1px dotted #cbd5e1; margin:0; }
+.toc li .n{ width:9mm; font-weight:800; color:var(--accent); }
+.toc li a{ color:var(--navy); font-weight:600; }
+.toc li .d{ color:var(--muted); font-size:8.6pt; margin-left:2mm; flex:1; }
+.toc li .pg{ font-weight:700; color:var(--primary); min-width:8mm; text-align:right; }
+.toc-h{ break-before:auto; border:0; padding:0; margin-top:0; }
+.small{ font-size:8.6pt; color:var(--muted); }
+.nobreak{ break-inside:avoid; }
+hr.sep{ border:0; border-top:1px solid var(--line); margin:4mm 0; }
+.kv{ display:grid; grid-template-columns:32mm 1fr; gap:1mm 4mm; font-size:9.2pt; }
+.kv b{ color:var(--navy); }
+</style>
+</head>
+<body>
+
+<!-- =============================== COVER =============================== -->
+<section class="cover">
+  <svg class="orb" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="96" fill="none" stroke="#7dd3fc" stroke-width="1.2"/><circle cx="100" cy="100" r="70" fill="none" stroke="#7dd3fc" stroke-width="1"/><circle cx="100" cy="100" r="44" fill="none" stroke="#7dd3fc" stroke-width=".8"/><g fill="#bae6fd"><circle cx="100" cy="4" r="4"/><circle cx="170" cy="100" r="4"/><circle cx="56" cy="100" r="3"/><circle cx="31" cy="150" r="3"/><circle cx="150" cy="40" r="3"/></g><path d="M100 4 L170 100 L100 144 L56 100 Z M31 150 L56 100 M150 40 L170 100" fill="none" stroke="#bae6fd" stroke-width=".8"/></svg>
+  <div class="inner">
+    <div class="brand"><div class="dot"></div>Brainbox AI · Technical &amp; business guide</div>
+    <h1>Brainbox AI for Odoo<br><span>How it works</span></h1>
+    <p class="sub">How Odoo talks to your brainBox server, what every file in the add-on does, how the keys and roles keep each company's data separate, and how to install and configure it.</p>
+    <div class="meta">
+      <div><b>Odoo add-on</b><span>brainbox_ai 17.0.2.0.0</span></div>
+      <div><b>Web SDK</b><span>spres-web 2.0.0</span></div>
+      <div><b>Date</b><span>8 October 2026</span></div>
+    </div>
+    <p class="fine">Written for the project owner, to read and to explain to management. Plain-language explanations come first; technical details follow in "For developers" boxes and in the reference sections.</p>
+  </div>
+</section>
+
+<!-- =============================== TOC =============================== -->
+<h2 class="toc-h">Contents</h2>
+<ol class="toc">
+  <li><span class="n">1</span><a href="#s1">Executive summary</a><span class="d">The whole story on one page</span><span class="pg" data-sec="s1">3</span></li>
+  <li><span class="n">2</span><a href="#s2">The big picture</a><span class="d">Odoo, websites and brainBox in two diagrams</span><span class="pg" data-sec="s2">4</span></li>
+  <li><span class="n">3</span><a href="#s3">A message's journey</a><span class="d">"When is my bill due?" step by step</span><span class="pg" data-sec="s3">6</span></li>
+  <li><span class="n">4</span><a href="#s4">Companies (tenants) and keys</a><span class="d">pk_, sk_ and the admin token explained</span><span class="pg" data-sec="s4">8</span></li>
+  <li><span class="n">5</span><a href="#s5">Who sees what</a><span class="d">Roles, audiences and why the browser can't cheat</span><span class="pg" data-sec="s5">11</span></li>
+  <li><span class="n">6</span><a href="#s6">If another company installs the add-on</a><span class="d">Does it talk to my brainBox? Onboarding checklist</span><span class="pg" data-sec="s6">13</span></li>
+  <li><span class="n">7</span><a href="#s7">Installation and configuration</a><span class="d">Every setting, display modes, running Odoo</span><span class="pg" data-sec="s7">15</span></li>
+  <li><span class="n">8</span><a href="#s8">File-by-file reference</a><span class="d">Every file of the add-on, routes, settings keys</span><span class="pg" data-sec="s8">19</span></li>
+  <li><span class="n">9</span><a href="#s9">The web SDK (sdk-web)</a><span class="d">Plain-HTML snippet, options, Odoo mapping</span><span class="pg" data-sec="s9">25</span></li>
+  <li><span class="n">10</span><a href="#s10">Security and known limitations</a><span class="d">What is protected, what is not (yet)</span><span class="pg" data-sec="s10">28</span></li>
+  <li><span class="n">11</span><a href="#s11">Glossary</a><span class="d">The vocabulary in plain words</span><span class="pg" data-sec="s11">30</span></li>
+  <li><span class="n">12</span><a href="#s12">Where to find everything</a><span class="d">Folders, files, menus and URLs</span><span class="pg" data-sec="s12">31</span></li>
+</ol>
+
+<div class="callout" style="margin-top:8mm">
+  <span class="t">How to read this document</span>
+  <p>Sections 1 to 6 are written for everyone, including non-developers: read them to understand and explain the product. Sections 7 to 9 are the practical and technical reference for whoever installs and maintains it. Section 10 lists the protections and the current limitations honestly, so nobody is surprised.</p>
+</div>
+<div class="callout imp">
+  <span class="t">About secrets in this document</span>
+  <p>No real key, password or token appears here. Keys are written as placeholders such as <code>pk_live_xxx</code> and <code>sk_live_xxx</code>. The only real address used is the public brainBox server <code>https://port.smartpowerbilling.com</code>.</p>
+</div>
+
+<!-- =============================== 1 =============================== -->
+<h2 id="s1"><span class="num">1</span>Executive summary</h2>
+<p class="lead">Brainbox AI is an AI assistant that answers questions from a company's own knowledge (documents, FAQs, past support tickets). It has three parts, and Odoo is only one of the places where it can appear.</p>
+
+<div class="grid3 big3">
+  <div class="card blue">
+    <div class="ico" style="background:#0b1f44">B</div>
+    <h4>brainBox = the brain</h4>
+    <p>Runs on <b>your</b> server (<code>port.smartpowerbilling.com</code>). Keeps each client company's knowledge separate, finds the relevant passages, has the AI model write the answer, and remembers the conversations.</p>
+  </div>
+  <div class="card blue">
+    <div class="ico" style="background:#0ea5e9">S</div>
+    <h4>SDKs = the faces</h4>
+    <p>Ready-made chat windows: <b>sdk-web</b> (websites and Odoo), <b>sdk-react</b> (React / Next.js) and <b>sdk-react-native</b> (mobile apps). They show the chat; there is no AI inside them.</p>
+  </div>
+  <div class="card blue">
+    <div class="ico" style="background:#1d4ed8">O</div>
+    <h4>Odoo add-on = the bridge</h4>
+    <p><b>brainbox_ai</b> puts the web chat inside Odoo, adds a settings screen, and passes each message to brainBox with the company's secret key and the user's identity.</p>
+  </div>
+</div>
+
+<div class="callout">
+  <span class="t">In plain words</span>
+  <p>brainBox is a call centre with one expert per client company; the SDKs are the telephones; the Odoo add-on is the receptionist inside Odoo. She checks who is calling, dials the right expert with the company's private access code and passes the answer back. <b>She never answers questions herself and keeps no notes.</b></p>
+</div>
+
+<h3>Five facts to remember</h3>
+<table class="keep compact">
+  <thead><tr><th style="width:34%">Fact</th><th>What it means</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Odoo contains no AI</td><td>All AI work happens on the brainBox server.</td></tr>
+    <tr><td class="k">Odoo stores no chats</td><td>Conversations live on brainBox, per user; Odoo keeps only its settings.</td></tr>
+    <tr><td class="k">The secret key never reaches browsers</td><td>It stays on the Odoo server; users' browsers only talk to Odoo.</td></tr>
+    <tr><td class="k">Each company is sealed off</td><td>Each company is a separate "tenant"; a key opens only its own tenant.</td></tr>
+    <tr><td class="k">You control access</td><td>Nobody can use your brainBox without a key you created, and you can revoke it.</td></tr>
+  </tbody>
+</table>
+
+<p><b>What Odoo users see:</b> a chat button in a corner of every Odoo screen (or a docked panel, or a sparkle icon in the top bar), an <b>AI Assistant</b> app with full-screen chat and past conversations, and optionally a chat box inside a specific form that tells the AI which record is open.</p>
+
+<div class="callout ok">
+  <span class="t">The one-sentence version for your boss</span>
+  <p>"Our AI runs on our own server and keeps every client company's knowledge in a sealed compartment; the Odoo add-on is just a secure doorway that shows our chat inside Odoo and passes questions to our server with that company's private key, so nobody can use it, or see another company's data, without a key we issued and can revoke at any time."</p>
+</div>
+
+<!-- =============================== 2 =============================== -->
+<h2 id="s2"><span class="num">2</span>The big picture</h2>
+<p>The same brainBox server serves every channel. What changes between channels is <b>how the message reaches it</b> and <b>which key is used</b>.</p>
+
+<h3>A. Inside Odoo (the brainbox_ai add-on)</h3>
+<figure>
+<svg viewBox="0 0 720 318" role="img" aria-label="Browser to Odoo to brainBox diagram" font-family="Segoe UI, Inter, Arial, sans-serif">
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/></marker>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#0ea5e9"/></marker>
+  </defs>
+  <!-- browser -->
+  <rect x="6" y="18" width="164" height="236" rx="14" fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1.6"/>
+  <text x="88" y="44" text-anchor="middle" font-size="14" font-weight="700" fill="#0b1f44">1 · Your browser</text>
+  <text x="88" y="61" text-anchor="middle" font-size="11" fill="#475569">Odoo user, e.g. Ada</text>
+  <rect x="22" y="76" width="132" height="76" rx="10" fill="#fff" stroke="#0ea5e9" stroke-width="1.3"/>
+  <text x="88" y="102" text-anchor="middle" font-size="13" font-weight="700" fill="#0369a1">sdk-web</text>
+  <text x="88" y="119" text-anchor="middle" font-size="11" fill="#334155">chat widget</text>
+  <text x="88" y="135" text-anchor="middle" font-size="10.5" fill="#64748b">(the "face")</text>
+  <text x="88" y="180" text-anchor="middle" font-size="10.5" fill="#334155">holds NO key</text>
+  <text x="88" y="196" text-anchor="middle" font-size="10.5" fill="#334155">talks only to Odoo</text>
+  <text x="88" y="212" text-anchor="middle" font-size="10.5" fill="#334155">(same website)</text>
+  <!-- odoo -->
+  <rect x="262" y="18" width="186" height="236" rx="14" fill="#eff6ff" stroke="#1d4ed8" stroke-width="1.6"/>
+  <text x="355" y="44" text-anchor="middle" font-size="14" font-weight="700" fill="#0b1f44">2 · Odoo server</text>
+  <text x="355" y="61" text-anchor="middle" font-size="11" fill="#475569">brainbox_ai add-on</text>
+  <rect x="278" y="76" width="154" height="34" rx="9" fill="#1d4ed8"/>
+  <text x="355" y="98" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">Proxy (messenger)</text>
+  <text x="282" y="134" font-size="10.8" fill="#0b1f44">✓ user logged in &amp; allowed?</text>
+  <text x="282" y="153" font-size="10.8" fill="#0b1f44">✓ only chat requests pass</text>
+  <text x="282" y="172" font-size="10.8" fill="#0b1f44">+ adds secret key  sk_…</text>
+  <text x="282" y="191" font-size="10.8" fill="#0b1f44">+ adds user id, name, role</text>
+  <text x="282" y="210" font-size="10.8" fill="#0b1f44">+ adds tenant (if set)</text>
+  <text x="282" y="236" font-size="10.5" fill="#64748b">stores settings only</text>
+  <!-- brainbox -->
+  <rect x="534" y="18" width="180" height="236" rx="14" fill="#0b1f44"/>
+  <text x="624" y="44" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">3 · brainBox server</text>
+  <text x="624" y="61" text-anchor="middle" font-size="10.5" fill="#93c5fd">port.smartpowerbilling.com</text>
+  <rect x="548" y="74" width="152" height="30" rx="8" fill="#163a7a"/><text x="624" y="94" text-anchor="middle" font-size="11" fill="#fff">key → which company</text>
+  <rect x="548" y="110" width="152" height="30" rx="8" fill="#163a7a"/><text x="624" y="130" text-anchor="middle" font-size="11" fill="#fff">search its knowledge</text>
+  <rect x="548" y="146" width="152" height="30" rx="8" fill="#163a7a"/><text x="624" y="166" text-anchor="middle" font-size="11" fill="#fff">AI model writes answer</text>
+  <rect x="548" y="182" width="152" height="30" rx="8" fill="#163a7a"/><text x="624" y="202" text-anchor="middle" font-size="11" fill="#fff">save the conversation</text>
+  <text x="624" y="236" text-anchor="middle" font-size="10.5" fill="#bae6fd">all AI work happens here</text>
+  <!-- arrows -->
+  <line x1="172" y1="100" x2="258" y2="100" stroke="#1d4ed8" stroke-width="2.2" marker-end="url(#a1)"/>
+  <text x="215" y="80" text-anchor="middle" font-size="10.5" fill="#1e3a8a" font-weight="600">question</text>
+  <text x="215" y="93" text-anchor="middle" font-size="10" fill="#475569">+ Odoo login</text>
+  <line x1="258" y1="196" x2="174" y2="196" stroke="#0ea5e9" stroke-width="2.2" marker-end="url(#a2)"/>
+  <text x="215" y="214" text-anchor="middle" font-size="10.5" fill="#0369a1" font-weight="600">answer</text>
+  <line x1="450" y1="100" x2="530" y2="100" stroke="#1d4ed8" stroke-width="2.2" marker-end="url(#a1)"/>
+  <text x="491" y="80" text-anchor="middle" font-size="10.5" fill="#1e3a8a" font-weight="600">question</text>
+  <text x="491" y="93" text-anchor="middle" font-size="10" fill="#475569">+ key + who</text>
+  <line x1="530" y1="196" x2="452" y2="196" stroke="#0ea5e9" stroke-width="2.2" marker-end="url(#a2)"/>
+  <text x="491" y="214" text-anchor="middle" font-size="10.5" fill="#0369a1" font-weight="600">answer</text>
+  <!-- bottom band -->
+  <rect x="6" y="268" width="708" height="42" rx="10" fill="#f8fafc" stroke="#dbe3ef"/>
+  <text x="360" y="286" text-anchor="middle" font-size="11" fill="#0b1f44" font-weight="600">The browser never sees the secret key, and cannot pretend to be someone else:</text>
+  <text x="360" y="302" text-anchor="middle" font-size="11" fill="#475569">Odoo overwrites "who is asking" with the real logged-in user before forwarding.</text>
+</svg>
+<figcaption><b>Figure 1.</b> Odoo: the chat widget talks to Odoo; Odoo's proxy adds the secret key and the user's identity, then forwards to brainBox.</figcaption>
+</figure>
+
+<h3>B. On a plain HTML website (no Odoo)</h3>
+<figure>
+<svg viewBox="0 0 720 236" role="img" aria-label="Website directly to brainBox diagram" font-family="Segoe UI, Inter, Arial, sans-serif">
+  <defs>
+    <marker id="b1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/></marker>
+    <marker id="b2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#0ea5e9"/></marker>
+  </defs>
+  <rect x="6" y="14" width="250" height="180" rx="14" fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1.6"/>
+  <text x="131" y="40" text-anchor="middle" font-size="14" font-weight="700" fill="#0b1f44">Visitor's browser</text>
+  <text x="131" y="57" text-anchor="middle" font-size="11" fill="#475569">any company website</text>
+  <rect x="24" y="70" width="214" height="56" rx="10" fill="#fff" stroke="#0ea5e9"/>
+  <text x="131" y="93" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0369a1">sdk-web widget</text>
+  <text x="131" y="111" text-anchor="middle" font-size="10.5" fill="#334155">loaded with one &lt;script&gt; tag</text>
+  <rect x="24" y="136" width="214" height="44" rx="10" fill="#e0f2fe" stroke="#7dd3fc"/>
+  <text x="131" y="154" text-anchor="middle" font-size="11" font-weight="700" fill="#075985">publishable key  pk_live_xxx</text>
+  <text x="131" y="170" text-anchor="middle" font-size="10" fill="#075985">visible in the page: that is expected</text>
+  <rect x="464" y="14" width="250" height="180" rx="14" fill="#0b1f44"/>
+  <text x="589" y="40" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">brainBox server</text>
+  <text x="589" y="57" text-anchor="middle" font-size="10.5" fill="#93c5fd">port.smartpowerbilling.com</text>
+  <rect x="482" y="70" width="214" height="30" rx="8" fill="#163a7a"/><text x="589" y="90" text-anchor="middle" font-size="11" fill="#fff">pk_ key → which company</text>
+  <rect x="482" y="106" width="214" height="30" rx="8" fill="#163a7a"/><text x="589" y="126" text-anchor="middle" font-size="11" fill="#fff">role forced to "public"</text>
+  <rect x="482" y="142" width="214" height="30" rx="8" fill="#163a7a"/><text x="589" y="162" text-anchor="middle" font-size="11" fill="#fff">only PUBLIC knowledge used</text>
+  <line x1="258" y1="86" x2="460" y2="86" stroke="#1d4ed8" stroke-width="2.2" marker-end="url(#b1)"/>
+  <text x="359" y="76" text-anchor="middle" font-size="10.5" fill="#1e3a8a" font-weight="600">question + publishable key (direct)</text>
+  <line x1="460" y1="140" x2="260" y2="140" stroke="#0ea5e9" stroke-width="2.2" marker-end="url(#b2)"/>
+  <text x="359" y="158" text-anchor="middle" font-size="10.5" fill="#0369a1" font-weight="600">answer</text>
+  <text x="360" y="218" text-anchor="middle" font-size="10.8" fill="#475569">sdk-react (React / Next.js) and sdk-react-native (mobile apps) connect the same way.</text>
+</svg>
+<figcaption><b>Figure 2.</b> Plain website: the widget calls brainBox directly with a publishable key. Visitors only ever get answers built from "public" knowledge.</figcaption>
+</figure>
+
+<div class="grid2">
+  <div class="callout"><span class="t">In plain words</span><p>A website visitor is a stranger, so the website uses a <b>front-door key</b> that only lets people ask public questions. Odoo users are known, logged-in people, so Odoo can safely use the company's <b>office key</b> and tell brainBox who each user is.</p></div>
+  <div class="callout dev"><span class="t">For developers</span><p>Odoo runs the SDK with <code>apiUrl: '/brainbox_ai/proxy'</code> and <b>no</b> <code>apiKey</code>. Because the proxy is on the same origin, there is no CORS and the Odoo session cookie authenticates the user. A website can also put its own proxy in front of the SDK ("proxy mode") to get the same protection.</p></div>
+</div>
+
+<h3>The SDK family</h3>
+<table class="keep">
+  <thead><tr><th>SDK</th><th>Used for</th><th>Typical key</th></tr></thead>
+  <tbody>
+    <tr><td class="k">sdk-web <span class="small">(npm: spres-web)</span></td><td>Plain HTML, WordPress, any JavaScript site, and Odoo (bundled inside the add-on)</td><td>pk_ in the page, or a server proxy holding sk_ (as Odoo does)</td></tr>
+    <tr><td class="k">sdk-react</td><td>React and Next.js web applications</td><td>pk_ in the browser (keep any sk_ on a server)</td></tr>
+    <tr><td class="k">sdk-react-native</td><td>Mobile apps (iOS / Android)</td><td>pk_ (anything inside an app can be extracted)</td></tr>
+  </tbody>
+</table>
+
+<!-- =============================== 3 =============================== -->
+<h2 id="s3"><span class="num">3</span>A message's journey</h2>
+<p class="lead">Example: <b>Ada</b> works in customer service at a company called <b>Acme</b>. She is logged into Acme's Odoo and types in the chat: <i>"When is my bill due?"</i></p>
+
+<figure>
+<svg viewBox="0 0 720 640" role="img" aria-label="Sequence diagram of one chat message" font-family="Segoe UI, Inter, Arial, sans-serif">
+  <defs>
+    <marker id="s1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/></marker>
+    <marker id="s1b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#0ea5e9"/></marker>
+    <style>
+      .sq-lbl{font-size:11.6px;fill:#0b1f44;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+      .sq-lbl2{font-size:10.8px;fill:#64748b;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+      .sq-note{fill:#eff6ff;stroke:#bfdbfe}
+      .sq-nt{font-size:11.2px;fill:#0b1f44}
+      .sq-num{font-size:10px;font-weight:700;fill:#fff}
+    </style>
+  </defs>
+  <!-- heads -->
+  <g font-size="11.5" text-anchor="middle">
+    <rect x="8" y="8" width="124" height="46" rx="9" fill="#0ea5e9"/><text x="70" y="27" fill="#fff" font-weight="700">Ada's browser</text><text x="70" y="44" fill="#e0f2fe" font-size="10">sdk-web widget</text>
+    <rect x="153" y="8" width="124" height="46" rx="9" fill="#1d4ed8"/><text x="215" y="27" fill="#fff" font-weight="700">Odoo server</text><text x="215" y="44" fill="#dbeafe" font-size="10">brainbox_ai proxy</text>
+    <rect x="298" y="8" width="124" height="46" rx="9" fill="#0b1f44"/><text x="360" y="27" fill="#fff" font-weight="700">brainBox API</text><text x="360" y="44" fill="#93c5fd" font-size="10">keys, tenants, chats</text>
+    <rect x="443" y="8" width="124" height="46" rx="9" fill="#334155"/><text x="505" y="27" fill="#fff" font-weight="700">Knowledge base</text><text x="505" y="44" fill="#cbd5e1" font-size="10">Acme's documents</text>
+    <rect x="588" y="8" width="124" height="46" rx="9" fill="#475569"/><text x="650" y="27" fill="#fff" font-weight="700">AI model</text><text x="650" y="44" fill="#e2e8f0" font-size="10">Ollama (OpenAI backup)</text>
+  </g>
+  <g stroke="#cbd5e1" stroke-width="1.4" stroke-dasharray="4 4">
+    <line x1="70" y1="54" x2="70" y2="630"/><line x1="215" y1="54" x2="215" y2="630"/><line x1="360" y1="54" x2="360" y2="630"/><line x1="505" y1="54" x2="505" y2="630"/><line x1="650" y1="54" x2="650" y2="630"/>
+  </g>
+  <!-- 1 -->
+  <line x1="70" y1="88" x2="211" y2="88" stroke="#1d4ed8" stroke-width="2" marker-end="url(#s1a)"/>
+  <circle cx="70" cy="88" r="8" fill="#1d4ed8"/><text x="70" y="91.5" text-anchor="middle" class="sq-num">1</text>
+  <text x="84" y="80" class="sq-lbl">POST /brainbox_ai/proxy/api/chat</text>
+  <text x="84" y="102" class="sq-lbl2">question · Odoo cookie · no key</text>
+  <!-- 2 -->
+  <rect x="223" y="118" width="304" height="40" rx="7" class="sq-note"/>
+  <circle cx="215" cy="138" r="8" fill="#1d4ed8"/><text x="215" y="141.5" text-anchor="middle" class="sq-num">2</text>
+  <text x="231" y="134" class="sq-nt">Checks: proxy header · logged in · allowed group</text>
+  <text x="231" y="150" class="sq-nt">· request is on the whitelist · add-on configured</text>
+  <!-- 3 -->
+  <rect x="223" y="168" width="304" height="40" rx="7" class="sq-note"/>
+  <circle cx="215" cy="188" r="8" fill="#1d4ed8"/><text x="215" y="191.5" text-anchor="middle" class="sq-num">3</text>
+  <text x="231" y="184" class="sq-nt">Replaces identity: user_id "odoo:acme_db:7",</text>
+  <text x="231" y="200" class="sq-nt">name "Ada", role "internal"; adds sk_live_xxx</text>
+  <!-- 4 -->
+  <line x1="215" y1="236" x2="356" y2="236" stroke="#1d4ed8" stroke-width="2" marker-end="url(#s1a)"/>
+  <circle cx="215" cy="236" r="8" fill="#1d4ed8"/><text x="215" y="239.5" text-anchor="middle" class="sq-num">4</text>
+  <text x="229" y="228" class="sq-lbl">POST /api/chat</text>
+  <text x="229" y="250" class="sq-lbl2">Bearer sk_live_xxx</text>
+  <!-- 5 -->
+  <rect x="368" y="262" width="304" height="40" rx="7" class="sq-note"/>
+  <circle cx="360" cy="282" r="8" fill="#0b1f44"/><text x="360" y="285.5" text-anchor="middle" class="sq-num">5</text>
+  <text x="376" y="278" class="sq-nt">Key valid, active, not expired → tenant "acme".</text>
+  <text x="376" y="294" class="sq-nt">Secret key → the role "internal" is trusted.</text>
+  <!-- 6 -->
+  <rect x="368" y="312" width="304" height="40" rx="7" class="sq-note"/>
+  <circle cx="360" cy="332" r="8" fill="#0b1f44"/><text x="360" y="335.5" text-anchor="middle" class="sq-num">6</text>
+  <text x="376" y="328" class="sq-nt">Find or create Ada's conversation (only she can</text>
+  <text x="376" y="344" class="sq-nt">open it). Check the 1-hour answer cache.</text>
+  <!-- 7 -->
+  <line x1="360" y1="380" x2="501" y2="380" stroke="#1d4ed8" stroke-width="2" marker-end="url(#s1a)"/>
+  <circle cx="360" cy="380" r="8" fill="#0b1f44"/><text x="360" y="383.5" text-anchor="middle" class="sq-num">7</text>
+  <text x="374" y="372" class="sq-lbl">search Acme's knowledge</text>
+  <text x="374" y="394" class="sq-lbl2">top 5 passages Ada may read</text>
+  <!-- 8 -->
+  <line x1="505" y1="430" x2="364" y2="430" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#s1b)"/>
+  <circle cx="505" cy="430" r="8" fill="#334155"/><text x="505" y="433.5" text-anchor="middle" class="sq-num">8</text>
+  <text x="376" y="422" class="sq-lbl">matching passages</text>
+  <!-- 9 -->
+  <line x1="360" y1="466" x2="646" y2="466" stroke="#1d4ed8" stroke-width="2" marker-end="url(#s1a)"/>
+  <circle cx="360" cy="466" r="8" fill="#0b1f44"/><text x="360" y="469.5" text-anchor="middle" class="sq-num">9</text>
+  <text x="374" y="458" class="sq-lbl">prompt = passages + question + rules</text>
+  <!-- 10 -->
+  <line x1="650" y1="500" x2="364" y2="500" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#s1b)"/>
+  <circle cx="650" cy="500" r="8" fill="#475569"/><text x="650" y="503.5" text-anchor="middle" class="sq-num">10</text>
+  <text x="378" y="492" class="sq-lbl">answer text</text>
+  <!-- 11 -->
+  <rect x="368" y="514" width="304" height="26" rx="7" class="sq-note"/>
+  <circle cx="360" cy="527" r="8" fill="#0b1f44"/><text x="360" y="530.5" text-anchor="middle" class="sq-num">11</text>
+  <text x="376" y="531" class="sq-nt">Save question + answer; cache the answer.</text>
+  <!-- 12 -->
+  <line x1="360" y1="566" x2="219" y2="566" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#s1b)"/>
+  <circle cx="360" cy="566" r="8" fill="#0b1f44"/><text x="360" y="569.5" text-anchor="middle" class="sq-num">12</text>
+  <text x="230" y="558" class="sq-lbl">answer JSON (200)</text>
+  <!-- 13 -->
+  <line x1="215" y1="600" x2="74" y2="600" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#s1b)"/>
+  <circle cx="215" cy="600" r="8" fill="#1d4ed8"/><text x="215" y="603.5" text-anchor="middle" class="sq-num">13</text>
+  <text x="84" y="592" class="sq-lbl">same JSON, unchanged</text>
+  <text x="84" y="622" class="sq-lbl2">widget shows the answer</text>
+</svg>
+<figcaption><b>Figure 3.</b> One question, from Ada's keyboard to the answer on her screen. Solid arrows are requests; dashed arrows are replies.</figcaption>
+</figure>
+
+<h3>The same steps in words</h3>
+<ol class="steps">
+  <li><b class="h">Ada asks.</b> She types the question and presses Enter. The chat window shows "Thinking…".<span class="tech">The SDK sends <code>POST /brainbox_ai/proxy/api/chat</code> to Odoo itself, with her Odoo login cookie and the header <code>X-Brainbox-Proxy: 1</code>. It contains no key and no tenant.</span></li>
+  <li><b class="h">Odoo checks the caller.</b> Is the request coming from the Odoo screen, is Ada logged in, is she in an allowed group, is this a permitted kind of request, is the add-on configured? If any answer is no, Odoo refuses and the chat shows a friendly error.<span class="tech"><code>controllers/proxy.py</code>: 403 without the header or for users outside "Allowed groups", 404 for paths not on the whitelist, 503 when not configured.</span></li>
+  <li><b class="h">Odoo writes the "envelope".</b> It removes anything the browser claimed about identity and writes the truth: Ada's id, her name, her role, and Acme's secret key.<span class="tech">Sets <code>user_id = "odoo:&lt;database&gt;:&lt;user id&gt;"</code>, <code>user_name</code>, <code>user_role</code> (from the role mapping), <code>tenant_id</code> (if set) and <code>Authorization: Bearer sk_live_xxx</code>.</span></li>
+  <li><b class="h">Odoo forwards to brainBox</b> at <code>https://port.smartpowerbilling.com/api/chat</code> and waits up to 200 seconds.</li>
+  <li><b class="h">brainBox identifies the company from the key.</b> The key is looked up (only its fingerprint is stored), must be active and not expired. It belongs to tenant "acme", so everything that follows happens inside Acme's compartment. Because it is a <i>secret</i> key, brainBox trusts the role "internal" sent by Odoo.</li>
+  <li><b class="h">brainBox opens Ada's conversation.</b> It is stamped with her user id, so no other user can open it. It also checks whether the same question was answered within the last hour for the same company and role (cache).</li>
+  <li><b class="h">brainBox searches Acme's knowledge</b> for the 5 most relevant passages, <b>but only among documents Ada's role may read</b> (for "internal": public, customer, vendor and internal documents).</li>
+  <li><b class="h">The passages come back</b> from the knowledge base (a PostgreSQL database with vector search).</li>
+  <li><b class="h">The AI model writes the answer</b> from those passages, with instructions such as "say you don't know rather than guess" and "never reveal other customers' details".<span class="tech">Ollama is called first; OpenAI is used as a fallback if configured.</span></li>
+  <li><b class="h">The answer comes back</b> from the model.</li>
+  <li><b class="h">brainBox saves</b> the question and the answer in Ada's conversation, and caches the answer for one hour.</li>
+  <li><b class="h">brainBox replies</b> to Odoo with the answer and the conversation id.</li>
+  <li><b class="h">Odoo passes the reply back unchanged</b>, and the widget displays it, formatted (lists, tables, links). The next time Ada opens the chat, her past conversations are listed.</li>
+</ol>
+
+<div class="callout">
+  <span class="t">In plain words</span>
+  <p>If a <b>website visitor</b> asked the same question through a public website, steps 2 and 3 would not exist, the publishable key would make brainBox treat them as "public", and step 7 would search <b>only public documents</b>. Same brain, different access.</p>
+</div>
+
+<!-- =============================== 4 =============================== -->
+<h2 id="s4"><span class="num">4</span>Companies (tenants) and keys</h2>
+<p class="lead">brainBox is shared by many companies. Two ideas keep them apart: <b>tenants</b> (separate compartments) and <b>keys</b> (who may enter which compartment, and with how much power).</p>
+
+<h3>Tenant: one company's separate brain</h3>
+<p>A <b>tenant</b> is one customer company on your brainBox server, identified by a short id such as <code>acme</code>. Everything brainBox stores is labelled with a tenant: the knowledge (documents, FAQs, tickets), the conversations, the cached answers, the keys. A search for Acme only looks at Acme's documents; a cached answer for Acme is never served to Globex.</p>
+
+<h3>Three kinds of keys</h3>
+<div class="grid3">
+  <div class="card">
+    <span class="tag pk">Publishable · pk_live_…</span>
+    <h4>The front-door key</h4>
+    <p>For public places: websites, mobile apps. Anyone may see it. It opens <b>one</b> company's front desk and lets visitors <b>ask questions as "public"</b>, nothing more.</p>
+  </div>
+  <div class="card">
+    <span class="tag sk">Secret · sk_live_…</span>
+    <h4>The office key</h4>
+    <p>For servers only (Odoo, a company back-end). Opens <b>one</b> company's whole office: chat with trusted roles, and teach / manage the company's knowledge. Must never appear in a web page.</p>
+  </div>
+  <div class="card">
+    <span class="tag adm">Admin token</span>
+    <h4>The master key</h4>
+    <p>Held only by you, the brainBox operator. It doesn't chat; it <b>creates, lists and revokes keys</b> for every company. Stored in the brainBox server's settings file.</p>
+  </div>
+</div>
+
+<table class="keep">
+  <thead><tr><th style="width:30%">What it can do</th><th style="text-align:center">pk_ publishable</th><th style="text-align:center">sk_ secret</th><th style="text-align:center">Admin token</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Ask questions (chat)</td><td style="text-align:center"><span class="pill y">yes, as "public"</span></td><td style="text-align:center"><span class="pill y">yes, any role</span></td><td style="text-align:center"><span class="pill n">no</span></td></tr>
+    <tr><td class="k">List / read conversations</td><td style="text-align:center"><span class="pill y">yes</span></td><td style="text-align:center"><span class="pill y">yes</span></td><td style="text-align:center"><span class="pill n">no</span></td></tr>
+    <tr><td class="k">Attach files / images to a chat</td><td style="text-align:center"><span class="pill y">yes</span></td><td style="text-align:center"><span class="pill y">yes</span></td><td style="text-align:center"><span class="pill n">no</span></td></tr>
+    <tr><td class="k">Assert a user role (internal, admin…)</td><td style="text-align:center"><span class="pill n">no, ignored</span></td><td style="text-align:center"><span class="pill y">yes</span></td><td style="text-align:center"><span class="pill n">no</span></td></tr>
+    <tr><td class="k">Teach the AI (train, ingest, delete sources)</td><td style="text-align:center"><span class="pill n">no (403)</span></td><td style="text-align:center"><span class="pill y">yes</span></td><td style="text-align:center"><span class="pill n">no</span></td></tr>
+    <tr><td class="k">Detailed health checks (db, cache, vector)</td><td style="text-align:center"><span class="pill n">no</span></td><td style="text-align:center"><span class="pill y">yes</span></td><td style="text-align:center"><span class="pill n">no</span></td></tr>
+    <tr><td class="k">Create / list / revoke keys</td><td style="text-align:center"><span class="pill n">no</span></td><td style="text-align:center"><span class="pill n">no</span></td><td style="text-align:center"><span class="pill y">yes, all tenants</span></td></tr>
+    <tr><td class="k">Scope</td><td style="text-align:center">one tenant</td><td style="text-align:center">one tenant</td><td style="text-align:center">whole server</td></tr>
+    <tr><td class="k">Where it is kept</td><td style="text-align:center">web page / app code</td><td style="text-align:center">Odoo Settings (server side) or another server's config</td><td style="text-align:center">brainBox server <code>.env</code> (<code>BRAINBOX_ADMIN_TOKEN</code>)</td></tr>
+  </tbody>
+</table>
+<p class="small">The basic health check (<code>GET /api/health</code>) needs no key at all; it only says "the server is running".</p>
+
+<div class="callout imp">
+  <span class="t">Important: the tenant comes from the key</span>
+  <p>A key belongs to exactly one tenant. If a request also names a tenant and it is a <b>different</b> one, brainBox refuses it (403 "tenant_id does not match API key"). In Odoo you may therefore leave <b>Tenant ID</b> empty when a secret key is set; if you fill it in, it must be exactly the key's tenant.</p>
+</div>
+
+<h3>How keys are stored and created</h3>
+<ul>
+  <li>brainBox stores only a <b>fingerprint</b> (SHA-256 hash) of each key, plus its type, tenant, a name, a short visible prefix (e.g. <code>sk_live_Ab3x</code>) for recognising it, active/revoked status, optional expiry date and "last used" time.</li>
+  <li>The full key is <b>shown only once</b>, at creation. If it is lost, create a new one and revoke the old one.</li>
+  <li>An <b>existing</b> key can be imported (so already-deployed sites keep working); it must be at least 24 characters long.</li>
+</ul>
+
+<h4>Option 1: command line on the brainBox server (works without the admin token)</h4>
+<pre><span class="c"># create a secret key for Acme's Odoo server (prints the key once)</span>
+python -m app.cli keys create --tenant acme --type secret --name "Acme Odoo server"
+<span class="c"># create a publishable key for Acme's public website, expiring 1 Jan 2027</span>
+python -m app.cli keys create --tenant acme --type publishable --name "Acme website" --expires 2027-01-01
+<span class="c"># list keys (never prints full keys), optionally for one tenant</span>
+python -m app.cli keys list --tenant acme
+<span class="c"># revoke key number 42 immediately</span>
+python -m app.cli keys revoke 42
+<span class="c"># with Docker, run the same commands inside the API container</span>
+docker exec -i brainbox-api python -m app.cli keys list</pre>
+
+<h4>Option 2: the admin API (requires the admin token)</h4>
+<pre><span class="k">POST</span>   https://port.smartpowerbilling.com/api/admin/keys      <span class="c">{ "tenant_id": "acme", "key_type": "secret", "name": "Acme Odoo" }</span>
+<span class="k">GET</span>    https://port.smartpowerbilling.com/api/admin/keys?tenant_id=acme
+<span class="k">DELETE</span> https://port.smartpowerbilling.com/api/admin/keys/42
+<span class="c">Header on every call:  X-Admin-Token: &lt;your admin token&gt;</span></pre>
+<p class="small">Without <code>BRAINBOX_ADMIN_TOKEN</code> set on the server, the admin API answers 503 (disabled); with a wrong token, 401. A staff dashboard for managing keys and knowledge is <b>coming</b> (being built now); this document covers the current mechanisms only.</p>
+
+<h3>What happens if a key leaks?</h3>
+<table class="keep">
+  <thead><tr><th style="width:17%">Key</th><th style="width:43%">What someone could do with it</th><th>What to do</th></tr></thead>
+  <tbody>
+    <tr><td class="k">pk_ publishable</td><td>Nothing secret: ask questions as "public" (public knowledge only) and use your AI capacity. It can also list conversations that are not tied to a specific user. A pk_ is public by design, so "leaking" is expected.</td><td>If abused, revoke it (<code>keys revoke &lt;id&gt;</code>), create a new one, update the website.</td></tr>
+    <tr><td class="k">sk_ secret</td><td><b>Serious.</b> Read all of that company's knowledge (by claiming the "admin" role), read its users' conversations, add or delete its training data. Other companies are not affected.</td><td>Revoke immediately, create a new secret key, paste it into Odoo Settings (Secret API key), save.</td></tr>
+    <tr><td class="k">Admin token</td><td><b>Critical.</b> Create keys for any company, and so reach any company's data.</td><td>Change <code>BRAINBOX_ADMIN_TOKEN</code> in the server <code>.env</code>, restart brainBox, review <code>keys list</code> and revoke unknown keys.</td></tr>
+  </tbody>
+</table>
+
+<div class="callout dev">
+  <span class="t">For developers: enforcement switch</span>
+  <p>Keys are enforced when <code>REQUIRE_API_KEY=true</code> (the default). Setting it to <code>false</code> is a temporary migration mode in which no key is checked and the tenant and role are taken from the request; brainBox logs a warning at start-up. It should stay <code>true</code> in production. Keys are read from <code>X-API-Key</code> or <code>Authorization: Bearer</code> (<code>app/dependencies.py</code>).</p>
+</div>
+
+<!-- =============================== 5 =============================== -->
+<h2 id="s5"><span class="num">5</span>Who sees what: roles and audiences</h2>
+<p class="lead">Inside one company, not everyone should see everything. brainBox uses two labels: every piece of knowledge has an <b>audience</b>, and every question has a <b>role</b>. A role can only read certain audiences.</p>
+
+<div class="grid2">
+<div>
+<h4>Audience: who a document is for</h4>
+<table class="keep">
+  <thead><tr><th>Audience</th><th>Meant for</th></tr></thead>
+  <tbody>
+    <tr><td class="k">public</td><td>anyone, including anonymous website visitors</td></tr>
+    <tr><td class="k">customer</td><td>logged-in customers</td></tr>
+    <tr><td class="k">vendor</td><td>suppliers / vendors</td></tr>
+    <tr><td class="k">internal</td><td>staff (default for new training sources)</td></tr>
+    <tr><td class="k">admin</td><td>administrators only</td></tr>
+  </tbody>
+</table>
+</div>
+<div>
+<h4>Role: what a person may read</h4>
+<table class="keep">
+  <thead><tr><th>Role</th><th>Reads audiences</th></tr></thead>
+  <tbody>
+    <tr><td class="k">admin</td><td>everything</td></tr>
+    <tr><td class="k">internal</td><td>public, customer, vendor, internal</td></tr>
+    <tr><td class="k">customer <span class="small">(= portal)</span></td><td>public, customer</td></tr>
+    <tr><td class="k">vendor</td><td>public, vendor</td></tr>
+    <tr><td class="k">public</td><td>public only</td></tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+<h3>How Odoo decides a user's role</h3>
+<p>The add-on looks at the user's Odoo groups and applies the <b>first</b> rule that matches (Settings › Brainbox AI › Roles):</p>
+<table class="keep">
+  <thead><tr><th style="width:5%">#</th><th style="width:38%">Odoo user</th><th style="width:22%">Role sent</th><th>So they can read</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td class="k">Administrator (Settings rights)</td><td><code>admin</code></td><td>everything</td></tr>
+    <tr><td>2</td><td class="k">Member of a "Vendor group"</td><td><code>vendor</code></td><td>public + vendor</td></tr>
+    <tr><td>3</td><td class="k">Member of a "Customer group"</td><td><code>customer</code></td><td>public + customer</td></tr>
+    <tr><td>4</td><td class="k">Other internal (employee) user</td><td>"Role of internal users": <code>internal</code> (default) or <code>public</code></td><td>public, customer, vendor, internal (or public only)</td></tr>
+    <tr><td>5</td><td class="k">Portal user</td><td>"Role of portal users": <code>customer</code> (default), <code>portal</code>, <code>vendor</code> or <code>public</code></td><td>depends on the choice</td></tr>
+    <tr><td>6</td><td class="k">Anyone else</td><td><code>public</code></td><td>public only</td></tr>
+  </tbody>
+</table>
+<p class="small">Vendor and customer groups are chosen by the Odoo administrator (any Odoo groups). Unknown or missing roles are always treated as <code>public</code> by brainBox: the safe default.</p>
+
+<h3>Why the browser cannot fake its role</h3>
+<ol>
+  <li><b>Odoo overwrites identity.</b> The proxy deletes any <code>tenant_id</code>, <code>user_id</code>, <code>user_name</code> or <code>user_role</code> sent by the browser and writes the real values from the Odoo login.</li>
+  <li><b>Only secret keys may state a role.</b> With a publishable key, brainBox ignores the role and uses <code>public</code>, so a website visitor who edits the page code still gets public answers only.</li>
+  <li><b>Filtering happens before the AI sees anything.</b> Documents the role may not read are never retrieved, so the AI cannot leak them, even by accident.</li>
+  <li><b>Cached answers are kept per company and per role,</b> so a "public" user can never receive an answer that was built for "internal".</li>
+  <li><b>Conversations belong to one user.</b> Each Odoo user's conversations are stamped with <code>odoo:&lt;database&gt;:&lt;user id&gt;</code>; another user asking for them gets "Session not found".</li>
+</ol>
+
+<div class="callout imp">
+  <span class="t">Important: the add-on lives in Odoo's back-office</span>
+  <p>The widget is loaded in Odoo's back-office screens (the <code>web.assets_backend</code> bundle) and the AI Assistant menu is for internal users. Portal customers using the Odoo website/portal pages do not see it today, so the "portal" and "customer group" settings matter only for users you deliberately give back-office access. Who may use it at all is controlled by <b>Allowed groups</b> (empty = all internal users; administrators always).</p>
+</div>
+
+<div class="callout dev">
+  <span class="t">For developers</span>
+  <p>Role mapping: <code>brainbox.ai.backend._user_role()</code>. Audience filtering: <code>app/permissions.py</code> (<code>allowed_audiences</code>) applied in the search step <code>log_node</code>. Documents created before audiences existed are treated as <code>LEGACY_DOC_AUDIENCE</code> (default <code>public</code>). The audience of a training source can be changed later with <code>PATCH /api/train/sources/{id}</code>; this relabels all its documents and clears the company's cached answers.</p>
+</div>
+
+<!-- =============================== 6 =============================== -->
+<h2 id="s6"><span class="num">6</span>If another company installs the add-on: does it talk to my brainBox?</h2>
+<div class="callout ok">
+  <span class="t">Short answer</span>
+  <p><b>Only if you let it.</b> The add-on ships with <b>no server address and no key</b> (the Backend URL default is empty). A freshly installed copy talks to nobody. It reaches <b>your</b> brainBox only when the company's administrator enters <b>your server's URL</b> and <b>a key that you created for their tenant</b>. Without a valid key, your server refuses every chat request (401).</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 720 352" role="img" aria-label="Several companies connecting to brainBox" font-family="Segoe UI, Inter, Arial, sans-serif">
+  <defs>
+    <marker id="t1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/></marker>
+    <marker id="t2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/></marker>
+  </defs>
+  <!-- server -->
+  <rect x="392" y="8" width="320" height="270" rx="14" fill="#0b1f44"/>
+  <text x="552" y="32" text-anchor="middle" font-size="13.5" font-weight="700" fill="#fff">YOUR brainBox server</text>
+  <text x="552" y="49" text-anchor="middle" font-size="10.5" fill="#93c5fd">port.smartpowerbilling.com · you hold the admin token</text>
+  <g font-size="11">
+    <rect x="410" y="64" width="284" height="60" rx="10" fill="#163a7a" stroke="#38bdf8"/>
+    <text x="424" y="86" fill="#fff" font-weight="700">Tenant "acme"</text>
+    <text x="424" y="104" fill="#bae6fd" font-size="10.3">Acme's knowledge · Acme's chats · Acme's keys</text>
+    <rect x="410" y="134" width="284" height="60" rx="10" fill="#163a7a" stroke="#38bdf8"/>
+    <text x="424" y="156" fill="#fff" font-weight="700">Tenant "globex"</text>
+    <text x="424" y="174" fill="#bae6fd" font-size="10.3">Globex's knowledge · chats · keys</text>
+    <rect x="410" y="204" width="284" height="60" rx="10" fill="#163a7a" stroke="#38bdf8" stroke-dasharray="5 4"/>
+    <text x="424" y="226" fill="#fff" font-weight="700">Tenant "your-next-client"</text>
+    <text x="424" y="244" fill="#bae6fd" font-size="10.3">created when you issue its first key</text>
+  </g>
+  <!-- clients -->
+  <g font-size="11">
+    <rect x="8" y="64" width="230" height="44" rx="9" fill="#eff6ff" stroke="#1d4ed8"/>
+    <text x="20" y="83" font-weight="700" fill="#0b1f44">Acme's Odoo (brainbox_ai)</text>
+    <text x="20" y="99" fill="#475569" font-size="10.3">your URL + sk_ key for "acme"</text>
+    <rect x="8" y="122" width="230" height="44" rx="9" fill="#eff6ff" stroke="#1d4ed8"/>
+    <text x="20" y="141" font-weight="700" fill="#0b1f44">Globex's Odoo (brainbox_ai)</text>
+    <text x="20" y="157" fill="#475569" font-size="10.3">your URL + sk_ key for "globex"</text>
+    <rect x="8" y="180" width="230" height="44" rx="9" fill="#f0f9ff" stroke="#0ea5e9"/>
+    <text x="20" y="199" font-weight="700" fill="#0b1f44">Globex's website (sdk-web)</text>
+    <text x="20" y="215" fill="#475569" font-size="10.3">your URL + pk_ key for "globex"</text>
+    <rect x="8" y="238" width="230" height="44" rx="9" fill="#fef2f2" stroke="#ef4444"/>
+    <text x="20" y="257" font-weight="700" fill="#7f1d1d">Odoo with no / revoked key</text>
+    <text x="20" y="273" fill="#991b1b" font-size="10.3">reaches your server, gets refused</text>
+    <rect x="8" y="296" width="230" height="44" rx="9" fill="#f8fafc" stroke="#94a3b8"/>
+    <text x="20" y="315" font-weight="700" fill="#334155">Odoo set to another server</text>
+    <text x="20" y="331" fill="#64748b" font-size="10.3">their own brainBox, never yours</text>
+  </g>
+  <line x1="240" y1="86" x2="406" y2="94" stroke="#1d4ed8" stroke-width="2" marker-end="url(#t1)"/>
+  <line x1="240" y1="144" x2="406" y2="158" stroke="#1d4ed8" stroke-width="2" marker-end="url(#t1)"/>
+  <line x1="240" y1="202" x2="406" y2="170" stroke="#0ea5e9" stroke-width="2" marker-end="url(#t1)"/>
+  <line x1="240" y1="260" x2="368" y2="260" stroke="#ef4444" stroke-width="2"/>
+  <g stroke="#ef4444" stroke-width="3"><line x1="372" y1="250" x2="388" y2="270"/><line x1="388" y1="250" x2="372" y2="270"/></g>
+  <text x="304" y="252" text-anchor="middle" font-size="10.5" fill="#b91c1c" font-weight="700">401 refused</text>
+  <line x1="240" y1="318" x2="388" y2="318" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#t2)"/>
+  <rect x="392" y="298" width="320" height="42" rx="10" fill="#f8fafc" stroke="#94a3b8"/>
+  <text x="552" y="323" text-anchor="middle" font-size="11" fill="#334155">a different brainBox server (not yours)</text>
+</svg>
+<figcaption><b>Figure 4.</b> Each installation reaches exactly one tenant, chosen by the key you issued. A key for "globex" can never open "acme".</figcaption>
+</figure>
+
+<h3>The rules, in plain words</h3>
+<ul>
+  <li><b>The URL decides which server.</b> The Odoo administrator types the Backend URL. If they type yours, requests go to your server; if they run their own brainBox, they type that one instead and you are not involved.</li>
+  <li><b>The key decides which company.</b> On your server, the key alone decides the tenant. You create one tenant per customer company and give that company only its own keys.</li>
+  <li><b>Their data stays in their tenant.</b> Their knowledge, conversations and cached answers are labelled with their tenant and never mixed with other companies'.</li>
+  <li><b>You stay in control.</b> You can see every key (<code>keys list</code>: tenant, name, last used) and revoke any key at any time; the add-on then stops working for that company immediately, and their Odoo shows a "cannot get an answer" error banner instead of answers.</li>
+  <li><b>Several Odoo databases, one tenant.</b> A company with several Odoo databases can use the same tenant; users stay separate because their id includes the database name (<code>odoo:&lt;database&gt;:&lt;user id&gt;</code>).</li>
+</ul>
+
+<div class="nobreak"><h3>Onboarding checklist for a new customer company</h3>
+<ul class="check">
+  <li><b>Choose the tenant id</b> (short, lowercase, e.g. <code>globex</code>).</li>
+  <li><b>Create a secret key</b> on your server: <code>python -m app.cli keys create --tenant globex --type secret --name "Globex Odoo"</code>. Copy the key shown once.</li>
+  <li><b>Send the key securely</b> (password manager or a one-time secret link, not plain email or chat) together with the Backend URL <code>https://port.smartpowerbilling.com</code>.</li>
+  <li><b>Load their knowledge</b> into their tenant with the training tools (secret key), and label each source with the right audience (public / customer / vendor / internal / admin).</li>
+  <li><b>They install the add-on</b> in Odoo (Apps › Update Apps List › Brainbox AI › Activate).</li>
+  <li><b>They configure Settings › Brainbox AI:</b> Backend URL, Secret API key; leave Tenant ID empty (or set exactly <code>globex</code>); choose display mode, allowed groups, role mapping and branding.</li>
+  <li><b>Test connection</b>, then ask a real question in the chat to confirm the key works (see the note below).</li>
+  <li><b>Optional website:</b> create a publishable key (<code>--type publishable</code>) for their public site and give them the sdk-web snippet (section 9).</li>
+  <li><b>Record it:</b> note the key ids, names and expiry dates so you can revoke or rotate them later.</li>
+</ul></div>
+<div class="callout imp">
+  <span class="t">Note about "Test connection"</span>
+  <p>The Test connection button calls <code>/api/health</code>, which brainBox answers <b>without checking keys</b>. A green result proves the server is reachable, not that the key is right. A wrong key or tenant only shows up when the first real question is sent (the chat displays an error banner).</p>
+</div>
+
+<!-- =============================== 7 =============================== -->
+<h2 id="s7"><span class="num">7</span>Installation and configuration</h2>
+
+<h3>Install</h3>
+<ol class="steps">
+  <li><b class="h">Put the folder in place.</b> Copy <code>brainbox_ai</code> into an add-ons folder listed in <code>addons_path</code> of <code>odoo.conf</code> (here: <code>odoo\custom_addons</code>).<span class="tech">Depends on Odoo modules <code>base</code>, <code>web</code>, <code>base_setup</code> and the Python package <code>requests</code> (shipped with Odoo).</span></li>
+  <li><b class="h">Install it.</b> In Odoo: <b>Apps › Update Apps List</b>, search "Brainbox AI", click <b>Activate</b>. Or from the command line (below).</li>
+  <li><b class="h">Configure it.</b> <b>Settings › Brainbox AI</b> (also <b>AI Assistant › Configuration</b>). Only administrators see these settings.</li>
+</ol>
+
+<h4>Running Odoo (from <code>C:\Users\USER\Documents\PERSONAL\odoo</code>)</h4>
+<pre><span class="c"># start the server  →  http://localhost:8069</span>
+.venv\Scripts\python.exe odoo-bin -c odoo.conf
+<span class="c"># install the add-on in database &lt;db&gt; (one-shot)</span>
+.venv\Scripts\python.exe odoo-bin -c odoo.conf -d &lt;db&gt; -i brainbox_ai --stop-after-init
+<span class="c"># upgrade it after changing its files</span>
+.venv\Scripts\python.exe odoo-bin -c odoo.conf -d &lt;db&gt; -u brainbox_ai --stop-after-init</pre>
+<p class="small">If a server already runs on port 8069, add <code>--http-port 8075</code> (or another free port) to the one-shot commands. After an upgrade, restart the running server (or open Odoo with <code>?debug=assets</code>) so browsers get the new files. Upgrading from version 1.x deletes the old <code>brainbox_ai_session</code> table (see the migration script); conversations are on brainBox and are not affected.</p>
+
+<h3>Every setting explained</h3>
+<table class="compact">
+  <thead><tr><th style="width:21%">Setting</th><th>What it does</th><th style="width:25%">Example / default</th></tr></thead>
+  <tbody>
+    <tr class="group"><td colspan="3">Connection</td></tr>
+    <tr><td class="k">Backend URL</td><td>Address of the brainBox server, without <code>/api</code>. Odoo's server calls it; browsers never do.</td><td><code>https://port.smartpowerbilling.com</code><br>default: empty</td></tr>
+    <tr><td class="k">Tenant ID</td><td>The company's id on brainBox. Optional when a secret key is set (the key's tenant is used); if set, it must match the key's tenant exactly.</td><td><code>acme</code> or empty</td></tr>
+    <tr><td class="k">Secret API key (sk_…)</td><td>The company's office key. Saved on the Odoo server, never sent to browsers and never shown again (the form says "An API key is stored"). Leave empty to keep the current key; tick <b>Remove it on save</b> to delete it.</td><td><code>sk_live_xxx</code></td></tr>
+    <tr><td class="k">SDK script URL</td><td>Optional: load the chat widget file from a CDN or your server instead of the copy bundled in the add-on. If that file cannot be loaded, the bundled copy is used.</td><td><code>https://cdn.jsdelivr.net/npm/spres-web@2</code><br>default: empty (bundled)</td></tr>
+    <tr><td class="k">Test connection</td><td>Button: the Odoo server calls <code>&lt;Backend URL&gt;/api/health</code> (10 s timeout) and shows success, warning or the error. Uses the values typed in the form.</td><td>"Connection successful"</td></tr>
+    <tr class="group"><td colspan="3">Display</td></tr>
+    <tr><td class="k">Display mode</td><td>Where the chat appears in every Odoo app: floating, sidebar, systray or disabled (table below).</td><td>default: Floating</td></tr>
+    <tr><td class="k">Position</td><td>Corner of the floating button and window.</td><td>Bottom right / Bottom left</td></tr>
+    <tr><td class="k">Systray icon in floating mode</td><td>Also show the sparkle icon in the top bar when the floating button is used.</td><td>default: off</td></tr>
+    <tr><td class="k">Allowed groups</td><td>Only users in one of these Odoo groups get the assistant (and may use the proxy). Empty = all internal users. Administrators always have access.</td><td>e.g. "Sales / User"</td></tr>
+    <tr class="group"><td colspan="3">Roles (section 5)</td></tr>
+    <tr><td class="k">Role of internal users</td><td>Role sent for ordinary employees.</td><td><code>internal</code> (default) or <code>public</code></td></tr>
+    <tr><td class="k">Role of portal users</td><td>Role sent for portal users.</td><td><code>customer</code> (default), <code>portal</code>, <code>vendor</code>, <code>public</code></td></tr>
+    <tr><td class="k">Vendor groups</td><td>Users in these groups get the <code>vendor</code> role.</td><td>any Odoo groups</td></tr>
+    <tr><td class="k">Customer groups</td><td>Users in these groups get the <code>customer</code> role.</td><td>any Odoo groups</td></tr>
+    <tr class="group"><td colspan="3">Branding</td></tr>
+    <tr><td class="k">Colors</td><td>Primary color (buttons, user bubbles) and panel background. Must be hex colors.</td><td><code>#b93fff</code> / <code>#fbf1ff</code></td></tr>
+    <tr><td class="k">Bot name</td><td>Name the assistant uses for itself.</td><td>Brainbox AI</td></tr>
+    <tr><td class="k">Header title / subtitle</td><td>Text in the chat window header.</td><td>Brainbox AI / "Your AI assistant, everywhere in Odoo"</td></tr>
+    <tr><td class="k">Launcher text</td><td>Label of the floating button.</td><td>Chat</td></tr>
+    <tr><td class="k">Logo / Logo URL</td><td>Upload an image (stored in Odoo, served at <code>/brainbox_ai/logo</code>) or give an image address.</td><td>default: purple orb</td></tr>
+    <tr><td class="k">Welcome message</td><td>One intro bubble per line. <code>{{name}}</code> = user's first name, <code>{{botName}}</code> = bot name.</td><td>"Hi {{name}}! I'm {{botName}}…"</td></tr>
+    <tr><td class="k">Quick actions</td><td>One suggested question per line; clicking it sends it.</td><td>"What can you help me with?"</td></tr>
+  </tbody>
+</table>
+
+<h3>Display modes</h3>
+<table class="keep">
+  <thead><tr><th style="width:20%">Mode</th><th>What users see</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Floating (default)</td><td>A chat button in a bottom corner of every Odoo app; it opens a chat window. A dock button in the chat header moves it into the sidebar and back.</td></tr>
+    <tr><td class="k">Sidebar</td><td>A panel docked on the right under the Odoo top bar, opened and closed by a sparkle icon in the top bar. On wide screens (992 px and more) it pushes the page to the left so nothing is hidden. Users can pop it out to a floating window.</td></tr>
+    <tr><td class="k">Systray</td><td>Only the sparkle icon in the top bar; it opens the floating chat window.</td></tr>
+    <tr><td class="k">Disabled</td><td>Nothing global. The AI Assistant app and embedded widgets still work.</td></tr>
+  </tbody>
+</table>
+<p>Each user's choice (floating or docked), whether the chat is open, and their last conversation are remembered <b>in their own browser</b> by the widget; nothing about it is stored in Odoo. If the add-on is not configured yet, administrators see the sparkle icon, and clicking it shows a notice with an <b>Open settings</b> button; other users see nothing.</p>
+
+<h3>The AI Assistant app</h3>
+<p>A new app in the Odoo home menu, <b>AI Assistant</b> (internal users), with two menus: <b>Chat</b> (a full-screen chat with the conversation list: New chat, search, conversations grouped by Today / Yesterday / This week / Older) and <b>Configuration</b> (administrators only, opens the settings). While this app is open, the floating button or sidebar is hidden and comes back when you leave.</p>
+
+<h3>Embedding the chat in a specific form</h3>
+<p>A developer can place the chat inside any Odoo view with one line, <code>&lt;widget name="brainbox_chat"/&gt;</code>. By default the record being viewed is sent along with each question (e.g. <i>"Odoo record: Contact — Acme Corporation (id 10)"</i>), and each record keeps its own conversation. Example, adding it to the contact form, in your own module that depends on <code>brainbox_ai</code>:</p>
+<pre>&lt;record id="view_partner_form_brainbox" model="ir.ui.view"&gt;
+    &lt;field name="name"&gt;res.partner.form.brainbox&lt;/field&gt;
+    &lt;field name="model"&gt;res.partner&lt;/field&gt;
+    &lt;field name="inherit_id" ref="base.view_partner_form"/&gt;
+    &lt;field name="arch" type="xml"&gt;
+        &lt;xpath expr="//sheet" position="inside"&gt;
+            <span class="s">&lt;widget name="brainbox_chat" height="520" title="Ask about this contact"/&gt;</span>
+        &lt;/xpath&gt;
+    &lt;/field&gt;
+&lt;/record&gt;</pre>
+<table class="keep">
+  <thead><tr><th style="width:22%">Attribute</th><th style="width:28%">Default</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td class="k">height</td><td>520</td><td>Height in pixels (minimum 240).</td></tr>
+    <tr><td class="k">title</td><td>Header title from Settings</td><td>Title shown in the chat header.</td></tr>
+    <tr><td class="k">record_context</td><td>1 (on)</td><td><code>0</code> sends questions without the record description.</td></tr>
+  </tbody>
+</table>
+<p class="small">The view can also be created without code from Settings › Technical › Views in developer mode.</p>
+
+<h3>Updating the bundled widget (SDK)</h3>
+<p>The add-on contains an unmodified copy of the official web SDK. Never edit it inside Odoo: change the SDK project, then copy it in with the helper script, and upgrade the module (<code>-u brainbox_ai</code>) or restart Odoo.</p>
+<pre><span class="c"># from the add-on folder: copy from the local SDK project</span>
+.\tools\sync_sdk.ps1 -SdkPath C:\Users\USER\Documents\PERSONAL\ai\sdk-web
+<span class="c"># or download version 2.x of the npm package "spres-web" from the jsDelivr CDN</span>
+.\tools\sync_sdk.ps1 -Version 2</pre>
+<p class="small">Alternative: keep the bundled copy and set <b>SDK script URL</b> to load the widget from a CDN or your server.</p>
+
+<!-- =============================== 8 =============================== -->
+<h2 id="s8"><span class="num">8</span>File-by-file reference</h2>
+<p class="lead">The add-on is deliberately thin: settings, a loader for the official widget, and a server-side messenger (proxy). No chat screens are built in Odoo and no chats are stored in Odoo.</p>
+
+<pre class="tree"><span class="d">brainbox_ai/</span>
+├── __manifest__.py                         <span class="c">module card: name, version, what to load</span>
+├── __init__.py                             <span class="c">loads controllers + models</span>
+├── README.md                               <span class="c">developer documentation</span>
+├── <span class="d">controllers/</span>
+│   ├── __init__.py
+│   ├── main.py                             <span class="c">/brainbox_ai/config, /brainbox_ai/logo</span>
+│   └── proxy.py                            <span class="c">/brainbox_ai/proxy/&lt;path&gt;  (the messenger)</span>
+├── <span class="d">models/</span>
+│   ├── __init__.py
+│   ├── brainbox_backend.py                 <span class="c">helper: settings, who may use it, roles, health check</span>
+│   └── res_config_settings.py              <span class="c">the Settings › Brainbox AI screen</span>
+├── <span class="d">migrations/17.0.2.0.0/</span>post-migrate.py     <span class="c">removes the 1.x chat table</span>
+├── <span class="d">static/</span>
+│   ├── description/icon.png                <span class="c">app icon</span>
+│   ├── lib/brainbox-web-sdk/brainbox-web-sdk.js   <span class="c">official SDK v2.0.0 (copy)</span>
+│   └── src/
+│       ├── js/brainbox_service.js          <span class="c">glue: settings → Brainbox.init()</span>
+│       ├── js/brainbox_systray.js          <span class="c">sparkle icon in the top bar</span>
+│       ├── js/brainbox_chat_page.js        <span class="c">AI Assistant app (full page)</span>
+│       ├── js/brainbox_chat_widget.js      <span class="c">&lt;widget name="brainbox_chat"/&gt;</span>
+│       ├── xml/brainbox_ai.xml             <span class="c">small screen templates</span>
+│       └── scss/brainbox_ai.scss           <span class="c">styles for the Odoo-side parts</span>
+├── <span class="d">tools/</span>sync_sdk.ps1                       <span class="c">updates the SDK copy</span>
+└── <span class="d">views/</span>
+    ├── res_config_settings_views.xml       <span class="c">settings form + settings action</span>
+    └── brainbox_ai_menus.xml               <span class="c">AI Assistant app + menus</span></pre>
+
+<h3>About "models" (database)</h3>
+<div class="callout">
+  <span class="t">In plain words</span>
+  <p>The add-on creates <b>no tables for chats or messages</b>. Its settings are saved as Odoo <b>system parameters</b> (one line per setting, all named <code>brainbox_ai.…</code>).</p>
+</div>
+<table>
+  <thead><tr><th style="width:28%">Model</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td class="k">brainbox.ai.backend</td><td><b>AbstractModel</b>: a helper with code only, <b>no database table</b>. Reads settings, decides who may use the assistant and with which role, builds the browser configuration, runs the health check.</td></tr>
+    <tr><td class="k">res.config.settings <span class="small">(extended)</span></td><td>Odoo's standard settings screen, extended with the Brainbox AI fields. It is a temporary (transient) model: values are copied into system parameters on Save, and Odoo regularly cleans up the screen's temporary rows.</td></tr>
+    <tr><td class="k">Relation tables</td><td>The only tables the add-on causes Odoo to create are the automatic link tables of the three group pickers: <code>brainbox_ai_settings_group_rel</code>, <code>brainbox_ai_settings_vendor_group_rel</code>, <code>brainbox_ai_settings_customer_group_rel</code> (temporary rows of the settings screen; the real values are saved as comma-separated group ids). The new fields are also added as columns to Odoo's existing temporary <code>res_config_settings</code> table.</td></tr>
+  </tbody>
+</table>
+
+<h4>Settings saved as system parameters (ir.config_parameter)</h4>
+<table class="keep">
+  <thead><tr><th>Key</th><th>Holds</th><th>Key</th><th>Holds</th></tr></thead>
+  <tbody>
+    <tr><td><code>brainbox_ai.backend_url</code></td><td>Backend URL</td><td><code>brainbox_ai.primary_color</code></td><td>Primary color</td></tr>
+    <tr><td><code>brainbox_ai.tenant_id</code></td><td>Tenant ID</td><td><code>brainbox_ai.panel_color</code></td><td>Panel color</td></tr>
+    <tr><td><code>brainbox_ai.api_key</code></td><td>Secret key (server only)</td><td><code>brainbox_ai.bot_name</code></td><td>Bot name</td></tr>
+    <tr><td><code>brainbox_ai.sdk_script_url</code></td><td>SDK script URL</td><td><code>brainbox_ai.company_name</code></td><td>Header title</td></tr>
+    <tr><td><code>brainbox_ai.display_mode</code></td><td>Display mode</td><td><code>brainbox_ai.subtitle</code></td><td>Header subtitle</td></tr>
+    <tr><td><code>brainbox_ai.position</code></td><td>Corner</td><td><code>brainbox_ai.launcher_text</code></td><td>Launcher text</td></tr>
+    <tr><td><code>brainbox_ai.systray_in_floating</code></td><td>Systray in floating</td><td><code>brainbox_ai.logo</code></td><td>Uploaded logo (base64)</td></tr>
+    <tr><td><code>brainbox_ai.allowed_group_ids</code></td><td>Allowed groups</td><td><code>brainbox_ai.logo_url</code></td><td>Logo URL</td></tr>
+    <tr><td><code>brainbox_ai.vendor_group_ids</code></td><td>Vendor groups</td><td><code>brainbox_ai.welcome_message</code></td><td>Welcome lines</td></tr>
+    <tr><td><code>brainbox_ai.customer_group_ids</code></td><td>Customer groups</td><td><code>brainbox_ai.quick_actions</code></td><td>Quick actions</td></tr>
+    <tr><td><code>brainbox_ai.internal_role</code></td><td>Role of internal users</td><td><code>brainbox_ai.portal_role</code></td><td>Role of portal users</td></tr>
+  </tbody>
+</table>
+
+<h3>Python files</h3>
+
+<div class="filecard"><div class="fh"><code>__manifest__.py</code><span>module "ID card"</span></div><div class="fb">
+<p>Tells Odoo what the module is and what to load.</p>
+<ul><li>Name "Brainbox AI", version <code>17.0.2.0.0</code>, category Productivity, licence LGPL-3, <code>application: True</code> (appears as an app).</li>
+<li>Depends on <code>base</code>, <code>web</code>, <code>base_setup</code>; Python package <code>requests</code>.</li>
+<li>Data files: the settings view and the menus. Assets in <code>web.assets_backend</code>: the SDK file <b>first</b> (defines <code>window.Brainbox</code>), then the SCSS, JS and XML glue.</li></ul></div></div>
+
+<div class="filecard"><div class="fh"><div class="l"><code>__init__.py</code><code>controllers/__init__.py</code><code>models/__init__.py</code></div><span>loaders</span></div><div class="fb">
+<p>Standard Python loaders: import the controllers (<code>main</code>, <code>proxy</code>) and the models (<code>brainbox_backend</code>, <code>res_config_settings</code>). No logic.</p></div></div>
+
+<div class="filecard"><div class="fh"><code>controllers/main.py</code><span>non-secret settings &amp; logo for the browser</span></div><div class="fb">
+<p>Gives the browser what it needs to draw the chat, and nothing secret.</p>
+<ul><li><code>/brainbox_ai/config</code> (JSON-RPC, logged-in users): returns <code>get_public_config()</code>: allowed?, configured?, display mode, colours, names, logo URL, welcome messages, quick actions, position, SDK script URL. <b>Never the key.</b></li>
+<li><code>/brainbox_ai/logo</code> (GET, logged-in users): serves the uploaded logo, detecting PNG / JPEG / GIF / WebP / SVG, with a strict Content-Security-Policy and <code>nosniff</code> (an SVG cannot run scripts) and 7-day private caching.</li></ul></div></div>
+
+<div class="filecard"><div class="fh"><code>controllers/proxy.py</code><span>the messenger between browser and brainBox</span></div><div class="fb">
+<p>Receives the widget's requests on Odoo's own address and forwards the allowed ones to brainBox, adding the secret key and the real user identity. It contains no AI logic and returns brainBox's answer unchanged.</p>
+<ul><li>Route <code>/brainbox_ai/proxy/&lt;path&gt;</code>, GET/POST, logged-in users only (<code>auth='user'</code>), <code>csrf=False</code> but requires the header <code>X-Brainbox-Proxy: 1</code> (a cross-site form cannot send a custom header, so this blocks cross-site request forgery).</li>
+<li>Refuses users outside Allowed groups (403), unknown paths (404), wrong methods (405), unconfigured module (503).</li>
+<li>Removes <code>tenant_id</code>, <code>user_id</code>, <code>user_name</code>, <code>user_role</code> from the browser's data (JSON body, query or upload form) and sets the true values; adds <code>Authorization: Bearer &lt;secret key&gt;</code>.</li>
+<li>Limits: JSON body 512 KB, uploads 10 MB, conversation ids checked against a safe pattern.</li>
+<li>Errors: 504 if brainBox is too slow, 502 if unreachable or if the answer is not JSON (friendly message, details only in the Odoo log).</li></ul></div></div>
+
+<h4>Proxy whitelist: the only requests that pass</h4>
+<table>
+  <thead><tr><th>Browser calls (on Odoo)</th><th>Forwarded to brainBox</th><th>Methods</th><th>Content</th><th>Timeout</th></tr></thead>
+  <tbody>
+    <tr><td><code>/brainbox_ai/proxy/api/chat</code></td><td><code>/api/chat</code></td><td>POST</td><td>JSON</td><td>200 s</td></tr>
+    <tr><td><code>…/proxy/api/chat/sessions</code></td><td><code>/api/chat/sessions</code></td><td>GET, POST</td><td>JSON</td><td>30 s</td></tr>
+    <tr><td><code>…/proxy/api/chat/session</code></td><td><code>/api/chat/session</code></td><td>POST</td><td>JSON</td><td>30 s</td></tr>
+    <tr><td><code>…/proxy/api/chat/session/&lt;id&gt;/messages</code></td><td>same path</td><td>GET</td><td>query</td><td>30 s</td></tr>
+    <tr><td><code>…/proxy/api/chat/upload/file</code></td><td><code>/api/chat/upload/file</code></td><td>POST</td><td>file ≤ 10 MB</td><td>60 s</td></tr>
+    <tr><td><code>…/proxy/api/chat/upload/image</code></td><td><code>/api/chat/upload/image</code></td><td>POST</td><td>image ≤ 10 MB</td><td>60 s</td></tr>
+    <tr><td><code>…/proxy/api/health</code></td><td><code>/api/health</code></td><td>GET</td><td>none</td><td>30 s</td></tr>
+  </tbody>
+</table>
+<p class="small">Everything else answers 404, in particular <code>api/train</code>, <code>api/ingest</code> and <code>api/admin</code>: teaching the AI and managing keys are impossible from an Odoo browser.</p>
+
+<div class="filecard"><div class="fh"><code>models/brainbox_backend.py</code><span>AbstractModel <code>brainbox.ai.backend</code> (no table)</span></div><div class="fb">
+<p>The add-on's "rule book": reads settings, decides access and roles, and checks the server.</p>
+<ul><li>Constants: display modes, positions, role choices and <b>default values</b> (e.g. colour <code>#b93fff</code>, bot name "Brainbox AI", empty Backend URL).</li>
+<li><code>_get_param</code>, <code>_backend_url</code>, <code>_api_key</code>, <code>_tenant</code>: read <code>brainbox_ai.*</code> system parameters. <code>_is_configured</code>: Backend URL plus (Tenant ID or secret key).</li>
+<li><code>_is_user_allowed</code>: public users never; administrators always; others if in Allowed groups (default: internal users).</li>
+<li><code>_user_role</code>: the precedence admin › vendor groups › customer groups › internal › portal › public.</li>
+<li><code>get_public_config</code>: the non-secret settings sent to the browser. <code>check_health</code>: GET <code>/api/health</code> with 10 s timeout and readable error messages. <code>BrainboxError</code>: errors safe to show to users.</li></ul></div></div>
+
+<div class="filecard"><div class="fh"><code>models/res_config_settings.py</code><span>extends <code>res.config.settings</code></span></div><div class="fb">
+<p>Adds the Brainbox AI section to Odoo Settings and saves the values.</p>
+<ul><li>Fields for every setting (section 7). Most are linked directly to a <code>brainbox_ai.*</code> system parameter.</li>
+<li><code>get_values</code>: fills the form; the key is <b>never</b> sent back (only "a key is stored").</li>
+<li><code>set_values</code>: only for administrators; saves or removes the key, welcome text, quick actions, group lists and the uploaded logo (validated as base64).</li>
+<li>Checks: SDK script URL must start with <code>https://</code>, <code>http://</code> or <code>/</code>; colours must be hex.</li>
+<li><code>action_brainbox_test_connection</code>: runs the health check and shows a green / orange / red notification.</li></ul></div></div>
+
+<div class="filecard"><div class="fh"><code>migrations/17.0.2.0.0/post-migrate.py</code><span>runs once when upgrading to 2.0</span></div><div class="fb">
+<p>Version 1.x stored chats in Odoo; version 2 does not. This script deletes the leftover <code>brainbox_ai_session</code> table if it exists. (The old per-user display-mode column is removed by Odoo itself.)</p></div></div>
+
+<h3>Browser files (JavaScript, templates, styles)</h3>
+
+<div class="filecard"><div class="fh"><code>static/lib/brainbox-web-sdk/brainbox-web-sdk.js</code><span>official SDK v2.0.0, unmodified copy</span></div><div class="fb">
+<p>The whole chat interface: button, window, sidebar, full page, history, uploads, formatted answers, error banners with Retry. It defines <code>window.Brainbox</code>. Identical to <code>ai\sdk-web\brainbox-web-sdk.js</code>; updated with <code>tools/sync_sdk.ps1</code>.</p></div></div>
+
+<div class="filecard"><div class="fh"><code>static/src/js/brainbox_service.js</code><span>Odoo service <code>brainbox_ai</code></span></div><div class="fb">
+<p>The glue between Odoo and the SDK.</p>
+<ul><li>Fetches <code>/brainbox_ai/config</code> once, then converts the settings into <code>Brainbox.init()</code> options (table in section 9) with <code>apiUrl: '/brainbox_ai/proxy'</code>, header <code>X-Brainbox-Proxy: 1</code>, and no key or tenant.</li>
+<li>Loads the SDK: the bundled copy, or the "SDK script URL" with automatic fallback to the bundled copy.</li>
+<li>Creates the global chat (floating / sidebar / systray) after the Odoo web client is ready (4 s safety timer), measures the top bar for the sidebar and pushes <code>.o_action_manager</code> aside.</li>
+<li>Hides the global chat while the AI Assistant app is open. Shows administrators a "not configured" notice with an Open settings button.</li>
+<li>Small adapter: when old conversations are reloaded, hides the "Context: … Question:" prefix added by embedded widgets so users only see their own question.</li>
+<li>Registered in the <code>services</code> registry as <code>brainbox_ai</code>.</li></ul></div></div>
+
+<div class="filecard"><div class="fh"><code>static/src/js/brainbox_systray.js</code><span>sparkle icon in the top bar</span></div><div class="fb">
+<p>Shows a sparkle icon that opens / closes the chat. Visible in sidebar and systray modes, in floating mode when "Systray icon in floating mode" is on, and for administrators when the add-on is not configured. Registered in the <code>systray</code> registry (<code>brainbox_ai.Systray</code>, sequence 30).</p></div></div>
+
+<div class="filecard"><div class="fh"><code>static/src/js/brainbox_chat_page.js</code><span>the AI Assistant app</span></div><div class="fb">
+<p>Client action <code>brainbox_ai.chat_page</code> (registry <code>actions</code>): runs the SDK in <b>page</b> mode inside Odoo (conversation list + chat), with its own memory key <code>bb-odoo:&lt;db&gt;:page</code>. Tells the service to hide the global chat while open.</p></div></div>
+
+<div class="filecard"><div class="fh"><code>static/src/js/brainbox_chat_widget.js</code><span>view widget <code>brainbox_chat</code></span></div><div class="fb">
+<p>Lets developers embed the chat in a form (SDK <b>inline</b> mode). Reads <code>height</code>, <code>title</code>, <code>record_context</code>. Adds a context line "Odoo record: &lt;model name&gt; — &lt;record name&gt; (id N)" to each question unless disabled, and keeps one conversation per record (<code>bb-odoo:&lt;db&gt;:rec:&lt;model&gt;:&lt;id&gt;</code>). Registered in the <code>view_widgets</code> registry.</p></div></div>
+
+<div class="filecard"><div class="fh"><code>static/src/xml/brainbox_ai.xml</code><span>OWL templates</span></div><div class="fb">
+<p>Four small templates: <code>brainbox_ai.Systray</code> (the icon button), <code>brainbox_ai.Notice</code> ("Loading…", "You are not allowed…", "not configured yet" + Open settings), <code>brainbox_ai.ChatPage</code> and <code>brainbox_ai.ChatWidget</code> (empty containers the SDK fills).</p></div></div>
+
+<div class="filecard"><div class="fh"><code>static/src/scss/brainbox_ai.scss</code><span>styles for the Odoo-side parts only</span></div><div class="fb">
+<p>Styles the systray button, hides the SDK's corner button in sidebar mode (the systray icon replaces it), hides the global chat while the AI Assistant app is open, and sizes the page and widget containers. The chat's own look comes from the SDK.</p></div></div>
+
+<h3>Views, tools and documentation</h3>
+
+<div class="filecard"><div class="fh"><code>views/res_config_settings_views.xml</code><span>settings screen + action</span></div><div class="fb">
+<ul><li><code>res_config_settings_view_form</code>: inherits Odoo's settings form (<code>base.res_config_settings_view_form</code>, priority 95) and adds a "Brainbox AI" app section, visible to administrators only, with the blocks Connection, Display, Roles and Branding. The key field is a password field.</li>
+<li><code>action_brainbox_ai_config_settings</code>: window action that opens these settings (used by the Configuration menu and the "Open settings" buttons).</li></ul></div></div>
+
+<div class="filecard"><div class="fh"><code>views/brainbox_ai_menus.xml</code><span>AI Assistant app and menus</span></div><div class="fb">
+<ul><li><code>action_brainbox_ai_chat_page</code>: client action with tag <code>brainbox_ai.chat_page</code>.</li>
+<li><code>menu_brainbox_ai_root</code> "AI Assistant" (home menu, internal users, sequence 45, icon from <code>static/description/icon.png</code>) with <code>menu_brainbox_ai_chat</code> "Chat" and <code>menu_brainbox_ai_config</code> "Configuration" (administrators only).</li></ul></div></div>
+
+<div class="filecard"><div class="fh"><code>tools/sync_sdk.ps1</code><span>PowerShell helper</span></div><div class="fb">
+<p>Copies <code>brainbox-web-sdk.js</code> from a local SDK checkout (<code>-SdkPath</code>) or downloads it from <code>cdn.jsdelivr.net/npm/spres-web@&lt;Version&gt;</code> (default version 2) into <code>static/lib/…</code>, then prints the bundled SDK version. Not used by Odoo at runtime.</p></div></div>
+
+<div class="filecard"><div class="fh"><div class="l"><code>README.md</code><code>static/description/icon.png</code></div><span>docs and icon</span></div><div class="fb">
+<p>Developer documentation of the add-on (install, run, configure, modes, embedding, permissions, proxy, updating the SDK) and the app icon shown in the Odoo home menu and Apps.</p></div></div>
+
+<!-- =============================== 9 =============================== -->
+<h2 id="s9"><span class="num">9</span>The web SDK (sdk-web)</h2>
+<p class="lead">sdk-web is one JavaScript file with no dependencies. Any website can show the Brainbox chat by adding two small pieces of code. Odoo uses the very same file.</p>
+
+<h3>The plain-HTML snippet</h3>
+<pre><span class="k">&lt;script</span> src="https://port.smartpowerbilling.com/sdk/brainbox-web-sdk.js"<span class="k">&gt;&lt;/script&gt;</span>
+<span class="c">&lt;!-- or from the CDN: https://cdn.jsdelivr.net/npm/spres-web@2 --&gt;</span>
+<span class="k">&lt;script&gt;</span>
+  const bb = Brainbox.init({
+    apiUrl: <span class="s">'https://port.smartpowerbilling.com'</span>,   <span class="c">// the brainBox server</span>
+    apiKey: <span class="s">'pk_live_xxx'</span>,                          <span class="c">// a PUBLISHABLE key only</span>
+    mode: <span class="s">'floating'</span>, position: <span class="s">'bottom-right'</span>,
+    theme: { primary: <span class="s">'#2563EB'</span> },
+    branding: { botName: <span class="s">'Acme Assistant'</span>, subtitle: <span class="s">'Ask us anything'</span> },
+    launcher: { text: <span class="s">'Support chat'</span> },
+    quickActions: [<span class="s">'Opening hours?'</span>, <span class="s">'How do I pay my bill?'</span>]
+  });
+<span class="k">&lt;/script&gt;</span></pre>
+
+<h3>Main options</h3>
+<table>
+  <thead><tr><th style="width:20%">Option</th><th style="width:22%">Default</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td class="k">apiUrl</td><td>''</td><td>brainBox address, or a same-site proxy path such as <code>/brainbox_ai/proxy</code>.</td></tr>
+    <tr><td class="k">apiKey</td><td>–</td><td>Sent as <code>Authorization: Bearer</code>. Publishable key on public pages; omit it behind a proxy.</td></tr>
+    <tr><td class="k">tenantId</td><td>–</td><td>Sent only when set. Optional (the key decides the tenant).</td></tr>
+    <tr><td class="k">user</td><td>{}</td><td><code>{ id, name, email, avatarUrl }</code>: id becomes <code>user_id</code> (per-user history), name is used in greetings.</td></tr>
+    <tr><td class="k">headers / credentials</td><td>{} / 'same-origin'</td><td>Extra headers on every request (e.g. a proxy marker) and cookie policy.</td></tr>
+    <tr><td class="k">timeout</td><td>200000 ms</td><td>How long to wait for an answer (an AI answer can take ~3 minutes).</td></tr>
+    <tr><td class="k">mode / container</td><td>'floating'</td><td><code>floating</code>, <code>sidebar</code>, <code>inline</code> or <code>page</code>; inline and page need a container element.</td></tr>
+    <tr><td class="k">allowedModes</td><td>['floating','sidebar']</td><td>Modes the user can switch between with the dock button.</td></tr>
+    <tr><td class="k">position / offset / zIndex</td><td>bottom-right / 24px / 9999</td><td>Placement of the floating button and window.</td></tr>
+    <tr><td class="k">width / height</td><td>360 / 560</td><td>Floating window size (capped to the screen).</td></tr>
+    <tr><td class="k">sidebarWidth / sidebarTop / sidebarPushContent</td><td>380 / 0 / body</td><td>Sidebar size, top offset (e.g. a navbar) and the element pushed aside.</td></tr>
+    <tr><td class="k">defaultOpen</td><td>false</td><td>Open on first visit; afterwards the user's last state is remembered.</td></tr>
+    <tr><td class="k">launcher</td><td>{type:'button', text:'Chat'}</td><td>Button style: <code>button</code>, <code>icon</code>, <code>gif</code> or <code>none</code> (open from your own UI).</td></tr>
+    <tr><td class="k">theme</td><td>primary #b93fff, panel #fbf1ff</td><td>Colours, text colour, corner radius, optional font.</td></tr>
+    <tr><td class="k">branding</td><td>botName 'Brainbox AI'</td><td><code>botName</code>, <code>title</code>, <code>subtitle</code>, <code>logoUrl</code>, <code>botAvatarUrl</code>.</td></tr>
+    <tr><td class="k">welcomeMessages / quickActions / placeholder</td><td>greeting / [] / 'Type message...'</td><td>Intro bubbles (<code>{{name}}</code>, <code>{{botName}}</code>), suggested questions, input hint.</td></tr>
+    <tr><td class="k">features</td><td>history, upload, emoji, modeSwitch, newChat on; export off</td><td>Turn interface features on or off.</td></tr>
+    <tr><td class="k">context</td><td>–</td><td>Function returning text added before each question ("Context: … Question: …"), e.g. the record being viewed.</td></tr>
+    <tr><td class="k">storageKey / locale / onEvent</td><td>'bb-web' / browser / –</td><td>Browser-memory namespace, time format, event callback (open, close, message, response, error, …).</td></tr>
+  </tbody>
+</table>
+<p class="small">The SDK also offers methods (<code>open</code>, <code>close</code>, <code>send</code>, <code>newChat</code>, <code>loadSession</code>, <code>setMode</code>, <code>updateConfig</code>, <code>destroy</code>…) and a headless <code>Brainbox.Client</code> for using the API without any interface. Older v1 code (<code>BrainboxWebSDK</code>, <code>BrainboxWebWidget</code>) keeps working.</p>
+
+<h3>How Odoo's settings become SDK options</h3>
+<table class="keep">
+  <thead><tr><th style="width:34%">Odoo setting / situation</th><th>Brainbox.init() option set by brainbox_service.js</th></tr></thead>
+  <tbody>
+    <tr><td class="k">(always)</td><td><code>apiUrl: '/brainbox_ai/proxy'</code>, <code>headers: {'X-Brainbox-Proxy': '1'}</code>, <code>credentials: 'same-origin'</code>; <b>no</b> <code>apiKey</code>, <b>no</b> <code>tenantId</code></td></tr>
+    <tr><td class="k">Logged-in user</td><td><code>user: { id: &lt;Odoo uid&gt;, name }</code> (the id only separates browser memory; the proxy sets the real <code>user_id</code>)</td></tr>
+    <tr><td class="k">Display mode</td><td>Floating → <code>mode:'floating'</code>; Sidebar → <code>mode:'sidebar'</code> (both with <code>allowedModes: ['floating','sidebar']</code>); Systray → <code>mode:'floating'</code>, <code>allowedModes:['floating']</code>, <code>launcher.type:'none'</code>; Disabled → no global chat</td></tr>
+    <tr><td class="k">Position</td><td><code>position</code></td></tr>
+    <tr><td class="k">Primary / Panel color</td><td><code>theme.primary</code> / <code>theme.panel</code></td></tr>
+    <tr><td class="k">Bot name / Header title / subtitle</td><td><code>branding.botName</code> / <code>branding.title</code> / <code>branding.subtitle</code></td></tr>
+    <tr><td class="k">Logo or Logo URL</td><td><code>branding.logoUrl</code> (uploaded logo → <code>/brainbox_ai/logo?v=…</code>)</td></tr>
+    <tr><td class="k">Launcher text</td><td><code>launcher.text</code></td></tr>
+    <tr><td class="k">Welcome message / Quick actions</td><td><code>welcomeMessages</code> / <code>quickActions</code> (one per line)</td></tr>
+    <tr><td class="k">SDK script URL</td><td>Which SDK file is loaded (bundled copy when empty or on failure)</td></tr>
+    <tr><td class="k">Odoo layout (fixed)</td><td><code>zIndex: 990</code> (below Odoo menus and dialogs), <code>sidebarTop</code> = navbar height, <code>sidebarPushContent: '.o_action_manager'</code>, <code>storageKey: 'bb-odoo:&lt;db&gt;'</code></td></tr>
+    <tr><td class="k">AI Assistant app</td><td><code>mode:'page'</code>, its own container and <code>storageKey</code></td></tr>
+    <tr><td class="k">&lt;widget name="brainbox_chat"/&gt;</td><td><code>mode:'inline'</code>, <code>context</code> = record description, <code>branding.title</code> = the widget's title</td></tr>
+  </tbody>
+</table>
+
+<div class="callout dev">
+  <span class="t">For developers: proxy mode on any site</span>
+  <p>A website with logged-in users should copy Odoo's approach: a small endpoint on its own domain that checks the session, adds <code>Authorization: Bearer sk_live_xxx</code>, the tenant and the user, and forwards to brainBox; then <code>Brainbox.init({ apiUrl: '/your/proxy', credentials: 'same-origin' })</code> without a key. When <code>tenantId</code> and <code>user.id</code> are not set, the SDK does not send them, so the proxy decides.</p>
+</div>
+
+<!-- =============================== 10 =============================== -->
+<h2 id="s10"><span class="num">10</span>Security and known limitations</h2>
+
+<h3>What is protected, and how</h3>
+<table>
+  <thead><tr><th style="width:28%">Risk</th><th>Protection</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Secret key stolen from a browser</td><td>The key is stored only on the Odoo server, never included in the settings sent to the browser, never shown again in the form, and only administrators can change it.</td></tr>
+    <tr><td class="k">One company reading another's data</td><td>The tenant comes from the key; a different tenant in the request is refused (403). Searches, conversations and cached answers are all limited to that tenant.</td></tr>
+    <tr><td class="k">A user pretending to be someone else or claiming a higher role</td><td>The Odoo proxy overwrites user id, name, role and tenant with the real logged-in values. Publishable keys are always "public" on brainBox.</td></tr>
+    <tr><td class="k">Restricted knowledge leaking through the AI</td><td>Documents are filtered by audience <b>before</b> the AI sees them; the cache is separated by role; the AI is told not to reveal other customers' details.</td></tr>
+    <tr><td class="k">Reading another user's conversations</td><td>Conversations are stamped with the user id; other users get "Session not found" (existence is not revealed).</td></tr>
+    <tr><td class="k">Misuse of Odoo as an open relay</td><td>Only logged-in users in Allowed groups; only 7 chat endpoints are forwarded; training, ingestion and key management are blocked (404).</td></tr>
+    <tr><td class="k">Cross-site request forgery</td><td>The proxy requires the custom header <code>X-Brainbox-Proxy: 1</code>, which another website cannot send to Odoo.</td></tr>
+    <tr><td class="k">Oversized or malicious uploads</td><td>10 MB limit (Odoo and brainBox), JSON limited to 512 KB, conversation ids validated; brainBox accepts only JPEG/PNG/GIF/WebP as images and strips paths from file names.</td></tr>
+    <tr><td class="k">Malicious content in answers or logo</td><td>The SDK renders answers with a safe formatter (no raw HTML; only http/https/mailto links). The logo is served with a strict Content-Security-Policy.</td></tr>
+    <tr><td class="k">Stolen key database</td><td>brainBox stores only SHA-256 fingerprints of keys; keys can expire and be revoked; the admin token is compared in constant time.</td></tr>
+  </tbody>
+</table>
+
+<h3>Known limitations (as of this version)</h3>
+<table>
+  <thead><tr><th style="width:28%">Limitation</th><th>Details</th></tr></thead>
+  <tbody>
+    <tr><td class="k">No streaming</td><td>The answer arrives all at once; the widget shows "Thinking…" meanwhile. A slow answer can take up to ~3 minutes (the Odoo proxy waits 200 s, then shows a timeout message).</td></tr>
+    <tr><td class="k">Uploads are stored, not learned from</td><td>Files and images attached in the chat are saved on the brainBox server (in a temporary folder) and noted in the conversation, but the AI does not read them when answering and they are not added to the knowledge base. Teaching the AI is done through the training tools with a secret key.</td></tr>
+    <tr><td class="k">Answer cache keyed on the first 50 characters</td><td>Answers are cached for 1 hour per tenant and role using only the first 50 characters of the question. Two different questions that start with the same 50 characters can receive the same answer. This especially affects the embedded form widget, because each question there starts with the same "Context: Odoo record: …" line for a given record. Worth fixing in brainBox (e.g. hash the whole question).</td></tr>
+    <tr><td class="k">Test connection does not check the key</td><td><code>/api/health</code> is public, so a successful test proves only that the server is reachable. A wrong key or a mismatching Tenant ID appears at the first real question (401 / 403).</td></tr>
+    <tr><td class="k">Back-office only</td><td>The add-on adds the chat to Odoo's back-office, not to the Odoo website or customer portal pages.</td></tr>
+    <tr><td class="k">Publishable keys are open by nature</td><td>brainBox accepts requests from any website (CORS open) and has no per-key website allow-list or rate limiting yet (listed as next steps). A copied pk_ key can be used elsewhere, but only for public answers. A pk_ key can also list conversations that are not tied to a user.</td></tr>
+    <tr><td class="k">History depends on brainBox</td><td>All conversations live on brainBox. If it is down, Odoo shows an error banner with Retry. Per-user history is tied to <code>odoo:&lt;database&gt;:&lt;user id&gt;</code>; renaming the Odoo database gives users a fresh history.</td></tr>
+    <tr><td class="k">Per-browser preferences</td><td>The open/closed state, docked/floating choice and last conversation are remembered per browser, not per Odoo user account.</td></tr>
+    <tr><td class="k">Staff dashboard</td><td>A web dashboard for staff (keys, knowledge, conversations) is being built and is not covered here; today keys are managed with the CLI or the admin API.</td></tr>
+  </tbody>
+</table>
+
+<!-- =============================== 11 =============================== -->
+<h2 id="s11"><span class="num">11</span>Glossary</h2>
+<table class="compact">
+  <thead><tr><th style="width:22%">Term</th><th>Meaning in plain words</th></tr></thead>
+  <tbody>
+    <tr><td class="k">brainBox</td><td>Your AI server application. It stores each company's knowledge, searches it, asks an AI model to write answers and keeps the conversations.</td></tr>
+    <tr><td class="k">Tenant</td><td>One customer company on brainBox: a sealed compartment with its own knowledge, conversations and keys.</td></tr>
+    <tr><td class="k">SDK</td><td>"Software development kit": a ready-made building block that developers drop into their software. Here: the chat window (sdk-web, sdk-react, sdk-react-native).</td></tr>
+    <tr><td class="k">Add-on / module</td><td>A package that extends Odoo. <code>brainbox_ai</code> is the Odoo add-on for Brainbox.</td></tr>
+    <tr><td class="k">Proxy</td><td>A middleman that receives a request and passes it on. Odoo's proxy passes chat requests to brainBox, adding the secret key and the user's identity.</td></tr>
+    <tr><td class="k">API</td><td>The set of addresses (such as <code>/api/chat</code>) through which programs talk to brainBox.</td></tr>
+    <tr><td class="k">API key</td><td>A long password that identifies a client program and its tenant. <b>Publishable</b> (pk_): safe in public pages, public answers only. <b>Secret</b> (sk_): servers only, full access to one tenant.</td></tr>
+    <tr><td class="k">Admin token</td><td>The operator's master password on the brainBox server, used only to create, list and revoke keys.</td></tr>
+    <tr><td class="k">Role</td><td>Who is asking (admin, internal, customer, vendor, public). It decides which knowledge may be used to answer.</td></tr>
+    <tr><td class="k">Audience</td><td>Label on each piece of knowledge saying who it is for (public, customer, vendor, internal, admin).</td></tr>
+    <tr><td class="k">Session / conversation</td><td>One chat thread with its messages, stored on brainBox, owned by one user.</td></tr>
+    <tr><td class="k">Knowledge base</td><td>The company's documents, FAQs, tickets and records that brainBox has learned, cut into passages.</td></tr>
+    <tr><td class="k">Embedding / vector search</td><td>Each passage is turned into a list of numbers that captures its meaning; the question is turned into one too, and the closest passages are found ("semantic search"). Stored in PostgreSQL with pgvector.</td></tr>
+    <tr><td class="k">AI model (LLM)</td><td>The language model that writes the answer from the passages found. brainBox uses Ollama, with OpenAI as a fallback.</td></tr>
+    <tr><td class="k">Training / ingestion</td><td>Adding knowledge to a tenant (files, text, external APIs such as a helpdesk). Requires a secret key; not possible through Odoo's proxy.</td></tr>
+    <tr><td class="k">Cache</td><td>A short-term memory of recent answers (1 hour, per tenant and role) so repeated questions are answered instantly.</td></tr>
+    <tr><td class="k">System parameter</td><td>Odoo's key-value settings store (<code>ir.config_parameter</code>), where the add-on saves its settings.</td></tr>
+    <tr><td class="k">AbstractModel</td><td>An Odoo model that holds code but no database table.</td></tr>
+    <tr><td class="k">Systray</td><td>The row of small icons at the top right of Odoo.</td></tr>
+    <tr><td class="k">CORS / CSRF</td><td>Browser security rules about which websites may call which servers, and a type of attack where another site tricks a browser into sending requests. The proxy design avoids both problems.</td></tr>
+  </tbody>
+</table>
+
+<!-- =============================== 12 =============================== -->
+<h2 id="s12"><span class="num">12</span>Where to find everything</h2>
+<table>
+  <thead><tr><th style="width:30%">What</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr class="group"><td colspan="2">On this computer (C:\Users\USER\Documents\PERSONAL\…)</td></tr>
+    <tr><td class="k">Odoo add-on</td><td><code>odoo\custom_addons\brainbox_ai\</code></td></tr>
+    <tr><td class="k">Odoo source, config, Python</td><td><code>odoo\odoo-bin</code>, <code>odoo\odoo.conf</code>, <code>odoo\.venv\Scripts\python.exe</code></td></tr>
+    <tr><td class="k">Web SDK (sdk-web)</td><td><code>ai\sdk-web\</code> (<code>brainbox-web-sdk.js</code>, <code>README.md</code>, <code>widget-example.html</code>, <code>examples\</code>)</td></tr>
+    <tr><td class="k">React SDK / mobile SDK</td><td><code>ai\sdk-react\</code> / <code>ai\sdk-react-native\</code></td></tr>
+    <tr><td class="k">brainBox backend</td><td><code>ai\brainBox\</code>: <code>app\main.py</code> (start-up, routes), <code>app\dependencies.py</code> (key checks), <code>app\apikeys.py</code> (key storage), <code>app\permissions.py</code> (roles/audiences), <code>app\api\chat.py</code>, <code>app\api\upload.py</code>, <code>app\api\admin.py</code>, <code>app\cli.py</code></td></tr>
+    <tr><td class="k">brainBox secrets</td><td><code>ai\brainBox\.env</code> on the server (database, admin token, AI settings). Never share or commit it.</td></tr>
+    <tr><td class="k">This document</td><td><code>ai\docs\odoo-integration-guide.html</code> and <code>ai\docs\Brainbox-Odoo-Integration-Guide.pdf</code></td></tr>
+    <tr class="group"><td colspan="2">In Odoo</td></tr>
+    <tr><td class="k">Settings</td><td>Settings › Brainbox AI (administrators), or AI Assistant › Configuration</td></tr>
+    <tr><td class="k">Full-screen chat</td><td>Home menu › AI Assistant › Chat</td></tr>
+    <tr><td class="k">Stored settings</td><td>Settings › Technical › System Parameters (developer mode), keys starting with <code>brainbox_ai.</code></td></tr>
+    <tr><td class="k">Install / update</td><td>Apps › Update Apps List › "Brainbox AI"</td></tr>
+    <tr class="group"><td colspan="2">On the internet</td></tr>
+    <tr><td class="k">brainBox server</td><td><code>https://port.smartpowerbilling.com</code> (health: <code>/api/health</code>)</td></tr>
+    <tr><td class="k">Hosted SDK file</td><td><code>https://port.smartpowerbilling.com/sdk/brainbox-web-sdk.js</code></td></tr>
+    <tr><td class="k">SDK on the CDN</td><td><code>https://cdn.jsdelivr.net/npm/spres-web@2</code> (npm package <code>spres-web</code>)</td></tr>
+    <tr class="group"><td colspan="2">On the brainBox server</td></tr>
+    <tr><td class="k">Manage keys</td><td><code>python -m app.cli keys create | list | revoke</code> (or inside Docker: <code>docker exec -i brainbox-api python -m app.cli keys …</code>)</td></tr>
+    <tr><td class="k">Admin API</td><td><code>/api/admin/keys</code> with header <code>X-Admin-Token</code></td></tr>
+    <tr><td class="k">Logs</td><td><code>brainbox.log</code> (brainBox) and the Odoo server log (proxy warnings)</td></tr>
+  </tbody>
+</table>
+
+
+
+</body>
+</html>
