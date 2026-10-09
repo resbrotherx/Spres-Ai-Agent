@@ -12,6 +12,7 @@ from app.api.admin import router as admin_router
 from app.api.staff import router as staff_router
 from app.api.reports import router as reports_router
 from app.api.dashboard import router as dashboard_router
+from app.api.platform import router as platform_router
 from app.config import settings
 from app.db.session import init_db
 from app.permissions import AUDIENCES
@@ -93,6 +94,7 @@ app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
 app.include_router(staff_router, prefix="/api", tags=["staff"])
 app.include_router(reports_router, prefix="/api", tags=["reports"])
 app.include_router(dashboard_router, prefix="/api", tags=["dashboard"])
+app.include_router(platform_router, prefix="/api/platform", tags=["platform"])
 
 @app.get("/")
 def root():

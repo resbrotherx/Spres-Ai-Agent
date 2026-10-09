@@ -1,7 +1,8 @@
 """Staff dashboard accounts: login, profile, invites, password reset, staff management.
 
 Roles: owner > admin > trainer > viewer. Admins manage trainers/viewers; owners manage everyone.
-A tenant always keeps at least one active owner.
+A tenant always keeps at least one active owner. Platform-admin accounts can only be changed by a
+platform admin (so a tenant owner can't take over or lock out a platform admin in their tenant).
 """
 from typing import Any, Dict, List, Optional
 
@@ -63,6 +64,15 @@ class InvitePayload(BaseModel):
     email: str = Field(..., max_length=254)
     full_name: Optional[str] = Field(None, max_length=120)
     role: str
+    password: Optional[str] = Field(
+        None, max_length=256,
+        description="Set a temporary password (>= 10 chars) instead of emailing an invite; "
+                    "the user must change it at first login")
+
+
+class AdminSetPassword(BaseModel):
+    password: str = Field(..., max_length=256)
+    must_change_password: bool = True
 
 
 class StaffPatch(BaseModel):
@@ -96,6 +106,14 @@ def _target(db: Session, auth: AuthContext, user_id: int) -> User:
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff member not found")
     return user
+
+
+PLATFORM_ADMIN_TARGET = "Only a platform admin can change a platform admin account"
+
+
+def _guard_platform_admin(auth: AuthContext, user: User) -> None:
+    if user.is_platform_admin and not auth.is_platform_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=PLATFORM_ADMIN_TARGET)
 
 
 def _can_manage(auth: AuthContext, target_role: Optional[str]) -> bool:
@@ -279,9 +297,18 @@ def invite_staff(payload: InvitePayload, request: Request, auth: AuthContext = D
         role = staff_mod.validate_role(payload.role)
         if not _can_manage(auth, role):
             raise role_forbidden(auth.staff_role)
-        user, raw = staff_mod.create_staff(db, auth.tenant_id, payload.email, role, payload.full_name)
+        if payload.password:
+            user, raw = staff_mod.create_staff(
+                db, auth.tenant_id, payload.email, role, payload.full_name, payload.password,
+                must_change_password=True, min_password=staff_mod.ADMIN_MIN_PASSWORD)
+        else:
+            user, raw = staff_mod.create_staff(db, auth.tenant_id, payload.email, role, payload.full_name)
     except staff_mod.StaffError as e:
         _raise(e)
+    if payload.password:
+        logger.info(f"Staff created with a temporary password: user={user.id} tenant={auth.tenant_id} "
+                    f"role={role} by={auth.staff_user_id}")
+        return {"user": staff_mod.to_dict(user), "invite_url": None, "email_sent": False, "password_set": True}
     url, sent = _send_invite(db, user, raw, request.headers.get("origin"), auth.staff_name)
     logger.info(f"Staff invited: user={user.id} tenant={auth.tenant_id} role={role} by={auth.staff_user_id}")
     return {"user": staff_mod.to_dict(user), "invite_url": url, "email_sent": sent}
@@ -293,6 +320,7 @@ def update_staff(user_id: int, payload: StaffPatch, auth: AuthContext = Depends(
     user = _target(db, auth, user_id)
     if not _can_manage(auth, user.role):
         raise role_forbidden(auth.staff_role)
+    _guard_platform_admin(auth, user)
     new_role = user.role
     if payload.role is not None:
         try:
@@ -322,6 +350,7 @@ def delete_staff(user_id: int, auth: AuthContext = Depends(require_staff("admin"
     user = _target(db, auth, user_id)
     if not _can_manage(auth, user.role):
         raise role_forbidden(auth.staff_role)
+    _guard_platform_admin(auth, user)
     is_active_owner = user.role == "owner" and user.is_active and user.invite_token_hash is None
     if is_active_owner and staff_mod.active_owner_count(db, auth.tenant_id, exclude_id=user.id) == 0:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=LAST_OWNER)
@@ -338,8 +367,29 @@ def resend_invite(user_id: int, request: Request, auth: AuthContext = Depends(re
     user = _target(db, auth, user_id)
     if not _can_manage(auth, user.role):
         raise role_forbidden(auth.staff_role)
+    _guard_platform_admin(auth, user)
     if user.invite_token_hash is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This user has already accepted the invite")
     raw = staff_mod.refresh_invite(db, user)
     url, sent = _send_invite(db, user, raw, request.headers.get("origin"), auth.staff_name)
     return {"invite_url": url, "email_sent": sent}
+
+
+@router.post("/staff/{user_id}/password")
+def set_staff_password(user_id: int, payload: AdminSetPassword, auth: AuthContext = Depends(require_staff("admin")),
+                       db: Session = Depends(get_db)):
+    """Set a (temporary) password for a staff member (admin+, same rules as role management).
+    Completes a pending invite. Use /staff/me/password for your own password."""
+    user = _target(db, auth, user_id)
+    if user.id == auth.staff_user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Use Account settings to change your own password")
+    if not _can_manage(auth, user.role):
+        raise role_forbidden(auth.staff_role)
+    _guard_platform_admin(auth, user)
+    try:
+        staff_mod.admin_set_password(db, user, payload.password, payload.must_change_password)
+    except staff_mod.StaffError as e:
+        _raise(e)
+    logger.info(f"Staff password set by admin: user={user.id} tenant={auth.tenant_id} by={auth.staff_user_id}")
+    return {"ok": True, "user": staff_mod.to_dict(user)}

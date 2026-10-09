@@ -13,7 +13,8 @@ export interface AuthProps {
   logoUrl?: string;
   href: (to: string, q?: Record<string, string | number | undefined | null>) => string;
   navigate: (to: string, q?: Record<string, string | number | undefined | null>, o?: { replace?: boolean }) => void;
-  onAuthenticated: (user: StaffUser) => void;
+  /** `password` is passed by the sign-in form so a forced password change can prefill it (memory only). */
+  onAuthenticated: (user: StaffUser, meta?: { password?: string }) => void;
 }
 
 function AuthLayout({ brandName, logoUrl, children }: { brandName: string; logoUrl?: string; children: ReactNode }) {
@@ -125,7 +126,7 @@ export function LoginPage(props: AuthProps & { next?: string }) {
     try {
       if (mode === 'login') {
         const res = await client.login(email.trim(), password);
-        onAuthenticated(res.user);
+        onAuthenticated(res.user, { password });
       } else {
         await client.forgotPassword(email.trim());
         setMode('sent');
@@ -323,5 +324,86 @@ export function ResetPasswordPage(props: AuthProps & { token: string }) {
         onAuthenticated(res.user);
       }}
     />
+  );
+}
+
+/**
+ * Shown right after sign-in when an admin set this account's password (`must_change_password`):
+ * the user must pick their own before using the dashboard. The current password is prefilled
+ * from the sign-in form when available (kept in memory only).
+ */
+export function ForcePasswordChangePage({
+  client,
+  brandName,
+  logoUrl,
+  user,
+  currentPassword,
+  onDone,
+  onSignOut
+}: {
+  client: BrainboxStaffClient;
+  brandName: string;
+  logoUrl?: string;
+  user: StaffUser;
+  currentPassword?: string;
+  onDone: (user: StaffUser) => void;
+  onSignOut: () => void;
+}) {
+  const id = useId();
+  const [cur, setCur] = useState(currentPassword || '');
+  const [pw, setPw] = useState('');
+  const [pw2, setPw2] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const mismatch = !!pw2 && pw !== pw2;
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (pw.length < 8) return setError('Password must be at least 8 characters.');
+    if (pw !== pw2) return setError('Passwords don’t match.');
+    if (pw === cur) return setError('Choose a password that’s different from the temporary one.');
+    setError(null);
+    setBusy(true);
+    try {
+      await client.changePassword({ current_password: cur, new_password: pw });
+      const fresh = await client.me().catch(() => ({ ...user, must_change_password: false }));
+      onDone({ ...fresh, must_change_password: false });
+    } catch (err) {
+      setError(errMsg(err));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AuthLayout brandName={brandName} logoUrl={logoUrl}>
+      <form className="bb-staff-auth-form" onSubmit={submit}>
+        <MobileLogo brandName={brandName} logoUrl={logoUrl} />
+        <div>
+          <h1>Choose a new password</h1>
+          <p className="bb-staff-auth-lead">
+            An administrator set a temporary password for <b>{user.email}</b>. Pick your own to continue — only you will know it.
+          </p>
+        </div>
+        {error ? <Alert tone="error">{error}</Alert> : null}
+        <Field label="Temporary password" htmlFor={`${id}-cur`} hint={currentPassword ? 'Filled in from the sign-in form.' : 'The password you just signed in with.'}>
+          <PasswordInput id={`${id}-cur`} value={cur} onChange={setCur} autoComplete="current-password" autoFocus={!currentPassword} />
+        </Field>
+        <Field label="New password" htmlFor={`${id}-pw`}>
+          <PasswordInput id={`${id}-pw`} value={pw} onChange={setPw} autoComplete="new-password" autoFocus={!!currentPassword} />
+          <PasswordMeter value={pw} />
+        </Field>
+        <Field label="Confirm new password" htmlFor={`${id}-pw2`} error={mismatch ? 'Passwords don’t match' : null}>
+          <PasswordInput id={`${id}-pw2`} value={pw2} onChange={setPw2} autoComplete="new-password" invalid={mismatch} />
+        </Field>
+        <Button type="submit" variant="primary" size="lg" block loading={busy} disabled={!cur || !pw || !pw2}>
+          Save password & continue
+        </Button>
+        <p className="bb-staff-auth-foot">
+          <button type="button" className="bb-staff-link-btn" onClick={onSignOut}>
+            Sign out instead
+          </button>
+        </p>
+      </form>
+    </AuthLayout>
   );
 }

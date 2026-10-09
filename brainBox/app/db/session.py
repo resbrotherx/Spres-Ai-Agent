@@ -81,6 +81,8 @@ def init_db(reset_interrupted: bool = True):
         ("invite_expires_at", "TIMESTAMP WITH TIME ZONE"),
         ("reset_token_hash", "VARCHAR"),
         ("reset_expires_at", "TIMESTAMP WITH TIME ZONE"),
+        ("is_platform_admin", "BOOLEAN DEFAULT FALSE"),
+        ("must_change_password", "BOOLEAN DEFAULT FALSE"),
     ):
         _run_ddl(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {column} {ddl}")
     _run_ddl("CREATE INDEX IF NOT EXISTS ix_users_tenant_id ON users (tenant_id)")

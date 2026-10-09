@@ -32,7 +32,21 @@ import type {
   NotificationListResponse,
   OkResponse,
   OverviewReport,
+  PlatformApiKey,
+  PlatformCreateKeyPayload,
+  PlatformCreateUserPayload,
+  PlatformCreateUserResponse,
+  PlatformOverview,
+  PlatformTenant,
+  PlatformTenantDetail,
+  PlatformUpdateUserPayload,
+  PlatformUser,
+  PlatformUserListParams,
+  CreateTenantPayload,
+  CreateTenantResponse,
   ResendInviteResponse,
+  RollApiKeyResponse,
+  SetStaffPasswordPayload,
   StaffLoginResponse,
   StaffUser,
   TenantSettings,
@@ -235,6 +249,11 @@ export class BrainboxStaffClient {
     return this.call({ method: 'POST', url: `/api/staff/${this.seg(id)}/resend-invite` });
   }
 
+  /** Admin+: set a (temporary) password for a team member. */
+  setStaffPassword(id: string | number, payload: SetStaffPasswordPayload): Promise<{ ok: boolean; user: StaffUser }> {
+    return this.call({ method: 'POST', url: `/api/staff/${this.seg(id)}/password`, data: { must_change_password: true, ...payload } });
+  }
+
   /* --------------------------- knowledge gaps --------------------------- */
 
   listGaps(params: GapListParams = {}): Promise<GapListResponse> {
@@ -325,6 +344,80 @@ export class BrainboxStaffClient {
 
   revokeKey(id: string | number): Promise<{ revoked: boolean }> {
     return this.call({ method: 'DELETE', url: `/api/keys/${this.seg(id)}` });
+  }
+
+  /** Replace a key: a new one is created (returned once) and the old one revoked. */
+  rollKey(id: string | number): Promise<RollApiKeyResponse> {
+    return this.call({ method: 'POST', url: `/api/keys/${this.seg(id)}/roll` });
+  }
+
+  /* --------------------- platform admin (/api/platform) --------------------- */
+
+  platformOverview(): Promise<PlatformOverview> {
+    return this.call({ method: 'GET', url: '/api/platform/overview' });
+  }
+
+  async listTenants(): Promise<PlatformTenant[]> {
+    const res = await this.call<{ tenants: PlatformTenant[] }>({ method: 'GET', url: '/api/platform/tenants' });
+    return Array.isArray(res?.tenants) ? res.tenants : [];
+  }
+
+  createTenant(payload: CreateTenantPayload): Promise<CreateTenantResponse> {
+    return this.call({ method: 'POST', url: '/api/platform/tenants', data: payload });
+  }
+
+  getTenant(tenantId: string): Promise<PlatformTenantDetail> {
+    return this.call({ method: 'GET', url: `/api/platform/tenants/${this.seg(tenantId)}` });
+  }
+
+  updateTenant(tenantId: string, patch: { display_name?: string }): Promise<PlatformTenant> {
+    return this.call({ method: 'PATCH', url: `/api/platform/tenants/${this.seg(tenantId)}`, data: patch });
+  }
+
+  async listPlatformUsers(params: PlatformUserListParams = {}): Promise<PlatformUser[]> {
+    const clean: Record<string, unknown> = {};
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') clean[k] = v;
+    });
+    const res = await this.call<{ users: PlatformUser[] }>({ method: 'GET', url: '/api/platform/users', params: clean });
+    return Array.isArray(res?.users) ? res.users : [];
+  }
+
+  createPlatformUser(payload: PlatformCreateUserPayload): Promise<PlatformCreateUserResponse> {
+    return this.call({ method: 'POST', url: '/api/platform/users', data: payload });
+  }
+
+  updatePlatformUser(id: string | number, patch: PlatformUpdateUserPayload): Promise<PlatformUser> {
+    return this.call({ method: 'PATCH', url: `/api/platform/users/${this.seg(id)}`, data: patch });
+  }
+
+  setPlatformUserPassword(id: string | number, payload: SetStaffPasswordPayload): Promise<{ ok: boolean; user: PlatformUser }> {
+    return this.call({ method: 'POST', url: `/api/platform/users/${this.seg(id)}/password`, data: { must_change_password: true, ...payload } });
+  }
+
+  platformInviteLink(id: string | number): Promise<{ invite_url: string }> {
+    return this.call({ method: 'POST', url: `/api/platform/users/${this.seg(id)}/invite-link` });
+  }
+
+  deletePlatformUser(id: string | number): Promise<{ deleted: boolean }> {
+    return this.call({ method: 'DELETE', url: `/api/platform/users/${this.seg(id)}` });
+  }
+
+  async listPlatformKeys(tenantId?: string): Promise<PlatformApiKey[]> {
+    const res = await this.call<{ keys: PlatformApiKey[] }>({ method: 'GET', url: '/api/platform/keys', params: tenantId ? { tenant_id: tenantId } : {} });
+    return Array.isArray(res?.keys) ? res.keys : [];
+  }
+
+  createPlatformKey(payload: PlatformCreateKeyPayload): Promise<{ key: PlatformApiKey; raw_key: string }> {
+    return this.call({ method: 'POST', url: '/api/platform/keys', data: payload });
+  }
+
+  rollPlatformKey(id: string | number): Promise<RollApiKeyResponse<PlatformApiKey>> {
+    return this.call({ method: 'POST', url: `/api/platform/keys/${this.seg(id)}/roll` });
+  }
+
+  revokePlatformKey(id: string | number): Promise<{ revoked: boolean; key: PlatformApiKey }> {
+    return this.call({ method: 'DELETE', url: `/api/platform/keys/${this.seg(id)}` });
   }
 
   /* ------------------------------- training ------------------------------- */

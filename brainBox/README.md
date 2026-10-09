@@ -246,13 +246,81 @@ curl -X POST $API/api/admin/staff -H "X-Admin-Token: $TOKEN" -H "Content-Type: a
 | `PATCH /reports/gaps/{id}`, `POST /reports/gaps/{id}/answer` | trainer |
 | `GET /notifications`, `POST /notifications/{id}/read`, `POST /notifications/read-all` | viewer (own) |
 | `GET /settings` / `PUT /settings` | viewer / admin |
-| `GET/POST /keys`, `DELETE /keys/{id}` | admin |
+| `GET/POST /keys`, `DELETE /keys/{id}`, `POST /keys/{id}/roll` | admin |
+| `POST /staff/{id}/password` | admin |
+| `/platform/*` | platform admin (or `X-Admin-Token`) |
 | `GET /widget-config` | any API key |
 
 Invite links are valid 7 days, reset links 1 hour; both point to
 `${DASHBOARD_URL or request Origin}/#/accept-invite?token=...` (`#/reset-password?token=...`).
 Without SMTP the invite response still returns `invite_url` (with `email_sent: false`) so an admin
 can share it manually.
+
+### Platform admin
+
+Platform admins are Brainbox operators who manage **every** company (tenant): its staff, their
+access and its API keys. They are ordinary staff users (in some tenant) with
+`users.is_platform_admin = true`; their staff JWT carries `pa: true` (informational - the flag is
+re-read from the DB on every request). In the dashboard they get an extra **Platform** sidebar group
+(Companies, All users, All API keys). Being a platform admin does **not** change what the tenant-level
+`/api/staff`, `/api/keys`, ... endpoints show - those stay scoped to the user's own tenant.
+
+How admins get created (no self-signup):
+
+```bash
+# first platform admin, on the server (prompted / stdin password; no secret in shell history)
+python -m app.cli staff create --tenant brainbox --email ops@brainbox.io --role owner --platform-admin --password-stdin
+python -m app.cli staff platform-admin someone@acme.com --on      # or --off
+python -m app.cli staff set-password someone@acme.com --password-stdin --must-change
+python -m app.cli tenants list
+```
+
+After that, platform admins add companies and people from the dashboard (or `/api/platform/*`).
+A company owner/admin adds their own team from **Staff** (invite link *or* a temporary password).
+
+What can never be shown again (by design):
+
+- **API keys** are stored only as SHA-256 hashes. Listings show prefix, type, name, status, created,
+  last used and expiry. The raw key is in the create / roll response only. Lost it? **Roll** the key
+  (creates a replacement with the same name/type and revokes the old one at once) and update the app.
+- **Passwords** are bcrypt hashes and are never shown. An admin can *set* a temporary password
+  (>= 10 characters); the user then has `must_change_password = true` and the dashboard makes them
+  choose their own at the next sign-in (any self-chosen password clears the flag). Invite / reset
+  tokens are hashed too; `invite-link` issues a fresh one.
+- Key types: publishable `pk_live_...` (browser / website / mobile - chat only; this *is* the "client
+  key"), secret `sk_live_...` (servers, Odoo, training - never in a browser), the staff login token
+  (JWT, issued at sign-in, 12 h, not something you hand out) and `BRAINBOX_ADMIN_TOKEN` (server env
+  var, platform level, never shown in the dashboard).
+
+`/api/platform/*` accepts a platform-admin staff JWT **or** `X-Admin-Token` (server-to-server):
+
+| Endpoint | |
+|---|---|
+| `GET /platform/overview` | totals: tenants, staff, keys by type, documents, conversations, open gaps |
+| `GET /platform/tenants` | every tenant id found in users / api_keys / documents / training_sources / chat_sessions / tenant_settings, with `display_name, staff_count, owners, key_counts{publishable,secret,active,total}, documents, sources, conversations, open_gaps, last_activity_at, created_at` |
+| `POST /platform/tenants` | `{tenant_id (3-64 [A-Za-z0-9._-]), display_name, owner:{email, full_name?, password?}, create_keys:{publishable, secret}}` -> `{tenant, owner, password_set, invite_url?, email_sent?, keys:[{key, raw_key}]}` |
+| `GET /platform/tenants/{id}` | summary + `usage` (30 days) + `staff[]` + `keys[]` (no raw keys) |
+| `PATCH /platform/tenants/{id}` | `{display_name}` |
+| `GET /platform/users?q=&tenant_id=&role=&status=&platform_admin=` | all staff users (+`tenant_name`, `status`: active / invited / must_change / disabled, `has_password`) |
+| `POST /platform/users` | `{tenant_id, email, full_name?, role, password?, must_change_password=true, is_platform_admin?}` |
+| `PATCH /platform/users/{id}` | `{role?, is_active?, full_name?, is_platform_admin?, tenant_id?}` - you can't remove your own platform-admin flag or deactivate/delete yourself; a tenant keeps >= 1 active owner (409) |
+| `POST /platform/users/{id}/password` | `{password, must_change_password=true}` |
+| `POST /platform/users/{id}/invite-link` | fresh 7-day invite link (users without a password) |
+| `DELETE /platform/users/{id}` | remove |
+| `GET /platform/keys?tenant_id=` | all keys (+`tenant_name`) |
+| `POST /platform/keys` | `{tenant_id, key_type, name, expires_at?}` -> `{key, raw_key}` |
+| `POST /platform/keys/{id}/roll` | -> `{key, raw_key, revoked_id}` |
+| `DELETE /platform/keys/{id}` | revoke |
+
+Tenant-level additions (admin+ of the tenant, same role rules as role management):
+`POST /staff/invite` accepts an optional `password` (>= 10; user is active at once, must change it,
+response has `password_set: true` and no invite link), `POST /staff/{id}/password`
+`{password, must_change_password=true}`, and `POST /keys/{id}/roll`. Login and `/staff/me` include
+`is_platform_admin` and `must_change_password`. Platform-admin accounts can only be changed
+(password, role, deactivate, remove) by a platform admin.
+
+Upgrade: the `users.is_platform_admin` and `users.must_change_password` columns are added
+automatically on API start (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
 
 ### Knowledge gaps
 

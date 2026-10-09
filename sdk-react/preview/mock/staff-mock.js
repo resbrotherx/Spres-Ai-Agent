@@ -4,7 +4,10 @@
  * to `${apiUrl}/api/*`; everything else goes to the network untouched.
  *
  * Demo accounts (password: "password123"):
- *   owner@acme.test · admin@acme.test · trainer@acme.test · viewer@acme.test
+ *   owner@acme.test (owner + PLATFORM ADMIN) · admin@acme.test · trainer@acme.test · viewer@acme.test
+ *   temp@acme.test — admin-set password: must choose a new one after signing in
+ *   grace@northwind.test (owner of another company, not a platform admin)
+ * Four companies are seeded for the Platform pages (Companies / All users / All API keys).
  * `?smtp=0` simulates a server without SMTP (invite links must be copied manually).
  * Console helpers: window.__bbMock.simulateGap(), window.__bbMock.db
  */
@@ -77,8 +80,37 @@ function seed(now) {
     last_login_at: lastDays == null ? null : iso(now - lastDays * DAY - i * 3600e3),
     created_at: iso(now - (90 - i * 6) * DAY),
     invited,
-    password: invited ? null : PASSWORD
+    password: invited ? null : PASSWORD,
+    is_platform_admin: email === 'owner@acme.test',
+    must_change_password: false
   }));
+  staff.push({
+    id: staff.length + 1, tenant_id: TENANT, email: 'temp@acme.test', full_name: 'Tess Temp', role: 'viewer', is_active: true,
+    notify_email: true, notify_in_app: true, last_login_at: null, created_at: iso(now - 1 * DAY), invited: false,
+    password: PASSWORD, is_platform_admin: false, must_change_password: true
+  });
+
+  // Other companies (platform admin pages). Usage numbers are static for these.
+  const LEGACY = 'eyJhbGciOiJIUzI1NiJ9.eyJ0ZW5hbnRfaWQiOiJiZXRhLWNsaWVudCJ9.Q2x5ZGVfbGVnYWN5X3RlbmFudA';
+  const tenants = {
+    [TENANT]: { display_name: 'Acme Energy', created_at: iso(now - 92 * DAY), live: true },
+    'northwind-logistics': { display_name: 'Northwind Logistics', created_at: iso(now - 61 * DAY), documents: 412, sources: 6, conversations: 1830, open_gaps: 9, last_activity_at: iso(now - 0.08 * DAY), questions_30d: 2210, unanswered_30d: 141 },
+    'globex-health': { display_name: 'Globex Health', created_at: iso(now - 19 * DAY), documents: 96, sources: 3, conversations: 214, open_gaps: 4, last_activity_at: iso(now - 2.5 * DAY), questions_30d: 388, unanswered_30d: 52 },
+    [LEGACY]: { display_name: null, created_at: iso(now - 240 * DAY), documents: 1204, sources: 1, conversations: 5400, open_gaps: 0, last_activity_at: iso(now - 12 * DAY), questions_30d: 61, unanswered_30d: 3 }
+  };
+  [
+    ['northwind-logistics', 'Grace Liu', 'grace@northwind.test', 'owner', true, false, false, 0.1],
+    ['northwind-logistics', 'Tom Becker', 'tom@northwind.test', 'admin', true, false, false, 1.4],
+    ['northwind-logistics', null, 'sam@northwind.test', 'trainer', true, true, false, null],
+    ['globex-health', 'Dr. Amara Nwosu', 'amara@globex.test', 'owner', true, false, true, null],
+    ['globex-health', 'Lee Park', 'lee@globex.test', 'viewer', false, false, false, 30]
+  ].forEach(([tenant_id, full_name, email, role, is_active, invited, must, lastDays], i) => {
+    staff.push({
+      id: staff.length + 1, tenant_id, email, full_name, role, is_active, notify_email: true, notify_in_app: true,
+      last_login_at: lastDays == null ? null : iso(now - lastDays * DAY), created_at: iso(now - (50 - i * 7) * DAY),
+      invited, password: invited ? null : PASSWORD, is_platform_admin: false, must_change_password: must
+    });
+  });
 
   const people = [
     ['Emma Johnson', 'customer'],
@@ -336,7 +368,13 @@ function seed(now) {
     { id: 3, name: 'Staging (old)', key_type: 'secret', key_prefix: 'sk_live_02aB', is_active: false, created_at: iso(now - 80 * DAY), last_used: iso(now - 40 * DAY), expires_at: null }
   ];
 
-  const keys = keys0.map((k) => ({ ...k, expired: false }));
+  keys0.push(
+    { id: 4, tenant_id: 'northwind-logistics', name: 'Website chat', key_type: 'publishable', key_prefix: 'pk_live_N0rt', is_active: true, created_at: iso(now - 60 * DAY), last_used: iso(now - 0.08 * DAY), expires_at: null },
+    { id: 5, tenant_id: 'northwind-logistics', name: 'Odoo production', key_type: 'secret', key_prefix: 'sk_live_wQ8e', is_active: true, created_at: iso(now - 59 * DAY), last_used: iso(now - 0.3 * DAY), expires_at: null },
+    { id: 6, tenant_id: 'globex-health', name: 'Patient portal', key_type: 'publishable', key_prefix: 'pk_live_G1bx', is_active: true, created_at: iso(now - 18 * DAY), last_used: iso(now - 2.5 * DAY), expires_at: iso(now + 160 * DAY) },
+    { id: 7, tenant_id: LEGACY, name: 'Legacy widget (imported)', key_type: 'publishable', key_prefix: 'Ab3xQ9', is_active: true, created_at: iso(now - 240 * DAY), last_used: iso(now - 12 * DAY), expires_at: null }
+  );
+  const keys = keys0.map((k) => ({ tenant_id: TENANT, ...k, expired: false }));
   return {
     TENANT,
     staff,
@@ -348,6 +386,7 @@ function seed(now) {
     notifications,
     settings,
     keys,
+    tenants,
     invites: {},
     loginFails: {},
     resets: {},
@@ -407,8 +446,26 @@ function createApi() {
     return s;
   };
   // Admins can only invite/edit/remove trainers and viewers; owners manage everyone.
-  const canManage = (actor, target) => actor.role === 'owner' || RANK[target.role] < RANK.admin;
-  const activeOwners = () => db.staff.filter((s) => s.role === 'owner' && s.is_active && !s.invited).length;
+  // Platform-admin accounts can only be changed by a platform admin.
+  const canManage = (actor, target) => (actor.role === 'owner' || RANK[target.role] < RANK.admin) && (!target.is_platform_admin || actor.is_platform_admin);
+  const activeOwners = (tenant = db.TENANT) => db.staff.filter((s) => s.tenant_id === tenant && s.role === 'owner' && s.is_active && !s.invited).length;
+  const tenantStaff = (me, id) => {
+    const u = findStaff(id);
+    if (u.tenant_id !== me.tenant_id) throw new HttpError(404, 'Staff member not found');
+    return u;
+  };
+  const randomKey = (type) => `${type === 'secret' ? 'sk' : 'pk'}_live_${Array.from({ length: 40 }, () => 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 56)]).join('')}`;
+  const newKey = (tenant_id, type, name, expires_at) => {
+    const raw = randomKey(type);
+    const key = { id: ++db.seq.key, tenant_id, name, key_type: type, key_prefix: raw.slice(0, 12), is_active: true, created_at: new Date().toISOString(), last_used: null, expires_at: expires_at || null, expired: false };
+    db.keys.unshift(key);
+    return { key, raw };
+  };
+  const keyOut = (k) => ({ ...k, expired: !!k.expires_at && new Date(k.expires_at).getTime() < Date.now() });
+  const tenantKeyOut = (k) => {
+    const { tenant_id, ...rest } = keyOut(k);
+    return rest;
+  };
   const inviteUrl = (token) => `${window.location.origin}${window.location.pathname}${window.location.search}#/accept-invite?token=${token}`;
 
   const tickTasks = () => {
@@ -462,6 +519,230 @@ function createApi() {
     db.notifications.unshift({ id: ++db.seq.notif, created_at: new Date().toISOString(), read_by: new Set(), ...n });
   };
 
+  /* ----- platform admin ----- */
+  const platformAuth = (headers) => {
+    const u = auth(headers);
+    if (!u.is_platform_admin) throw new HttpError(403, 'Platform admin access required');
+    return u;
+  };
+  const tenantName = (tid) => (db.tenants[tid] && db.tenants[tid].display_name) || tid;
+  const statusOf = (u) => (!u.is_active ? 'disabled' : u.invited ? 'invited' : u.must_change_password ? 'must_change' : 'active');
+  const platformUser = (u) => ({ ...publicUser(u), tenant_name: tenantName(u.tenant_id), status: statusOf(u), has_password: !!u.password });
+  const platformKey = (k) => ({ ...keyOut(k), tenant_name: tenantName(k.tenant_id) });
+  const findTenant = (tid) => {
+    if (!db.tenants[tid]) throw new HttpError(404, 'Company not found');
+    return db.tenants[tid];
+  };
+  const tenantSummary = (tid) => {
+    const t = db.tenants[tid];
+    const people = db.staff.filter((s) => s.tenant_id === tid);
+    const keys = db.keys.filter((k) => k.tenant_id === tid);
+    const active = keys.filter((k) => k.is_active);
+    const live = t.live
+      ? {
+          documents: db.sources.reduce((n, x) => n + (x.documents_count || 0), 0),
+          sources: db.sources.length,
+          conversations: db.conversations.length,
+          open_gaps: db.gaps.filter((g) => g.status === 'open').length,
+          last_activity_at: db.conversations[0] ? db.conversations[0].last_message_at : null
+        }
+      : { documents: t.documents || 0, sources: t.sources || 0, conversations: t.conversations || 0, open_gaps: t.open_gaps || 0, last_activity_at: t.last_activity_at || null };
+    const logins = people.map((p) => p.last_login_at).filter(Boolean);
+    const lastLogin = logins.sort().slice(-1)[0] || null;
+    return {
+      tenant_id: tid,
+      display_name: t.display_name || tid,
+      staff_count: people.length,
+      owners: people.filter((p) => p.role === 'owner').map((p) => p.email),
+      key_counts: { publishable: active.filter((k) => k.key_type !== 'secret').length, secret: active.filter((k) => k.key_type === 'secret').length, active: active.length, total: keys.length },
+      ...live,
+      last_activity_at: [live.last_activity_at, lastLogin].filter(Boolean).sort().slice(-1)[0] || null,
+      created_at: t.created_at
+    };
+  };
+  const createUser = (tid, body, actor) => {
+    const email = String(body.email || '').trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(422, 'Enter a valid email address');
+    if (!RANK.hasOwnProperty(body.role || 'viewer')) throw new HttpError(422, 'role must be one of: owner, admin, trainer, viewer');
+    if (db.staff.some((s) => s.email === email)) throw new HttpError(409, 'This email is already registered');
+    if (body.password && String(body.password).length < 10) throw new HttpError(422, 'Password must be at least 10 characters');
+    const u = {
+      id: ++db.seq.staff, tenant_id: tid, email, full_name: (body.full_name || '').trim() || null, role: body.role || 'viewer', is_active: true,
+      notify_email: true, notify_in_app: true, last_login_at: null, created_at: new Date().toISOString(), invited: !body.password,
+      password: body.password || null, is_platform_admin: !!body.is_platform_admin, must_change_password: !!body.password && body.must_change_password !== false
+    };
+    db.staff.push(u);
+    const out = { user: platformUser(u), password_set: !!body.password };
+    if (!body.password) {
+      const token = rid('inv');
+      db.invites[token] = u.id;
+      out.invite_url = inviteUrl(token);
+      out.email_sent = false;
+    }
+    return out;
+  };
+  const isActiveOwner = (u) => u.role === 'owner' && u.is_active && !u.invited;
+
+  function platformRoutes() {
+    return [
+      ['GET', /^\/api\/platform\/overview$/, ({ headers }) => {
+        platformAuth(headers);
+        const sums = Object.keys(db.tenants).map(tenantSummary);
+        const active = db.keys.filter((k) => k.is_active);
+        return {
+          tenants: sums.length,
+          staff: db.staff.length,
+          staff_active: db.staff.filter((s) => s.is_active && !s.invited).length,
+          platform_admins: db.staff.filter((s) => s.is_platform_admin).length,
+          keys: { publishable: active.filter((k) => k.key_type !== 'secret').length, secret: active.filter((k) => k.key_type === 'secret').length, active: active.length, revoked: db.keys.length - active.length },
+          documents: sums.reduce((n, t) => n + t.documents, 0),
+          sources: sums.reduce((n, t) => n + t.sources, 0),
+          conversations: sums.reduce((n, t) => n + t.conversations, 0),
+          questions_30d: db.daily.slice(-30).reduce((n, d) => n + d.questions, 0) + Object.values(db.tenants).reduce((n, t) => n + (t.questions_30d || 0), 0),
+          open_gaps: sums.reduce((n, t) => n + t.open_gaps, 0)
+        };
+      }],
+      ['GET', /^\/api\/platform\/tenants$/, ({ headers }) => {
+        platformAuth(headers);
+        return { tenants: Object.keys(db.tenants).map(tenantSummary).sort((a, b) => a.display_name.toLowerCase().localeCompare(b.display_name.toLowerCase())) };
+      }],
+      ['POST', /^\/api\/platform\/tenants$/, ({ headers, body }) => {
+        const me = platformAuth(headers);
+        const tid = String(body.tenant_id || '').trim();
+        if (!/^[A-Za-z0-9._-]{3,64}$/.test(tid)) throw new HttpError(422, "Tenant id must be 3-64 characters: letters, digits, '.', '_' or '-'");
+        if (db.tenants[tid]) throw new HttpError(409, 'A company with this tenant id already exists');
+        const owner = body.owner || {};
+        const email = String(owner.email || '').trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(422, 'Enter a valid email address');
+        if (db.staff.some((s) => s.email === email)) throw new HttpError(409, 'This email is already registered');
+        if (owner.password && String(owner.password).length < 10) throw new HttpError(422, 'Password must be at least 10 characters');
+        db.tenants[tid] = { display_name: (body.display_name || '').trim() || null, created_at: new Date().toISOString(), documents: 0, sources: 0, conversations: 0, open_gaps: 0, last_activity_at: null, questions_30d: 0, unanswered_30d: 0 };
+        const created = createUser(tid, { ...owner, role: 'owner' }, me);
+        const keys = [];
+        const ck = body.create_keys || {};
+        if (ck.publishable) {
+          const { key, raw } = newKey(tid, 'publishable', 'Website chat');
+          keys.push({ key: platformKey(key), raw_key: raw });
+        }
+        if (ck.secret) {
+          const { key, raw } = newKey(tid, 'secret', 'Server integration');
+          keys.push({ key: platformKey(key), raw_key: raw });
+        }
+        const out = { tenant: tenantSummary(tid), owner: created.user, password_set: created.password_set, keys };
+        if (created.invite_url) Object.assign(out, { invite_url: created.invite_url, email_sent: false });
+        return { __status: 201, body: out };
+      }],
+      ['GET', /^\/api\/platform\/tenants\/([^/]+)$/, ({ headers, m }) => {
+        platformAuth(headers);
+        const tid = decodeURIComponent(m[1]);
+        const t = findTenant(tid);
+        const sum = tenantSummary(tid);
+        const q30 = t.live ? db.daily.slice(-30).reduce((n, d) => n + d.questions, 0) : t.questions_30d || 0;
+        const u30 = t.live ? db.daily.slice(-30).reduce((n, d) => n + d.unanswered, 0) : t.unanswered_30d || 0;
+        return {
+          ...sum,
+          usage: { days: 30, questions: q30, unanswered: u30, questions_all_time: t.live ? db.daily.reduce((n, d) => n + d.questions, 0) : Math.round(q30 * 4.2) },
+          staff: db.staff.filter((s) => s.tenant_id === tid).map(platformUser),
+          keys: db.keys.filter((k) => k.tenant_id === tid).map(platformKey)
+        };
+      }],
+      ['PATCH', /^\/api\/platform\/tenants\/([^/]+)$/, ({ headers, body, m }) => {
+        platformAuth(headers);
+        const tid = decodeURIComponent(m[1]);
+        const t = findTenant(tid);
+        if (body.display_name !== undefined) t.display_name = String(body.display_name || '').trim() || null;
+        if (t.live) db.settings.display_name = t.display_name || tid;
+        return tenantSummary(tid);
+      }],
+      ['GET', /^\/api\/platform\/users$/, ({ headers, query }) => {
+        platformAuth(headers);
+        const q = String(query.q || '').trim().toLowerCase();
+        const users = db.staff.filter(
+          (u) =>
+            (!query.tenant_id || u.tenant_id === query.tenant_id) &&
+            (!query.role || u.role === query.role) &&
+            (!query.status || statusOf(u) === query.status) &&
+            (query.platform_admin === undefined || String(!!u.is_platform_admin) === String(query.platform_admin)) &&
+            (!q || [u.email, u.full_name, u.tenant_id, tenantName(u.tenant_id)].some((v) => String(v || '').toLowerCase().includes(q)))
+        );
+        return { users: users.sort((a, b) => tenantName(a.tenant_id).localeCompare(tenantName(b.tenant_id)) || a.id - b.id).map(platformUser) };
+      }],
+      ['POST', /^\/api\/platform\/users$/, ({ headers, body }) => {
+        const me = platformAuth(headers);
+        findTenant(String(body.tenant_id || ''));
+        return { __status: 201, body: createUser(body.tenant_id, body, me) };
+      }],
+      ['PATCH', /^\/api\/platform\/users\/([^/]+)$/, ({ headers, body, m }) => {
+        const me = platformAuth(headers);
+        const u = findStaff(m[1]);
+        const self = u.id === me.id;
+        if (self && body.is_platform_admin === false) throw new HttpError(400, "You can't remove your own platform admin access");
+        if (self && body.is_active === false) throw new HttpError(400, "You can't deactivate your own account");
+        if (body.role && !RANK.hasOwnProperty(body.role)) throw new HttpError(422, 'role must be one of: owner, admin, trainer, viewer');
+        if (body.tenant_id && body.tenant_id !== u.tenant_id) findTenant(body.tenant_id);
+        const loses = isActiveOwner(u) && ((body.role && body.role !== 'owner') || body.is_active === false || (body.tenant_id && body.tenant_id !== u.tenant_id));
+        if (loses && activeOwners(u.tenant_id) <= 1) throw new HttpError(409, 'A tenant must keep at least one active owner');
+        ['role', 'is_active', 'is_platform_admin', 'tenant_id'].forEach((k) => body[k] !== undefined && body[k] !== null && (u[k] = body[k]));
+        if (body.full_name !== undefined) u.full_name = String(body.full_name || '').trim() || null;
+        return platformUser(u);
+      }],
+      ['POST', /^\/api\/platform\/users\/([^/]+)\/password$/, ({ headers, body, m }) => {
+        platformAuth(headers);
+        const u = findStaff(m[1]);
+        if (String(body.password || '').length < 10) throw new HttpError(422, 'Password must be at least 10 characters');
+        u.password = body.password;
+        u.invited = false;
+        u.must_change_password = body.must_change_password !== false;
+        return { ok: true, user: platformUser(u) };
+      }],
+      ['POST', /^\/api\/platform\/users\/([^/]+)\/invite-link$/, ({ headers, m }) => {
+        platformAuth(headers);
+        const u = findStaff(m[1]);
+        if (!u.invited && u.password) throw new HttpError(400, 'This user already has a password. Set a new one instead.');
+        Object.keys(db.invites).forEach((t) => db.invites[t] === u.id && delete db.invites[t]);
+        const token = rid('inv');
+        db.invites[token] = u.id;
+        u.invited = true;
+        return { invite_url: inviteUrl(token) };
+      }],
+      ['DELETE', /^\/api\/platform\/users\/([^/]+)$/, ({ headers, m }) => {
+        const me = platformAuth(headers);
+        const u = findStaff(m[1]);
+        if (u.id === me.id) throw new HttpError(400, "You can't remove your own account");
+        if (isActiveOwner(u) && activeOwners(u.tenant_id) <= 1) throw new HttpError(409, 'A tenant must keep at least one active owner');
+        db.staff = db.staff.filter((s) => s !== u);
+        return { deleted: true };
+      }],
+      ['GET', /^\/api\/platform\/keys$/, ({ headers, query }) => {
+        platformAuth(headers);
+        return { keys: db.keys.filter((k) => !query.tenant_id || k.tenant_id === query.tenant_id).map(platformKey) };
+      }],
+      ['POST', /^\/api\/platform\/keys$/, ({ headers, body }) => {
+        platformAuth(headers);
+        findTenant(String(body.tenant_id || ''));
+        if (!['publishable', 'secret'].includes(body.key_type)) throw new HttpError(422, 'key_type must be one of: publishable, secret');
+        const { key, raw } = newKey(body.tenant_id, body.key_type, String(body.name || '').trim() || `${body.key_type} key for ${body.tenant_id}`, body.expires_at);
+        return { __status: 201, body: { key: platformKey(key), raw_key: raw } };
+      }],
+      ['POST', /^\/api\/platform\/keys\/([^/]+)\/roll$/, ({ headers, m }) => {
+        platformAuth(headers);
+        const k = db.keys.find((x) => String(x.id) === m[1]);
+        if (!k) throw new HttpError(404, 'API key not found');
+        if (!k.is_active) throw new HttpError(400, 'This key is already revoked; create a new key instead');
+        const { key, raw } = newKey(k.tenant_id, k.key_type, k.name, k.expires_at);
+        k.is_active = false;
+        return { key: platformKey(key), raw_key: raw, revoked_id: k.id };
+      }],
+      ['DELETE', /^\/api\/platform\/keys\/([^/]+)$/, ({ headers, m }) => {
+        platformAuth(headers);
+        const k = db.keys.find((x) => String(x.id) === m[1]);
+        if (!k) throw new HttpError(404, 'API key not found');
+        k.is_active = false;
+        return { revoked: true, key: platformKey(k) };
+      }]
+    ];
+  }
+
   const routes = [
     // ----- auth
     ['POST', /^\/api\/staff\/login$/, ({ body }) => {
@@ -489,6 +770,7 @@ function createApi() {
       if (u.password !== body.current_password) throw new HttpError(400, 'Current password is incorrect');
       if (String(body.new_password || '').length < 8) throw new HttpError(422, 'Password must be at least 8 characters');
       u.password = body.new_password;
+      u.must_change_password = false;
       return { ok: true };
     }],
     ['POST', /^\/api\/staff\/accept-invite$/, ({ body }) => {
@@ -498,6 +780,7 @@ function createApi() {
       if (String(body.password || '').length < 8) throw new HttpError(422, 'Password must be at least 8 characters');
       u.password = body.password;
       u.invited = false;
+      u.must_change_password = false;
       if (body.full_name) u.full_name = body.full_name;
       delete db.invites[body.token];
       notifyAll({ type: 'staff', title: `${u.full_name || u.email} joined the team`, body: `Accepted the invite as ${u.role}.`, link: '#/staff' });
@@ -518,13 +801,14 @@ function createApi() {
       const u = id && db.staff.find((s) => s.id === id);
       if (!u) throw new HttpError(400, 'This reset link is invalid or has expired');
       u.password = body.password;
+      u.must_change_password = false;
       delete db.resets[body.token];
       return issue(u);
     }],
     // ----- staff management
     ['GET', /^\/api\/staff$/, ({ headers }) => {
-      auth(headers);
-      return { staff: db.staff.map(publicUser) };
+      const me = auth(headers);
+      return { staff: db.staff.filter((s) => s.tenant_id === me.tenant_id).map(publicUser) };
     }],
     ['POST', /^\/api\/staff\/invite$/, ({ headers, body }) => {
       const me = auth(headers, 'admin');
@@ -533,8 +817,13 @@ function createApi() {
       if (!RANK.hasOwnProperty(body.role)) throw new HttpError(422, 'Invalid role');
       if (me.role !== 'owner' && RANK[body.role] >= RANK.admin) throw new HttpError(403, `Your role (${me.role}) can't do this`);
       if (db.staff.some((s) => s.email === email)) throw new HttpError(409, 'A staff member with this email already exists');
-      const u = { id: ++db.seq.staff, tenant_id: db.TENANT, email, full_name: body.full_name || null, role: body.role, is_active: true, notify_email: true, notify_in_app: true, last_login_at: null, created_at: new Date().toISOString(), invited: true, password: null };
+      if (body.password && String(body.password).length < 10) throw new HttpError(422, 'Password must be at least 10 characters');
+      const u = { id: ++db.seq.staff, tenant_id: me.tenant_id, email, full_name: body.full_name || null, role: body.role, is_active: true, notify_email: true, notify_in_app: true, last_login_at: null, created_at: new Date().toISOString(), invited: !body.password, password: body.password || null, is_platform_admin: false, must_change_password: !!body.password };
       db.staff.push(u);
+      if (body.password) {
+        notifyAll({ type: 'staff', title: `${u.full_name || u.email} was added`, body: `Added as ${u.role} by ${me.full_name || me.email} with a temporary password.`, link: '#/staff' });
+        return { user: publicUser(u), invite_url: null, email_sent: false, password_set: true };
+      }
       const token = rid('inv');
       db.invites[token] = u.id;
       notifyAll({ type: 'staff', title: `${u.full_name || u.email} was invited`, body: `Invited as ${u.role} by ${me.full_name || me.email}.`, link: '#/staff' });
@@ -542,26 +831,37 @@ function createApi() {
     }],
     ['PATCH', /^\/api\/staff\/([^/]+)$/, ({ headers, body, m }) => {
       const me = auth(headers, 'admin');
-      const u = findStaff(m[1]);
+      const u = tenantStaff(me, m[1]);
       if (!canManage(me, u)) throw new HttpError(403, `Your role (${me.role}) can't manage ${u.role}s`);
       if (body.role && me.role !== 'owner' && RANK[body.role] >= RANK.admin) throw new HttpError(403, `Your role (${me.role}) can't do this`);
       const losingOwner = u.role === 'owner' && ((body.role && body.role !== 'owner') || body.is_active === false);
-      if (losingOwner && activeOwners() <= 1) throw new HttpError(409, 'A tenant must keep at least one active owner');
+      if (losingOwner && activeOwners(u.tenant_id) <= 1) throw new HttpError(409, 'A tenant must keep at least one active owner');
       ['role', 'is_active', 'full_name', 'notify_email'].forEach((k) => body[k] !== undefined && (u[k] = body[k]));
       return publicUser(u);
     }],
     ['DELETE', /^\/api\/staff\/([^/]+)$/, ({ headers, m }) => {
       const me = auth(headers, 'admin');
-      const u = findStaff(m[1]);
+      const u = tenantStaff(me, m[1]);
       if (u.id === me.id) throw new HttpError(400, 'You can’t remove yourself');
       if (!canManage(me, u)) throw new HttpError(403, `Your role (${me.role}) can't manage ${u.role}s`);
-      if (u.role === 'owner' && activeOwners() <= 1) throw new HttpError(409, 'A tenant must keep at least one active owner');
+      if (u.role === 'owner' && activeOwners(u.tenant_id) <= 1) throw new HttpError(409, 'A tenant must keep at least one active owner');
       db.staff = db.staff.filter((s) => s !== u);
       return { deleted: true };
     }],
+    ['POST', /^\/api\/staff\/([^/]+)\/password$/, ({ headers, body, m }) => {
+      const me = auth(headers, 'admin');
+      const u = tenantStaff(me, m[1]);
+      if (u.id === me.id) throw new HttpError(400, 'Use Account settings to change your own password');
+      if (!canManage(me, u)) throw new HttpError(403, u.is_platform_admin ? 'Only a platform admin can change a platform admin account' : `Your role (${me.role}) can't do this`);
+      if (String(body.password || '').length < 10) throw new HttpError(422, 'Password must be at least 10 characters');
+      u.password = body.password;
+      u.invited = false;
+      u.must_change_password = body.must_change_password !== false;
+      return { ok: true, user: publicUser(u) };
+    }],
     ['POST', /^\/api\/staff\/([^/]+)\/resend-invite$/, ({ headers, m }) => {
       const me = auth(headers, 'admin');
-      const u = findStaff(m[1]);
+      const u = tenantStaff(me, m[1]);
       if (!canManage(me, u)) throw new HttpError(403, `Your role (${me.role}) can't manage ${u.role}s`);
       if (!u.invited) throw new HttpError(400, 'This person already accepted their invite');
       const token = rid('inv');
@@ -735,6 +1035,7 @@ function createApi() {
       auth(headers, 'admin');
       const { tenant_id, smtp_configured, widget, ...rest } = body || {};
       Object.assign(db.settings, rest);
+      if (rest.display_name !== undefined && db.tenants[db.TENANT]) db.tenants[db.TENANT].display_name = rest.display_name || null;
       if (widget) {
         // Deep-merge theme/branding/launcher; lists (welcomeMessages, quickActions) are replaced.
         const cur = db.settings.widget;
@@ -751,25 +1052,33 @@ function createApi() {
     ['GET', /^\/api\/widget-config$/, () => ({ widget: JSON.parse(JSON.stringify(db.settings.widget)) })],
     // ----- api keys
     ['GET', /^\/api\/keys$/, ({ headers }) => {
-      auth(headers, 'admin');
-      return { keys: db.keys.map((k) => ({ ...k, expired: !!k.expires_at && new Date(k.expires_at).getTime() < Date.now() })) };
+      const me = auth(headers, 'admin');
+      return { keys: db.keys.filter((k) => k.tenant_id === me.tenant_id).map(tenantKeyOut) };
     }],
     ['POST', /^\/api\/keys$/, ({ headers, body }) => {
-      auth(headers, 'admin');
+      const me = auth(headers, 'admin');
       if (!String(body.name || '').trim()) throw new HttpError(422, 'Name is required');
-      const type = body.key_type === 'secret' ? 'secret' : 'publishable';
-      const raw = `${type === 'secret' ? 'sk' : 'pk'}_live_${Array.from({ length: 40 }, () => 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 56)]).join('')}`;
-      const key = { id: ++db.seq.key, name: body.name.trim(), key_type: type, key_prefix: raw.slice(0, 12), is_active: true, created_at: new Date().toISOString(), last_used: null, expires_at: body.expires_at || null, expired: false };
-      db.keys.unshift(key);
-      return { __status: 201, body: { key, raw_key: raw } };
+      const { key, raw } = newKey(me.tenant_id, body.key_type === 'secret' ? 'secret' : 'publishable', body.name.trim(), body.expires_at);
+      return { __status: 201, body: { key: tenantKeyOut(key), raw_key: raw } };
+    }],
+    ['POST', /^\/api\/keys\/([^/]+)\/roll$/, ({ headers, m }) => {
+      const me = auth(headers, 'admin');
+      const k = db.keys.find((x) => String(x.id) === m[1] && x.tenant_id === me.tenant_id);
+      if (!k) throw new HttpError(404, 'API key not found');
+      if (!k.is_active) throw new HttpError(400, 'This key is already revoked; create a new key instead');
+      const { key, raw } = newKey(k.tenant_id, k.key_type, k.name, k.expires_at);
+      k.is_active = false;
+      return { key: tenantKeyOut(key), raw_key: raw, revoked_id: k.id };
     }],
     ['DELETE', /^\/api\/keys\/([^/]+)$/, ({ headers, m }) => {
-      auth(headers, 'admin');
-      const k = db.keys.find((x) => String(x.id) === m[1]);
+      const me = auth(headers, 'admin');
+      const k = db.keys.find((x) => String(x.id) === m[1] && x.tenant_id === me.tenant_id);
       if (!k) throw new HttpError(404, 'Key not found');
       k.is_active = false;
       return { revoked: true };
     }],
+    // ----- platform admin (/api/platform/*)
+    ...platformRoutes(),
     // ----- training (existing endpoints)
     ['GET', /^\/api\/train\/sources$/, ({ headers }) => {
       auth(headers);
@@ -849,7 +1158,7 @@ function createApi() {
       }
       const k = db.keys.find((x) => x.is_active && raw.startsWith(x.key_prefix));
       if (!k) throw new HttpError(401, 'Invalid API key');
-      return { status: 'ok', mock: true, key: { valid: true, key_type: k.key_type, tenant_id: db.TENANT } };
+      return { status: 'ok', mock: true, key: { valid: true, key_type: k.key_type, tenant_id: k.tenant_id } };
     }]
   ];
 

@@ -20,6 +20,7 @@ import {
   useStaff
 } from '../ui';
 import { errMsg, fmtDateTime, relTime, useAsync } from '../util';
+import { KeyTypeLegend, RawKeyModal } from '../access';
 
 type TabKey = 'general' | 'alerts' | 'widget' | 'keys' | 'install';
 
@@ -123,10 +124,25 @@ function KeysTab() {
   const { client, toast, can } = useStaff();
   const { data, setData, error, loading, reload } = useAsync(() => (can('admin') ? client.listKeys() : Promise.resolve([] as ApiKeyInfo[])), [client]);
   const [creating, setCreating] = useState(false);
-  const [confirm, setConfirm] = useState<string | number | null>(null);
+  const [confirm, setConfirm] = useState<{ id: string | number; action: 'roll' | 'revoke' } | null>(null);
   const [busy, setBusy] = useState<string | number | null>(null);
+  const [rolled, setRolled] = useState<{ key: ApiKeyInfo; raw_key: string; old: string } | null>(null);
 
   if (!can('admin')) return <Alert tone="info">Only admins and owners can view and manage API keys.</Alert>;
+
+  const roll = async (k: ApiKeyInfo) => {
+    setBusy(k.id);
+    try {
+      const res = await client.rollKey(k.id);
+      setData((list) => [res.key, ...(list || []).map((x) => (x.id === k.id ? { ...x, is_active: false } : x))]);
+      setRolled({ key: res.key, raw_key: res.raw_key, old: k.key_prefix });
+      setConfirm(null);
+    } catch (err) {
+      toast(errMsg(err), 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const revoke = async (k: ApiKeyInfo) => {
     setBusy(k.id);
@@ -148,7 +164,7 @@ function KeysTab() {
         <div className="bb-staff-card-head" style={{ paddingBottom: 14 }}>
           <div>
             <h3>API keys</h3>
-            <p>Publishable keys are safe in browsers (chat only). Secret keys can train and must stay on servers.</p>
+            <p>Publishable keys (pk_live_…) are the client key for browsers and apps — chat only. Secret keys (sk_live_…) can train and must stay on servers. Full keys are shown only once; roll a key to replace it.</p>
           </div>
           <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
             Create key
@@ -206,20 +222,25 @@ function KeysTab() {
                           {k.expires_at ? <div style={{ fontSize: 11.5 }}>Expires {fmtDateTime(k.expires_at)}</div> : null}
                         </td>
                         <td className="is-actions">
-                          {!k.is_active ? null : confirm === k.id ? (
+                          {!k.is_active ? null : confirm?.id === k.id ? (
                             <span className="bb-staff-confirm">
-                              Revoke? Apps using it stop working.
-                              <Button size="sm" variant="danger" loading={busy === k.id} onClick={() => void revoke(k)} autoFocus>
-                                Revoke
+                              {confirm.action === 'roll' ? 'Roll? The current key stops working now.' : 'Revoke? Apps using it stop working.'}
+                              <Button size="sm" variant="danger" loading={busy === k.id} onClick={() => void (confirm.action === 'roll' ? roll(k) : revoke(k))} autoFocus>
+                                {confirm.action === 'roll' ? 'Roll key' : 'Revoke'}
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => setConfirm(null)}>
                                 Cancel
                               </Button>
                             </span>
                           ) : (
-                            <Button size="sm" variant="danger-ghost" icon="ban" onClick={() => setConfirm(k.id)}>
-                              Revoke
-                            </Button>
+                            <span style={{ display: 'inline-flex', gap: 6 }}>
+                              <Button size="sm" variant="ghost" icon="refresh" onClick={() => setConfirm({ id: k.id, action: 'roll' })} title="Create a replacement key and revoke this one">
+                                Roll
+                              </Button>
+                              <Button size="sm" variant="danger-ghost" icon="ban" onClick={() => setConfirm({ id: k.id, action: 'revoke' })}>
+                                Revoke
+                              </Button>
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -236,6 +257,23 @@ function KeysTab() {
         ) : null}
       </section>
       {creating ? <CreateKeyModal onClose={() => setCreating(false)} onCreated={(k) => setData((list) => [k, ...(list || [])])} /> : null}
+      {rolled ? (
+        <RawKeyModal
+          title="Key rolled — copy the new key"
+          result={rolled}
+          onClose={() => setRolled(null)}
+          note={
+            <Alert tone="info">
+              The old key <code className="bb-staff-mono">{rolled.old}…</code> was revoked. Update every site, app or server that used it with the new key below.
+            </Alert>
+          }
+        />
+      ) : null}
+      <section className="bb-staff-card">
+        <div className="bb-staff-card-body bb-staff-stack" style={{ gap: 12 }}>
+          <KeyTypeLegend />
+        </div>
+      </section>
     </div>
   );
 }

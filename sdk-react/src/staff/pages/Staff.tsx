@@ -17,7 +17,9 @@ import {
   Switch,
   useStaff
 } from '../ui';
-import { errMsg, fmtDateTime, relTime, ROLE_INFO, useAsync } from '../util';
+import { ADMIN_MIN_PASSWORD, errMsg, fmtDateTime, relTime, ROLE_INFO, useAsync } from '../util';
+import { AccessChoice, AccessResult, AccessStatusPill, PlatformBadge, SetPasswordModal } from '../access';
+import type { AccessMode } from '../access';
 
 function staffStatus(u: StaffUser): 'active' | 'invited' | 'disabled' {
   if (!u.is_active) return 'disabled';
@@ -56,17 +58,21 @@ function InviteModal({ roles, onClose, onInvited }: { roles: StaffRole[]; onClos
   const [role, setRole] = useState<StaffRole>(roles.includes('trainer') ? 'trainer' : roles[roles.length - 1]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ url: string; sent: boolean; email: string } | null>(null);
+  const [mode, setMode] = useState<AccessMode>('invite');
+  const [pw, setPw] = useState('');
+  const [result, setResult] = useState<{ url: string | null; sent: boolean; email: string; password?: string } | null>(null);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (mode === 'password' && pw.length < ADMIN_MIN_PASSWORD) return setError(`The password must be at least ${ADMIN_MIN_PASSWORD} characters.`);
     setBusy(true);
     setError(null);
     try {
-      const res = await client.inviteStaff({ email: email.trim(), role, ...(name.trim() ? { full_name: name.trim() } : {}) });
+      const res = await client.inviteStaff({ email: email.trim(), role, ...(name.trim() ? { full_name: name.trim() } : {}), ...(mode === 'password' ? { password: pw } : {}) });
       onInvited(res.user);
-      setResult({ url: res.invite_url, sent: res.email_sent, email: res.user.email });
+      setResult({ url: res.invite_url, sent: res.email_sent, email: res.user.email, password: res.password_set ? pw : undefined });
       if (res.email_sent) toast(`Invitation sent to ${res.user.email}`);
+      else if (res.password_set) toast(`${res.user.email} can sign in now.`);
     } catch (err) {
       setError(errMsg(err));
     } finally {
@@ -76,8 +82,13 @@ function InviteModal({ roles, onClose, onInvited }: { roles: StaffRole[]; onClos
 
   if (result) {
     return (
-      <Modal title="Invite created" description="They’ll set their own password when they accept." onClose={onClose} footer={<Button variant="primary" onClick={onClose}>Done</Button>}>
-        <InviteLinkResult email={result.email} url={result.url} sent={result.sent} />
+      <Modal
+        title={result.password ? 'Account created' : 'Invite created'}
+        description={result.password ? 'They’ll choose their own password at first sign-in.' : 'They’ll set their own password when they accept.'}
+        onClose={onClose}
+        footer={<Button variant="primary" onClick={onClose}>Done</Button>}
+      >
+        {result.password ? <AccessResult email={result.email} password={result.password} /> : <InviteLinkResult email={result.email} url={result.url || ''} sent={result.sent} />}
       </Modal>
     );
   }
@@ -85,7 +96,7 @@ function InviteModal({ roles, onClose, onInvited }: { roles: StaffRole[]; onClos
   return (
     <Modal
       title="Invite staff"
-      description="Invited members get an email with a link to join and are notified about new knowledge gaps."
+      description="Send an invite link, or set a temporary password if you’d rather hand over the login yourself."
       onClose={onClose}
       width={560}
       footer={
@@ -93,8 +104,8 @@ function InviteModal({ roles, onClose, onInvited }: { roles: StaffRole[]; onClos
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" icon="send" type="submit" form={`${id}-form`} loading={busy} disabled={!email.trim()}>
-            Send invite
+          <Button variant="primary" icon={mode === 'password' ? 'plus' : 'send'} type="submit" form={`${id}-form`} loading={busy} disabled={!email.trim()}>
+            {mode === 'password' ? 'Create account' : 'Send invite'}
           </Button>
         </>
       }
@@ -125,6 +136,7 @@ function InviteModal({ roles, onClose, onInvited }: { roles: StaffRole[]; onClos
             ))}
           </div>
         </fieldset>
+        <AccessChoice mode={mode} setMode={setMode} password={pw} setPassword={setPw} inviteHint="We email them a link (valid 7 days) to choose their own password." />
       </form>
     </Modal>
   );
@@ -137,11 +149,14 @@ export function StaffPage() {
   const [confirmId, setConfirmId] = useState<string | number | null>(null);
   const [busyId, setBusyId] = useState<string | number | null>(null);
   const [linkResult, setLinkResult] = useState<{ email: string; url: string; sent: boolean } | null>(null);
+  const [pwFor, setPwFor] = useState<StaffUser | null>(null);
   const isAdmin = can('admin');
   const isOwner = can('owner');
   const assignable: StaffRole[] = isOwner ? ['owner', 'admin', 'trainer', 'viewer'] : ['trainer', 'viewer'];
 
-  const canManage = (u: StaffUser) => isAdmin && String(u.id) !== String(me.id) && (isOwner || (u.role !== 'owner' && u.role !== 'admin'));
+  // Platform-admin accounts can only be changed by a platform admin (the API enforces this too).
+  const canManage = (u: StaffUser) =>
+    isAdmin && String(u.id) !== String(me.id) && (isOwner || (u.role !== 'owner' && u.role !== 'admin')) && (!u.is_platform_admin || !!me.is_platform_admin);
 
   const filtered = useMemo(() => {
     const q = (query.q || '').trim().toLowerCase();
@@ -270,6 +285,7 @@ export function StaffPage() {
                               <span className="bb-staff-person-name" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                 <span className="bb-staff-truncate">{u.full_name || u.email.split('@')[0]}</span>
                                 {self ? <span className="bb-staff-count">You</span> : null}
+                                {u.is_platform_admin ? <PlatformBadge compact /> : null}
                               </span>
                               <span className="bb-staff-person-sub bb-staff-truncate" style={{ display: 'block' }}>
                                 {u.email}
@@ -300,7 +316,7 @@ export function StaffPage() {
                         </td>
                         <td>
                           <span className="bb-staff-cell-label">Status</span>
-                          <StatusPill status={st} />
+                          <AccessStatusPill user={u} />
                         </td>
                         <td>
                           <span className="bb-staff-cell-label">Email alerts</span>
@@ -348,6 +364,7 @@ export function StaffPage() {
                                 label={`Actions for ${u.email}`}
                                 items={[
                                   ...(u.invited ? [{ label: 'Resend invite', icon: 'mail' as const, onSelect: () => void resend(u) }] : []),
+                                  { label: 'Set password', icon: 'key' as const, onSelect: () => setPwFor(u) },
                                   u.is_active
                                     ? { label: 'Disable access', icon: 'ban' as const, onSelect: () => void patch(u, { is_active: false }, `${u.full_name || u.email} was disabled.`) }
                                     : { label: 'Re-enable access', icon: 'check' as const, onSelect: () => void patch(u, { is_active: true }, `${u.full_name || u.email} was re-enabled.`) },
@@ -396,6 +413,16 @@ export function StaffPage() {
           roles={assignable}
           onClose={() => setInviting(false)}
           onInvited={(u) => setData((list) => (list ? [...list.filter((x) => x.id !== u.id), u] : [u]))}
+        />
+      ) : null}
+      {pwFor ? (
+        <SetPasswordModal
+          user={pwFor}
+          onClose={() => setPwFor(null)}
+          onSubmit={async (password, mustChange) => {
+            const res = await client.setStaffPassword(pwFor.id, { password, must_change_password: mustChange });
+            replace(res.user);
+          }}
         />
       ) : null}
       {linkResult ? (

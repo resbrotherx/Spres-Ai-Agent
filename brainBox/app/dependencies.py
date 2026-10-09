@@ -5,6 +5,8 @@ Usage in routers::
     auth: AuthContext = Depends(require_api_key)      # chat endpoints (publishable or secret)
     auth: AuthContext = Depends(require_secret_key)   # ingest / training / diagnostics
     _: None = Depends(require_admin_token)            # /api/admin/*
+    actor: AuthContext = Depends(require_platform_admin)  # /api/platform/* (staff JWT with
+                                                      # is_platform_admin, or X-Admin-Token)
     auth: AuthContext = Depends(require_staff("admin"))  # staff-only dashboard endpoints
 
 Staff JWTs (``Authorization: Bearer <jwt>``, see app/staff.py) are accepted wherever a secret key
@@ -60,6 +62,12 @@ class AuthContext:
     staff_role: Optional[str] = None
     staff_email: Optional[str] = None
     staff_name: Optional[str] = None
+    is_platform_admin: bool = False
+
+    @property
+    def is_admin_token(self) -> bool:
+        """Server-to-server call authenticated with X-Admin-Token (platform endpoints only)."""
+        return self.key_type == "admin_token"
 
     @property
     def is_staff(self) -> bool:
@@ -130,6 +138,7 @@ def _staff_context(user) -> AuthContext:
         staff_role=user.role,
         staff_email=user.email,
         staff_name=staff_mod.display_name(user),
+        is_platform_admin=bool(user.is_platform_admin),
     )
 
 
@@ -192,14 +201,44 @@ def require_staff(minimum: str = "viewer"):
     return dependency
 
 
-def require_admin_token(x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token")) -> None:
-    """Guards key management. Independent of REQUIRE_API_KEY."""
+PLATFORM_ADMIN_REQUIRED = "Platform admin access required"
+
+
+def _check_admin_token(given: Optional[str]) -> None:
     expected = settings.BRAINBOX_ADMIN_TOKEN
     if not expected:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Admin API disabled: set BRAINBOX_ADMIN_TOKEN on the server",
         )
-    given = (x_admin_token or "").strip()
+    given = (given or "").strip()
     if not given or not hmac.compare_digest(given.encode(), expected.encode()):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing admin token")
+
+
+def require_platform_admin(request: Request, db: Session = Depends(get_db)) -> AuthContext:
+    """Platform-wide management (/api/platform/*): a staff JWT whose user is an active platform
+    admin (re-checked in the DB on every request), or the X-Admin-Token header (server-to-server).
+    Independent of REQUIRE_API_KEY. API keys are never accepted."""
+    admin_header = request.headers.get("x-admin-token")
+    if admin_header is not None:
+        _check_admin_token(admin_header)
+        return AuthContext(enforced=True, key_type="admin_token", staff_name="admin token")
+    raw = extract_api_key(request)
+    if staff_mod.looks_like_jwt(raw):
+        user = staff_mod.user_from_jwt(db, raw)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_SESSION,
+                                headers={"WWW-Authenticate": "Bearer"})
+        if not user.is_platform_admin:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=PLATFORM_ADMIN_REQUIRED)
+        return _staff_context(user)
+    if raw:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=PLATFORM_ADMIN_REQUIRED)
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=STAFF_REQUIRED,
+                        headers={"WWW-Authenticate": "Bearer"})
+
+
+def require_admin_token(x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token")) -> None:
+    """Guards key management. Independent of REQUIRE_API_KEY."""
+    _check_admin_token(x_admin_token)

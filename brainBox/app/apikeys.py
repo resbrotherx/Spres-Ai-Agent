@@ -122,6 +122,29 @@ def revoke_key(db: Session, key_id: int) -> Optional[APIKey]:
     return record
 
 
+def roll_key(db: Session, key_id: int, tenant_id: Optional[str] = None) -> Optional[Tuple[APIKey, str, APIKey]]:
+    """Replace an active key: create a new key (same tenant, type, name and a still-future expiry),
+    then revoke the old one. Returns (new_record, new_raw_key, old_record), or None when the key
+    doesn't exist (or belongs to another tenant when ``tenant_id`` is given).
+    Raises KeyRequestError when the key is already revoked."""
+    q = db.query(APIKey).filter(APIKey.id == key_id)
+    if tenant_id is not None:
+        q = q.filter(APIKey.tenant_id == tenant_id)
+    old = q.first()
+    if old is None:
+        return None
+    if not old.is_active:
+        raise KeyRequestError("This key is already revoked; create a new key instead")
+    expires = _aware(old.expires_at)
+    if expires is not None and expires <= _utcnow():
+        expires = None
+    record, raw = create_key(db, old.tenant_id, effective_key_type(old), old.name, expires)
+    old.is_active = False
+    db.commit()
+    db.refresh(old)
+    return record, raw, old
+
+
 def resolve_key(db: Session, raw_key: Optional[str]) -> Optional[APIKey]:
     """Return the active, unexpired key record for ``raw_key`` (and bump last_used at most once
     a minute), or None."""

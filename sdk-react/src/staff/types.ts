@@ -22,6 +22,10 @@ export interface StaffUser {
   created_at: string;
   /** True while the invite hasn't been accepted yet. */
   invited: boolean;
+  /** Brainbox operator: can manage every company via the Platform pages (`/api/platform/*`). */
+  is_platform_admin?: boolean;
+  /** An admin set this user's password; the dashboard asks them to choose their own at sign-in. */
+  must_change_password?: boolean;
 }
 
 export interface StaffLoginResponse {
@@ -64,12 +68,23 @@ export interface InviteStaffPayload {
   email: string;
   full_name?: string;
   role: StaffRole;
+  /** Set a temporary password (≥ 10 chars) instead of emailing an invite. */
+  password?: string;
 }
 
 export interface InviteStaffResponse {
   user: StaffUser;
-  invite_url: string;
+  /** null when a password was set instead. */
+  invite_url: string | null;
   email_sent: boolean;
+  /** True when the account was created with a temporary password. */
+  password_set?: boolean;
+}
+
+export interface SetStaffPasswordPayload {
+  password: string;
+  /** Ask the user to choose their own password at the next sign-in (default true). */
+  must_change_password?: boolean;
 }
 
 export interface UpdateStaffPayload {
@@ -306,6 +321,118 @@ export interface CreateApiKeyResponse {
   key: ApiKeyInfo;
   /** Shown once — store it now. */
   raw_key: string;
+}
+
+/** Roll = a replacement key (same name/type) is created and the old one revoked. */
+export interface RollApiKeyResponse<K = ApiKeyInfo> {
+  key: K;
+  /** The NEW raw key — shown once. */
+  raw_key: string;
+  revoked_id: string | number;
+}
+
+/* ------------------------------------------------------------------ */
+/* Platform admin (/api/platform/*)                                    */
+/* ------------------------------------------------------------------ */
+
+export type PlatformUserStatus = 'active' | 'invited' | 'must_change' | 'disabled';
+
+export interface PlatformTenant {
+  tenant_id: string;
+  display_name: string;
+  staff_count: number;
+  owners: string[];
+  key_counts: { publishable: number; secret: number; active: number; total?: number };
+  documents: number;
+  sources: number;
+  conversations: number;
+  open_gaps: number;
+  last_activity_at: string | null;
+  created_at: string | null;
+}
+
+export interface PlatformUser extends StaffUser {
+  tenant_name: string;
+  status: PlatformUserStatus;
+  has_password: boolean;
+}
+
+export interface PlatformApiKey extends ApiKeyInfo {
+  tenant_id: string;
+  tenant_name: string;
+}
+
+export interface PlatformTenantDetail extends PlatformTenant {
+  usage: { days: number; questions: number; unanswered: number; questions_all_time: number };
+  staff: PlatformUser[];
+  keys: PlatformApiKey[];
+}
+
+export interface PlatformOverview {
+  tenants: number;
+  staff: number;
+  staff_active: number;
+  platform_admins: number;
+  keys: { publishable: number; secret: number; active: number; revoked: number };
+  documents: number;
+  sources: number;
+  conversations: number;
+  questions_30d: number;
+  open_gaps: number;
+}
+
+export interface CreateTenantPayload {
+  tenant_id: string;
+  display_name?: string;
+  owner: { email: string; full_name?: string; password?: string };
+  create_keys?: { publishable?: boolean; secret?: boolean };
+}
+
+export interface CreateTenantResponse {
+  tenant: PlatformTenant;
+  owner: StaffUser;
+  password_set: boolean;
+  invite_url?: string;
+  email_sent?: boolean;
+  /** Raw keys — shown once. */
+  keys: { key: ApiKeyInfo & { tenant_id?: string }; raw_key: string }[];
+}
+
+export interface PlatformUserListParams {
+  q?: string;
+  tenant_id?: string;
+  role?: StaffRole | '';
+  status?: PlatformUserStatus | '';
+  platform_admin?: boolean;
+}
+
+export interface PlatformCreateUserPayload {
+  tenant_id: string;
+  email: string;
+  full_name?: string;
+  role: StaffRole;
+  password?: string;
+  must_change_password?: boolean;
+  is_platform_admin?: boolean;
+}
+
+export interface PlatformCreateUserResponse {
+  user: PlatformUser;
+  password_set: boolean;
+  invite_url?: string;
+  email_sent?: boolean;
+}
+
+export interface PlatformUpdateUserPayload {
+  role?: StaffRole;
+  is_active?: boolean;
+  full_name?: string;
+  is_platform_admin?: boolean;
+  tenant_id?: string;
+}
+
+export interface PlatformCreateKeyPayload extends CreateApiKeyPayload {
+  tenant_id: string;
 }
 
 /* ------------------------------------------------------------------ */

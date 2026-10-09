@@ -4,9 +4,14 @@ Staff users are rows of ``users`` with ``tenant_id`` and ``role`` set (legacy /a
 have them NULL and can never act as staff). Emails are unique globally, so one email address
 is one staff account (in one tenant); ``username`` is set to the email.
 
-Staff JWT (HS256, JWT_SECRET_KEY): ``{sub: email, user_id, tenant_id, role, typ: "staff", iat, exp}``.
-The user row is re-loaded on every request, so deactivation / role changes / removal take effect
-immediately (the role in the token is informational only).
+Staff JWT (HS256, JWT_SECRET_KEY): ``{sub: email, user_id, tenant_id, role, typ: "staff", iat, exp}``
+plus ``pa: true`` for platform admins. The user row is re-loaded on every request, so deactivation /
+role changes / removal / platform-admin changes take effect immediately (role and ``pa`` in the token
+are informational only).
+
+Passwords chosen by an admin for someone else (``admin_set_password``) must be at least
+``ADMIN_MIN_PASSWORD`` characters and normally set ``must_change_password`` so the dashboard asks the
+user to pick their own at the next login; any self-chosen password clears the flag.
 """
 import re
 import secrets
@@ -32,6 +37,7 @@ RESET_TTL = timedelta(hours=1)
 RESET_RESEND_AFTER = timedelta(minutes=2)  # forgot-password won't email the same user more often
 UNUSABLE_PASSWORD = "!"  # bcrypt.checkpw fails on it -> never matches (pending invites)
 MIN_PASSWORD = 8
+ADMIN_MIN_PASSWORD = 10  # passwords an admin sets for someone else
 MAX_PASSWORD_BYTES = 72  # bcrypt limit
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -73,10 +79,10 @@ def validate_role(role: Optional[str]) -> str:
     return value
 
 
-def validate_password(password: Optional[str]) -> str:
+def validate_password(password: Optional[str], minimum: int = MIN_PASSWORD) -> str:
     password = password or ""
-    if len(password) < MIN_PASSWORD:
-        raise StaffError(f"Password must be at least {MIN_PASSWORD} characters", 422)
+    if len(password) < minimum:
+        raise StaffError(f"Password must be at least {minimum} characters", 422)
     if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
         raise StaffError(f"Password must be at most {MAX_PASSWORD_BYTES} bytes", 422)
     return password
@@ -119,6 +125,7 @@ def create_staff_jwt(user: User) -> Tuple[str, int]:
         "role": user.role,
         "typ": "staff",
         "iat": now,
+        **({"pa": True} if user.is_platform_admin else {}),
         "exp": now + timedelta(seconds=expires_in),
     }
     token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
@@ -180,6 +187,8 @@ def to_dict(user: User) -> Dict[str, Any]:
         "last_login_at": user.last_login_at,
         "created_at": user.created_at,
         "invited": user.invite_token_hash is not None,
+        "is_platform_admin": bool(user.is_platform_admin),
+        "must_change_password": bool(user.must_change_password),
     }
 
 
@@ -206,15 +215,19 @@ def create_staff(
     role: str,
     full_name: Optional[str] = None,
     password: Optional[str] = None,
+    is_platform_admin: bool = False,
+    must_change_password: bool = False,
+    min_password: int = MIN_PASSWORD,
 ) -> Tuple[User, Optional[str]]:
-    """Create a staff user. Without a password an invite token is generated: returns (user, raw_token)."""
+    """Create a staff user. Without a password an invite token is generated: returns (user, raw_token).
+    ``must_change_password`` only applies when a password is given (an admin chose it)."""
     tenant_id = (tenant_id or "").strip()
     if not tenant_id:
         raise StaffError("tenant_id is required", 422)
     email = validate_email(email)
     role = validate_role(role)
     if password is not None:
-        validate_password(password)
+        validate_password(password, min_password)
     existing = get_by_email(db, email)
     if existing is not None:
         if existing.tenant_id == tenant_id:
@@ -230,6 +243,8 @@ def create_staff(
         full_name=(full_name or "").strip() or None,
         notify_email=True,
         notify_in_app=True,
+        is_platform_admin=bool(is_platform_admin),
+        must_change_password=bool(password and must_change_password),
     )
     raw = None
     if not password:
@@ -250,11 +265,36 @@ def refresh_invite(db: Session, user: User) -> str:
     return raw
 
 
-def set_password(db: Session, user: User, password: str) -> None:
+def set_password(db: Session, user: User, password: str, must_change: bool = False) -> None:
+    """Set a password (self-service by default, which clears ``must_change_password``)."""
     user.hashed_password = hash_password(validate_password(password))
     user.reset_token_hash = None
     user.reset_expires_at = None
+    user.must_change_password = bool(must_change)
     db.commit()
+
+
+def admin_set_password(db: Session, user: User, password: str, must_change: bool = True) -> None:
+    """An admin sets someone's password (>= ADMIN_MIN_PASSWORD). Completes a pending invite."""
+    validate_password(password, ADMIN_MIN_PASSWORD)
+    user.invite_token_hash = None
+    user.invite_expires_at = None
+    set_password(db, user, password, must_change=must_change)
+
+
+def has_password(user: User) -> bool:
+    return bool(user.hashed_password) and user.hashed_password != UNUSABLE_PASSWORD
+
+
+def status_of(user: User) -> str:
+    """active | invited | must_change | disabled (for listings and filters)."""
+    if not user.is_active:
+        return "disabled"
+    if user.invite_token_hash is not None:
+        return "invited"
+    if user.must_change_password:
+        return "must_change"
+    return "active"
 
 
 def check_password(user: User, password: str) -> bool:

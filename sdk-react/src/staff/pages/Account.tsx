@@ -7,6 +7,7 @@ import type { StaffNotification } from '../types';
 import { TrainingPanel } from '../../TrainingPanel';
 import { Alert, Avatar, Button, EmptyState, ErrorState, Field, PasswordInput, RolePill, SkeletonRows, Switch, useStaff } from '../ui';
 import { errMsg, fmtDateTime, relTime, ROLE_INFO, useAsync } from '../util';
+import { PlatformBadge } from '../access';
 
 export function AccountPage() {
   const { client, user, setUser, toast } = useStaff();
@@ -81,9 +82,13 @@ export function AccountPage() {
               <div className="bb-staff-muted">{user.email}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <RolePill role={user.role} />
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <RolePill role={user.role} />
+                {user.is_platform_admin ? <PlatformBadge /> : null}
+              </span>
               <div className="bb-staff-hint" style={{ marginTop: 6, maxWidth: 280 }}>
                 {ROLE_INFO[user.role]?.desc}
+                {user.is_platform_admin ? ' As a platform admin you can also manage every company (Platform section).' : ''}
               </div>
             </div>
           </div>

@@ -52,6 +52,10 @@ class User(Base):
     invite_expires_at = Column(DateTime(timezone=True), nullable=True)
     reset_token_hash = Column(String, index=True, nullable=True)
     reset_expires_at = Column(DateTime(timezone=True), nullable=True)
+    # Platform admins (Brainbox operators) can manage every tenant via /api/platform/*.
+    is_platform_admin = Column(Boolean, default=False, nullable=True)
+    # Set when an admin chose the password (temporary): the dashboard forces a change at login.
+    must_change_password = Column(Boolean, default=False, nullable=True)
 
 class APIKey(Base):
     __tablename__ = "api_keys"

@@ -6,6 +6,7 @@ import { resolveLink } from './router';
 import type { StaffNotification } from './types';
 import { Avatar, IconButton, menuKeyNav, useDismiss, useStaff } from './ui';
 import { relTime } from './util';
+import { PlatformBadge } from './access';
 
 export interface NavItem {
   key: string;
@@ -13,6 +14,8 @@ export interface NavItem {
   icon: StaffIconName;
   badge?: number | null;
   alert?: boolean;
+  /** Sidebar section heading; items without one go under “Workspace”. */
+  group?: string;
 }
 
 export function BrandMark({ logoUrl, size = 36 }: { logoUrl?: string; size?: number }) {
@@ -197,8 +200,9 @@ function UserMenu() {
                 <div className="bb-staff-person-sub bb-staff-truncate">{user.email}</div>
               </div>
             </div>
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 10, display: 'flex', gap: 6, alignItems: 'center' }}>
               <span className={`bb-staff-pill bb-staff-role-${user.role}`}>{user.role}</span>
+              {user.is_platform_admin ? <PlatformBadge /> : null}
             </div>
           </div>
           <div className="bb-staff-menu-sep" />
@@ -299,8 +303,17 @@ export function Shell({
             ) : null}
           </div>
           <nav className="bb-staff-nav">
-            <div className="bb-staff-nav-section">Workspace</div>
-            {nav.map((item) => (
+            {nav.map((item, i) => {
+              const group = item.group || 'Workspace';
+              const heading = i === 0 || (nav[i - 1].group || 'Workspace') !== group;
+              return (
+              <div key={item.key} style={{ display: 'contents' }}>
+              {heading ? (
+                <div className={`bb-staff-nav-section${group !== 'Workspace' ? ' is-platform' : ''}`}>
+                  {group !== 'Workspace' ? <Icon name="shield" size={12} /> : null}
+                  {group}
+                </div>
+              ) : null}
               <a
                 key={item.key}
                 href={href(`/${item.key}`)}
@@ -316,7 +329,9 @@ export function Shell({
                   </span>
                 ) : null}
               </a>
-            ))}
+              </div>
+              );
+            })}
           </nav>
           <div className="bb-staff-side-foot">
             <a href={href('/account')} className="bb-staff-side-user" style={{ textDecoration: 'none' }} title={collapsed ? name : undefined}>
@@ -325,7 +340,7 @@ export function Shell({
                 <span className="bb-staff-side-user-name bb-staff-truncate" style={{ display: 'block' }}>
                   {name}
                 </span>
-                <span className="bb-staff-side-user-role">{user.role}</span>
+                <span className="bb-staff-side-user-role">{user.role}{user.is_platform_admin ? ' · platform admin' : ''}</span>
               </span>
             </a>
             <button type="button" className="bb-staff-collapse" onClick={() => setCollapsed((c) => !c)} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-pressed={collapsed}>

@@ -8,7 +8,8 @@ import { useStaffStyles } from './styles';
 import type { StaffDashboardProps, StaffDashboardTheme, StaffUser } from './types';
 import { makeCan, StaffContext, ToastViewport, useToastState } from './ui';
 import type { StaffContextValue } from './ui';
-import { AcceptInvitePage, LoginPage, ResetPasswordPage } from './pages/Auth';
+import { AcceptInvitePage, ForcePasswordChangePage, LoginPage, ResetPasswordPage } from './pages/Auth';
+import { AllKeysPage, AllUsersPage, CompaniesPage, CompanyDetailPage } from './pages/Platform';
 import { OverviewPage } from './pages/Overview';
 import { GapsPage } from './pages/Gaps';
 import { ConversationDetailPage, ConversationsPage } from './pages/Conversations';
@@ -26,8 +27,11 @@ const TITLES: Record<string, string> = {
   staff: 'Staff',
   settings: 'Settings',
   notifications: 'Notifications',
-  account: 'Account'
+  account: 'Account',
+  platform: 'Companies'
 };
+
+const PLATFORM_TITLES: Record<string, string> = { companies: 'Companies', users: 'All users', keys: 'All API keys' };
 
 function themeVars(theme: StaffDashboardTheme | undefined, offsetTop: number): CSSProperties {
   const v: Record<string, string> = { '--bbs-top': `${offsetTop}px` };
@@ -74,6 +78,8 @@ export function StaffDashboard({
   const { toasts, push, dismiss } = useToastState();
   const [openGaps, setOpenGaps] = useState<number | null>(null);
   const expiredRef = useRef(false);
+  // Password typed at sign-in, kept in memory only to prefill a forced password change.
+  const loginPasswordRef = useRef<string | undefined>(undefined);
 
   // Restore the session from the stored token.
   useEffect(() => {
@@ -103,6 +109,7 @@ export function StaffDashboard({
         if (token) return;
         if (userRef.current && !expiredRef.current) push('Your session expired. Please sign in again.', 'info');
         expiredRef.current = false;
+        loginPasswordRef.current = undefined;
         setUser(null);
       }),
     [client, push]
@@ -147,7 +154,8 @@ export function StaffDashboard({
   }, [client, navigate, push]);
 
   const onAuthenticated = useCallback(
-    (u: StaffUser) => {
+    (u: StaffUser, meta?: { password?: string }) => {
+      loginPasswordRef.current = u.must_change_password ? meta?.password : undefined;
       setUser(u);
       push(`Welcome${u.full_name ? `, ${u.full_name.split(' ')[0]}` : ''}!`);
       const next = route.query.next;
@@ -201,6 +209,27 @@ export function StaffDashboard({
 
   const authProps = { client, brandName, logoUrl, href, navigate, onAuthenticated };
 
+  if (user && user.must_change_password && section !== 'accept-invite' && section !== 'reset-password') {
+    return (
+      <div className={rootClass} style={rootStyle}>
+        <ForcePasswordChangePage
+          client={client}
+          brandName={brandName}
+          logoUrl={logoUrl}
+          user={user}
+          currentPassword={loginPasswordRef.current}
+          onSignOut={signOut}
+          onDone={(u) => {
+            loginPasswordRef.current = undefined;
+            setUser(u);
+            push('Password updated. Welcome!');
+          }}
+        />
+        {toastsEl}
+      </div>
+    );
+  }
+
   if (section === 'accept-invite' || section === 'reset-password' || !user || !ctx) {
     let page: ReactNode;
     if (section === 'accept-invite') page = <AcceptInvitePage {...authProps} token={route.query.token || ''} />;
@@ -222,6 +251,13 @@ export function StaffDashboard({
     { key: 'staff', label: 'Staff', icon: 'staff' },
     { key: 'settings', label: 'Settings', icon: 'settings' }
   ];
+  if (user.is_platform_admin) {
+    nav.push(
+      { key: 'platform/companies', label: 'Companies', icon: 'building', group: 'Platform' },
+      { key: 'platform/users', label: 'All users', icon: 'staff', group: 'Platform' },
+      { key: 'platform/keys', label: 'All API keys', icon: 'key', group: 'Platform' }
+    );
+  }
 
   const seg1 = route.segments[1];
   let page: ReactNode;
@@ -259,12 +295,37 @@ export function StaffDashboard({
     case 'account':
       page = <AccountPage />;
       break;
+    case 'platform': {
+      const sub = seg1 && PLATFORM_TITLES[seg1] ? seg1 : 'companies';
+      if (!user.is_platform_admin) {
+        page = <OverviewPage />;
+        title = 'Overview';
+        break;
+      }
+      title = PLATFORM_TITLES[sub];
+      if (sub === 'companies' && route.segments[2]) {
+        page = <CompanyDetailPage tenantId={route.segments[2]} tab={route.segments[3]} />;
+        crumbs = [{ label: 'Companies', to: '/platform/companies' }];
+        title = 'Company';
+      } else if (sub === 'users') {
+        page = <AllUsersPage />;
+        search = { placeholder: 'Search name, email or company…', value: route.query.q || '', onChange: setQuerySearch };
+      } else if (sub === 'keys') {
+        page = <AllKeysPage />;
+        search = { placeholder: 'Search keys or companies…', value: route.query.q || '', onChange: setQuerySearch };
+      } else {
+        page = <CompaniesPage />;
+        search = { placeholder: 'Search companies or owners…', value: route.query.q || '', onChange: setQuerySearch };
+      }
+      break;
+    }
     default:
       page = <OverviewPage />;
       title = 'Overview';
   }
 
-  const activeKey = nav.some((n) => n.key === section) ? section : section === 'account' || section === 'notifications' ? '' : 'overview';
+  const navSection = section === 'platform' ? `platform/${seg1 && PLATFORM_TITLES[seg1] ? seg1 : 'companies'}` : section;
+  const activeKey = nav.some((n) => n.key === navSection) ? navSection : section === 'account' || section === 'notifications' ? '' : 'overview';
 
   return (
     <StaffContext.Provider value={ctx}>

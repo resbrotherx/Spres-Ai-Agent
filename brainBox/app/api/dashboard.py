@@ -126,3 +126,19 @@ def revoke_key(key_id: int, auth: AuthContext = Depends(require_staff("admin")),
     apikeys.revoke_key(db, key_id)
     logger.info(f"API key revoked from dashboard: id={key_id} tenant={auth.tenant_id} by={auth.staff_user_id}")
     return {"revoked": True}
+
+
+@router.post("/keys/{key_id}/roll")
+def roll_key(key_id: int, auth: AuthContext = Depends(require_staff("admin")), db: Session = Depends(get_db)):
+    """Replace a key: a new key (same name/type) is created and the old one revoked at once.
+    The new raw key is returned only in this response."""
+    try:
+        result = apikeys.roll_key(db, key_id, tenant_id=auth.tenant_id)
+    except apikeys.KeyRequestError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")
+    record, raw, old = result
+    logger.info(f"API key rolled from dashboard: old={old.id} new={record.id} tenant={auth.tenant_id} "
+                f"by={auth.staff_user_id}")
+    return {"key": _key_out(record), "raw_key": raw, "revoked_id": old.id}

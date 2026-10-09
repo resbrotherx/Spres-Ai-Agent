@@ -172,3 +172,39 @@ export async function copyText(text: string): Promise<boolean> {
     return false;
   }
 }
+
+/** Minimum length for a password an admin sets for someone else (matches the backend). */
+export const ADMIN_MIN_PASSWORD = 10;
+
+/**
+ * Strong random password generated in the browser (crypto.getRandomValues, rejection sampling — no modulo bias).
+ * 16 chars from an alphabet without look-alikes (0/O, 1/l/I), with at least one lower, upper, digit and symbol.
+ */
+export function generatePassword(length = 16): string {
+  const sets = ['abcdefghijkmnopqrstuvwxyz', 'ABCDEFGHJKLMNPQRSTUVWXYZ', '23456789', '!@#$%*-_+?'];
+  const all = sets.join('');
+  const cryptoObj: Crypto | undefined = typeof globalThis !== 'undefined' ? (globalThis as any).crypto : undefined;
+  if (!cryptoObj?.getRandomValues) throw new Error('Secure random numbers are not available in this browser.');
+  const randIndex = (n: number): number => {
+    const limit = Math.floor(256 / n) * n;
+    const buf = new Uint8Array(1);
+    for (;;) {
+      cryptoObj.getRandomValues(buf);
+      if (buf[0] < limit) return buf[0] % n;
+    }
+  };
+  const chars = sets.map((set) => set[randIndex(set.length)]);
+  while (chars.length < length) chars.push(all[randIndex(all.length)]);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randIndex(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
+}
+
+/** Shorten long ids (some tenant ids are JWT-like strings) for display: "eyJhbGci…x9Qk". */
+export function shortId(id: string, max = 22): string {
+  if (!id || id.length <= max) return id;
+  const keep = Math.max(4, Math.floor((max - 1) / 2));
+  return `${id.slice(0, keep)}…${id.slice(-Math.max(4, max - keep - 1))}`;
+}

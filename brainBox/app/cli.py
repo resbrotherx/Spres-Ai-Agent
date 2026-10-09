@@ -8,9 +8,12 @@
     python -m app.cli keys revoke 42
 
     python -m app.cli staff create --tenant acme --email owner@acme.com --role owner [--name "Ada"] [--password-stdin]
+    python -m app.cli staff create --tenant brainbox --email ops@brainbox.io --role owner --platform-admin --password-stdin
     python -m app.cli staff list [--tenant acme]
-    python -m app.cli staff set-password owner@acme.com [--password-stdin]
+    python -m app.cli staff set-password owner@acme.com [--password-stdin] [--must-change | --no-must-change]
+    python -m app.cli staff platform-admin ops@brainbox.io --on   (or --off)
     python -m app.cli staff deactivate owner@acme.com
+    python -m app.cli tenants list
 
 `staff create` without a password prints an invite link (valid 7 days) instead.
 The raw key is printed only by `create` (once). Prefer `--key-stdin` over `--key` when importing,
@@ -115,13 +118,15 @@ def cmd_staff_create(args) -> int:
         _read_password(False) if args.password else None)
     db = _session()
     try:
-        user, raw = staff_mod.create_staff(db, args.tenant, args.email, args.role, args.name, password or None)
+        user, raw = staff_mod.create_staff(db, args.tenant, args.email, args.role, args.name, password or None,
+                                           is_platform_admin=args.platform_admin)
     except staff_mod.StaffError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     finally:
         db.close()
-    print(f"Created {user.role} #{user.id} {user.email} for tenant '{user.tenant_id}'.")
+    print(f"Created {user.role} #{user.id} {user.email} for tenant '{user.tenant_id}'"
+          f"{' (platform admin)' if user.is_platform_admin else ''}.")
     if raw:
         print("Invite link (valid 7 days, shown once):")
         print(staff_mod.dashboard_link(f"accept-invite?token={raw}"))
@@ -137,9 +142,8 @@ def cmd_staff_list(args) -> int:
         if args.tenant:
             q = q.filter(User.tenant_id == args.tenant)
         users = q.order_by(User.tenant_id, User.id).all()
-        rows = [(str(u.id), u.tenant_id, u.email, u.role,
-                 "invited" if u.invite_token_hash else ("active" if u.is_active else "inactive"),
-                 u.full_name or "", _fmt(u.last_login_at)) for u in users]
+        rows = [(str(u.id), u.tenant_id, u.email, u.role + (" +platform" if u.is_platform_admin else ""),
+                 staff_mod.status_of(u), u.full_name or "", _fmt(u.last_login_at)) for u in users]
     finally:
         db.close()
     if not rows:
@@ -170,7 +174,7 @@ def cmd_staff_set_password(args) -> int:
         if user is None:
             return 1
         try:
-            staff_mod.set_password(db, user, password)
+            staff_mod.set_password(db, user, password, must_change=args.must_change)
         except staff_mod.StaffError as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
@@ -178,7 +182,8 @@ def cmd_staff_set_password(args) -> int:
         user.invite_expires_at = None
         user.is_active = True
         db.commit()
-        print(f"Password set for {user.email}.")
+        print(f"Password set for {user.email}"
+              f"{' (must change it at next login)' if args.must_change else ''}.")
         return 0
     finally:
         db.close()
@@ -201,6 +206,44 @@ def cmd_staff_deactivate(args) -> int:
         return 0
     finally:
         db.close()
+
+
+def cmd_staff_platform_admin(args) -> int:
+    db = _session()
+    try:
+        user = _staff_user(db, args.email)
+        if user is None:
+            return 1
+        user.is_platform_admin = bool(args.on)
+        db.commit()
+        print(f"{user.email} is {'now' if args.on else 'no longer'} a platform admin.")
+        return 0
+    finally:
+        db.close()
+
+
+def cmd_tenants_list(args) -> int:
+    from app.api.platform import tenant_summaries
+    db = _session()
+    try:
+        rows = tenant_summaries(db)
+    finally:
+        db.close()
+    if not rows:
+        print("No tenants.")
+        return 0
+    def short(v: str, n: int = 40) -> str:
+        return v if len(v) <= n else v[: n - 3] + "..."
+    table = [("TENANT", "NAME", "STAFF", "OWNERS", "PK", "SK", "DOCS", "CONVOS", "OPEN GAPS", "LAST ACTIVITY")]
+    for r in rows:
+        table.append((short(r["tenant_id"]), short(r["display_name"] or "", 30), str(r["staff_count"]),
+                      short(", ".join(r["owners"]) or "-", 40), str(r["key_counts"]["publishable"]),
+                      str(r["key_counts"]["secret"]), str(r["documents"]), str(r["conversations"]),
+                      str(r["open_gaps"]), _fmt(r["last_activity_at"])))
+    widths = [max(len(row[i]) for row in table) for i in range(len(table[0]))]
+    for row in table:
+        print("  ".join(c.ljust(w) for c, w in zip(row, widths)).rstrip())
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -235,6 +278,8 @@ def build_parser() -> argparse.ArgumentParser:
     pw = sc.add_mutually_exclusive_group()
     pw.add_argument("--password", action="store_true", help="Prompt for a password")
     pw.add_argument("--password-stdin", action="store_true", help="Read the password from stdin")
+    sc.add_argument("--platform-admin", action="store_true",
+                    help="Also make this user a platform admin (manages every tenant)")
     sc.set_defaults(func=cmd_staff_create)
     sl = staff.add_parser("list", help="List staff users")
     sl.add_argument("--tenant")
@@ -242,11 +287,23 @@ def build_parser() -> argparse.ArgumentParser:
     sp = staff.add_parser("set-password", help="Set a staff user's password")
     sp.add_argument("email")
     sp.add_argument("--password-stdin", action="store_true")
+    sp.add_argument("--must-change", action=argparse.BooleanOptionalAction, default=False,
+                    help="Ask the user to choose a new password at the next login (default: no)")
     sp.set_defaults(func=cmd_staff_set_password)
+    pa = staff.add_parser("platform-admin", help="Grant or remove platform admin access")
+    pa.add_argument("email")
+    onoff = pa.add_mutually_exclusive_group(required=True)
+    onoff.add_argument("--on", dest="on", action="store_true")
+    onoff.add_argument("--off", dest="on", action="store_false")
+    pa.set_defaults(func=cmd_staff_platform_admin)
     sd = staff.add_parser("deactivate", help="Deactivate a staff user")
     sd.add_argument("email")
     sd.add_argument("--force", action="store_true")
     sd.set_defaults(func=cmd_staff_deactivate)
+
+    tenants = sub.add_parser("tenants", help="Tenants (companies)").add_subparsers(dest="action", required=True)
+    tl = tenants.add_parser("list", help="List tenants with staff / key / usage counts")
+    tl.set_defaults(func=cmd_tenants_list)
     return parser
 
 
