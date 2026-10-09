@@ -1,3 +1,4 @@
+import { useLiveRefresh } from '../live';
 import { useId, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { StaffRole, StaffUser } from '../types';
@@ -143,8 +144,9 @@ function InviteModal({ roles, onClose, onInvited }: { roles: StaffRole[]; onClos
 }
 
 export function StaffPage() {
-  const { client, user: me, can, toast, query, setUser } = useStaff();
+  const { client, user: me, can, toast, query, setUser, live } = useStaff();
   const { data, setData, error, loading, reload } = useAsync(() => client.listStaff(), [client]);
+  useLiveRefresh(live, () => void reload(true), ['staff']);
   const [inviting, setInviting] = useState(false);
   const [confirmId, setConfirmId] = useState<string | number | null>(null);
   const [busyId, setBusyId] = useState<string | number | null>(null);
@@ -398,7 +400,7 @@ export function StaffPage() {
         </div>
         <div className="bb-staff-card-body" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
           {(['owner', 'admin', 'trainer', 'viewer'] as StaffRole[]).map((r) => (
-            <div key={r} style={{ padding: 14, borderRadius: 12, border: '1px solid var(--bbs-border)', background: 'var(--bbs-surface)' }}>
+            <div key={r} style={{ padding: 14, borderRadius: 12, border: '1px solid var(--bbs-separator)', background: 'var(--bbs-surface-2)' }}>
               <RolePill role={r} />
               <p className="bb-staff-hint" style={{ marginTop: 8 }}>
                 {ROLE_INFO[r].desc}

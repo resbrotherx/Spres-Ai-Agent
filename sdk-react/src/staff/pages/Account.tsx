@@ -1,11 +1,11 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Icon } from '../icons';
-import type { StaffIconName } from '../icons';
-import { resolveLink } from '../router';
+import { useLiveEvent, useLiveRefresh } from '../live';
+import { NotificationRow, openNotificationLink } from '../Shell';
 import type { StaffNotification } from '../types';
 import { TrainingPanel } from '../../TrainingPanel';
-import { Alert, Avatar, Button, EmptyState, ErrorState, Field, PasswordInput, RolePill, SkeletonRows, Switch, useStaff } from '../ui';
+import { Alert, Avatar, Button, EmptyState, ErrorState, Field, LiveDot, PasswordInput, RolePill, Segmented, SkeletonRows, Switch, useStaff } from '../ui';
 import { errMsg, fmtDateTime, relTime, ROLE_INFO, useAsync } from '../util';
 import { PlatformBadge } from '../access';
 
@@ -25,7 +25,7 @@ export function AccountPage() {
     setSavingName(true);
     try {
       setUser(await client.updateMe({ full_name: name.trim() }));
-      toast('Profile updated.');
+      toast('Profile updated', 'success');
     } catch (err) {
       toast(errMsg(err), 'error');
     } finally {
@@ -38,7 +38,7 @@ export function AccountPage() {
     setUser({ ...user, ...patch });
     try {
       setUser(await client.updateMe(patch));
-      toast('Notification preferences saved.');
+      toast('Preferences saved', 'success');
     } catch (err) {
       setUser(prev);
       toast(errMsg(err), 'error');
@@ -56,7 +56,7 @@ export function AccountPage() {
       setCur('');
       setPw('');
       setPw2('');
-      toast('Password changed.');
+      toast('Password changed', 'success');
     } catch (err) {
       setPwError(errMsg(err));
     } finally {
@@ -78,7 +78,7 @@ export function AccountPage() {
           <div className="bb-staff-profile-head">
             <Avatar name={user.full_name} email={user.email} size="lg" />
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 18, fontWeight: 650 }}>{user.full_name || user.email.split('@')[0]}</div>
+              <div className="bb-staff-profile-name">{user.full_name || user.email.split('@')[0]}</div>
               <div className="bb-staff-muted">{user.email}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -167,48 +167,46 @@ export function AccountPage() {
   );
 }
 
-const NOTIF_ICON: Record<string, StaffIconName> = { gap: 'gaps', feedback: 'thumbsDown', training_failed: 'alert', staff: 'staff' };
-
 export function NotificationsPage() {
-  const { client, routePrefix, toast } = useStaff();
-  const [unreadOnly, setUnreadOnly] = useState(false);
-  const { data, setData, error, loading, reload } = useAsync(() => client.listNotifications({ unread_only: unreadOnly, limit: 100 }), [client, unreadOnly]);
+  const { client, routePrefix, toast, live, notifications } = useStaff();
+  const [unreadOnly, setUnreadOnly] = useState<'all' | 'unread'>('all');
+  const { data, setData, error, loading, reload } = useAsync(() => client.listNotifications({ unread_only: unreadOnly === 'unread', limit: 100 }), [client, unreadOnly]);
+  const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+
+  useLiveRefresh(live, () => void reload(true));
+  useLiveEvent(live, 'notification', (n) => {
+    setData((d) => (d && !d.items.some((x) => x.id === n.id) ? { ...d, unread_count: d.unread_count + (n.read ? 0 : 1), items: [n, ...d.items] } : d));
+    const id = String(n.id);
+    setFresh((f) => new Set([...Array.from(f), id]));
+    setTimeout(() => setFresh((f) => new Set(Array.from(f).filter((x) => x !== id))), 2400);
+  });
 
   const open = (n: StaffNotification) => {
     if (!n.read) {
-      client.markNotificationRead(n.id).catch(() => undefined);
+      notifications.markRead(n);
       setData((d) => (d ? { ...d, unread_count: Math.max(0, d.unread_count - 1), items: d.items.map((x) => (x.id === n.id ? { ...x, read: true } : x)) } : d));
     }
-    const target = resolveLink(routePrefix, n.link);
-    if (target) window.location.hash = target;
+    openNotificationLink(routePrefix, n);
   };
 
   const readAll = async () => {
-    try {
-      const res = await client.markAllNotificationsRead();
-      setData((d) => (d ? { ...d, unread_count: 0, items: d.items.map((x) => ({ ...x, read: true })) } : d));
-      toast(res.updated ? `Marked ${res.updated} as read.` : 'All caught up.');
-    } catch (err) {
-      toast(errMsg(err), 'error');
-    }
+    const n = data?.unread_count || 0;
+    setData((d) => (d ? { ...d, unread_count: 0, items: d.items.map((x) => ({ ...x, read: true })) } : d));
+    await notifications.markAllRead();
+    toast(n ? `Marked ${n} as read` : 'All caught up', 'success');
   };
 
   return (
     <div className="bb-staff-stack" style={{ maxWidth: 900 }}>
-      <div className="bb-staff-page-head" style={{ marginBottom: 0 }}>
+      <div className="bb-staff-page-head">
         <div>
-          <h2>Notifications</h2>
+          <h2>
+            Notifications <LiveDot />
+          </h2>
           <p>{data ? `${data.unread_count} unread` : 'Alerts about knowledge gaps, feedback and training.'}</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <div className="bb-staff-seg" role="group" aria-label="Filter">
-            <button type="button" aria-pressed={!unreadOnly} onClick={() => setUnreadOnly(false)}>
-              All
-            </button>
-            <button type="button" aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)}>
-              Unread
-            </button>
-          </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Segmented<'all' | 'unread'> label="Filter" value={unreadOnly} onChange={setUnreadOnly} options={[{ value: 'all', label: 'All' }, { value: 'unread', label: 'Unread' }]} />
           <Button icon="check" onClick={() => void readAll()} disabled={!data?.unread_count}>
             Mark all read
           </Button>
@@ -219,30 +217,13 @@ export function NotificationsPage() {
         {loading && !data ? <SkeletonRows rows={6} /> : null}
         {data ? (
           data.items.length ? (
-            <div>
+            <div role="list">
               {data.items.map((n) => (
-                <button key={n.id} type="button" className={`bb-staff-notif${n.read ? '' : ' is-unread'}`} onClick={() => open(n)} style={{ padding: '16px 20px' }}>
-                  <span className={`bb-staff-notif-icon is-${n.type}`}>
-                    <Icon name={NOTIF_ICON[n.type] || 'bell'} size={17} />
-                  </span>
-                  <span style={{ minWidth: 0, flex: 1 }}>
-                    <span className="bb-staff-notif-title" style={{ display: 'block' }}>
-                      {n.title}
-                    </span>
-                    {n.body ? (
-                      <span className="bb-staff-notif-body" style={{ display: 'block' }}>
-                        {n.body}
-                      </span>
-                    ) : null}
-                    <span className="bb-staff-notif-time" style={{ display: 'block' }} title={fmtDateTime(n.created_at)}>
-                      {relTime(n.created_at)}
-                    </span>
-                  </span>
-                </button>
+                <NotificationRow key={n.id} n={n} onOpen={open} fresh={fresh.has(String(n.id))} />
               ))}
             </div>
           ) : (
-            <EmptyState icon="bell" title={unreadOnly ? 'No unread notifications' : 'No notifications yet'}>
+            <EmptyState icon="bell" title={unreadOnly === 'unread' ? 'No unread notifications' : 'No notifications yet'}>
               You’ll be notified here when the assistant can’t answer a question.
             </EmptyState>
           )
@@ -253,18 +234,34 @@ export function NotificationsPage() {
 }
 
 export function TrainingPage() {
-  const { client, can, user } = useStaff();
+  const { client, can, user, live, themeMode } = useStaff();
   const canTrain = can('trainer');
+  const [rev, setRev] = useState(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Refresh the embedded panel's source list on `training` events without remounting it (keeps any
+  // half-filled form): a fresh prototype-linked SDK object makes its data hook refetch.
+  const bump = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setRev((r) => r + 1), 400);
+  };
+  useLiveEvent(live, 'training', bump);
+  useLiveRefresh(live, bump);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+  const sdk = useMemo(() => (rev ? (Object.create(client.sdk) as typeof client.sdk) : client.sdk), [client, rev]);
   return (
     <div className="bb-staff-stack">
-      <div className="bb-staff-page-head" style={{ marginBottom: 0 }}>
+      <div className="bb-staff-page-head">
         <div>
-          <h2>Training</h2>
+          <h2>
+            Training <LiveDot />
+          </h2>
           <p>Documents, snippets and connected tools your assistant learns from.</p>
         </div>
       </div>
       {!canTrain ? <Alert tone="info">Your role ({user.role}) can view training sources. Trainers, admins and owners can add or change them.</Alert> : null}
-      <TrainingPanel sdk={client.sdk} variant="embedded" readOnly={!canTrain} primaryColor="var(--bbs-primary)" accentColor="var(--bbs-accent)" title="Knowledge sources" />
+      <TrainingPanel sdk={sdk} variant="embedded" readOnly={!canTrain} title="Knowledge sources" mode={themeMode} />
     </div>
   );
 }

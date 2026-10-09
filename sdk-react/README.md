@@ -30,11 +30,13 @@ The SDK provides client-side chat components. Your app must be served to users i
 
 ## What it includes
 
-- `BrainboxReactSDK` class for API and ingestion calls
-- `ChatWidget` support bot UI
-- `ChatPanel` full chat UI with sidebar and history
-- `useBrainboxChat` hook for real-time chat state
-- Customizable colors, button placement, and design variants
+- `BrainboxReactSDK` class for API calls, including **real token streaming** (`streamChat`)
+- `ChatWidget` — floating assistant (launcher + window, full-screen sheet on phones)
+- `ChatPanel` — full-page chat with a sessions sidebar, search and an empty state with prompt cards
+- `TrainingPanel` — upload / connect / paste training data and manage sources
+- `useBrainboxChat` hook — streaming chat state for custom UIs
+- `MessageContent`, `TypingIndicator`, `BrainboxLogo`, `playSound` building blocks
+- One Apple-style design system (light / dark / auto, UI sounds, reduced-motion aware, accessible)
 
 ## Quick Start
 
@@ -43,8 +45,7 @@ import { BrainboxReactSDK, ChatWidget } from 'spres-react';
 
 const sdk = new BrainboxReactSDK(
   'https://api.yourbackend.com',
-  'YOUR_API_KEY',
-  'your-tenant-id'
+  'pk_live_…'          // publishable key for browsers
 );
 
 export function App() {
@@ -52,128 +53,175 @@ export function App() {
 }
 ```
 
-## Support chat UI
+### Next.js (App Router)
 
-`ChatWidget` provides a launch button and popup chat bubble. It is styled by default to appear on the right side.
+All UI modules ship with a `"use client"` directive, so you can import them from a Server Component file and render
+them directly. Create the SDK instance in a client component (or a module only imported by one):
+
+```tsx
+'use client';
+import { BrainboxReactSDK, ChatWidget } from 'spres-react';
+const sdk = new BrainboxReactSDK(process.env.NEXT_PUBLIC_BRAINBOX_URL!, process.env.NEXT_PUBLIC_BRAINBOX_PK!);
+export default function Support() {
+  return <ChatWidget sdk={sdk} mode="auto" />;
+}
+```
+
+Styles are injected at runtime (once per component type), so there is no CSS file to import.
+
+## Floating widget — `ChatWidget`
 
 ```tsx
 <ChatWidget
   sdk={sdk}
-  position="bottom-right"
-  primaryColor="#2563EB"
-  accentColor="#111827"
-  backgroundColor="#F8FAFC"
-  buttonText="Support"
-  placeholder="Ask a question..."
-  width="360px"
-  height="520px"
-  design="support"
+  position="bottom-right"          // bottom-left | top-right | top-left | center
+  mode="auto"                      // 'light' (default) | 'dark' | 'auto' (follows the OS)
+  sounds                           // send / receive / error tones (default true, users can mute in the header)
+  primaryColor="#0071E3"           // accent: user bubbles, send button, focus ring
+  accentColor="#5E5CE6"            // second stop of the launcher gradient
+  launcherType="icon"              // 'icon' (default gradient circle) | 'button' (pill + buttonText) | 'gif' (launcherGifUrl)
+  buttonText="Chat"
+  companyName="Acme Support"       // header title
+  companyDescription="Typically replies in seconds"
+  logoUrl="/logo.png"              // header + welcome logo (defaults to the Brainbox mark)
+  avatarGifUrl="/bot.gif"          // assistant avatar
+  user={{ name: 'Sarah Connor' }}  // personalises the greeting
+  placeholder="Ask a question…"
+  width="380px" height="600px"     // default 380×600
+  showFileUpload showImageUpload   // composer attachments (default off in the widget)
+  showVoiceInput                   // Chat / Voice mode switch
+  showExportButton                 // export the conversation as JSON
+  showFeedback                     // 👍/👎 under answers (default true)
+  onOpenChange={(open) => {}}
 />
 ```
 
-## Full chat panel UI
+What you get: header with logo, online status and icon buttons (new chat, history, mute, expand, close); grouped
+messages with day separators and hover timestamps; streaming text with a caret and a **Stop** button; copy and 👍/👎 on
+every answer (sent to `/api/chat/feedback` with the stored `message_id`; 👎 becomes a knowledge gap for staff); a
+"Sources" disclosure when the answer used the knowledge base; toasts; an unread badge on the launcher when a reply
+arrives while the window is closed; Escape to close; full-screen sheet under 576 px.
 
-`ChatPanel` delivers a larger ChatGPT-style conversation experience with a sidebar for session status and history.
+Copy can be customised with `data` / `manualData`:
+
+```tsx
+<ChatWidget
+  sdk={sdk}
+  data={{
+    greeting: 'Hi {{name}} 👋',
+    introMessages: ['I can answer questions about billing and your account.'],
+    quickActions: ['Where is my invoice?', { label: 'Talk to a human', prompt: 'I want to talk to support', icon: 'help' }],
+    composer: { placeholder: 'Type a message…' }
+  }}
+/>
+```
+
+## Full-page chat — `ChatPanel`
 
 ```tsx
 import { ChatPanel } from 'spres-react';
 
-<ChatPanel
-  sdk={sdk}
-  headerText="Brainbox AI Chat"
-  sidebarTitle="Conversations"
-  primaryColor="#0F172A"
-  accentColor="#2563EB"
-  backgroundColor="#FFFFFF"
-  initialSessionId="session-123"
-  design="cloud"
-/>
+<div style={{ height: '100vh' }}>
+  <ChatPanel
+    sdk={sdk}
+    mode="light"                    // users can also toggle dark mode from the top bar
+    companyName="Acme"
+    headerText="How can I help you today?"
+    user={{ name: 'Sarah Connor', email: 'sarah@acme.com' }}
+    data={{ promptCards: [{ title: 'Billing', description: 'Explain my last bill', prompt: 'Explain my last bill', icon: 'doc' }] }}
+    showExportButton showFileUpload showImageUpload showVoiceInput
+  />
+</div>
 ```
+
+The panel fills its parent (`height` prop, default `100%`). The sidebar lists sessions grouped by date with search and
+"New chat"; under 860 px it becomes a drawer.
 
 ## Customization options
 
-You can customize the UI and behavior through props:
-
-- `primaryColor` — button, header, and primary bubble color
-- `accentColor` — secondary bubble and action color
-- `backgroundColor` — panel background
-- `buttonText` — launch button label
-- `placeholder` — text input placeholder
-- `position` — `bottom-right`, `bottom-left`, `top-right`, `top-left`, or `center`
-- `width`, `height` — widget container size
-- `design` — visual variant such as `support`, `assistant`, `cloud`, or `classic`
+| Prop | Applies to | Notes |
+|---|---|---|
+| `mode` | all | `'light'` (default), `'dark'`, `'auto'` |
+| `sounds` | all | UI sounds, default `true` (Web Audio, no files; muted while the tab is hidden) |
+| `primaryColor` / `accentColor` / `backgroundColor` | all | accent, gradient end, surface |
+| `border`, `borderRadius` | widget | window border / radius (default 18px) |
+| `position`, `launcherType`, `launcherGifUrl`, `buttonText`, `width`, `height`, `defaultOpen`, `onOpenChange`, `zIndex` | widget | |
+| `logoUrl`, `logoText`, `companyName`, `companyDescription`, `headerText`, `avatarGifUrl`, `user`, `bot` | all | branding |
+| `placeholder`, `newChatButtonText`, `searchPlaceholder`, `sidebarTitle` | all / panel | copy |
+| `showExportButton`, `showVoiceInput`, `showFileUpload`, `showImageUpload`, `showFeedback` | all | features |
+| `initialSessionId` | all | open this session on mount |
+| `persistSession` | all | remember the last session per API URL + tenant + user in `localStorage` (default `true`) |
+| `data` / `manualData` | all | copy overrides (see above) |
+| `design` | — | deprecated, ignored (there is one design) |
 
 ## Platform compatibility
 
-- React and Next.js: supported for browser-rendered React components. In Next.js, use client-only components or `useEffect` to avoid server-side rendering issues.
-- Angular / AngularJS: the React UI components are not compatible directly. Use the backend API endpoints or the `sdk-web` plain JavaScript widget for those environments.
-- React Native: the React web UI components are not supported. Use the new `brainbox-react-native-sdk` package for native mobile UI and backend chat calls.
-- Plain HTML / Odoo / jQuery: use the `sdk-web` package and copy-paste widget example.
+- React 18+ and Next.js (Pages or App Router — components are marked `"use client"`).
+- Angular / plain HTML / Odoo / jQuery: use the `sdk-web` widget.
+- React Native: use `brainbox-react-native-sdk`.
 
-## React Native guidance
+## Streaming
 
-The current React SDK does not include native mobile UI components for React Native. If you want React Native support:
+`sdk.streamChat()` calls `POST /api/chat/stream` with `fetch` + `ReadableStream` and parses Server-Sent Events
+(`meta`, `token`, `done`, `error`; `: ping` heartbeats are ignored). Auth headers are the same as every other call
+(including token-getter functions). If the server answers **404/405** (no streaming endpoint yet) the SDK falls back
+to `POST /api/chat` and remembers that for the rest of the session — the UI works the same either way.
 
-- use `BrainboxReactNativeSDK` from `brainbox-react-native-sdk` for backend chat calls,
-- use `ChatScreen` from `brainbox-react-native-sdk` for a mobile-ready chat UI,
-- build your own React Native screen and message components if you need a custom experience,
-- call `sdk.chat(...)` or `sdk.streamChat(...)` from your native UI.
-
-This means React Native requires a separate deployment of your mobile app, not a browser-hosted web UI.
-
-## Real-time chat behavior
-
-The SDK supports HTTP streaming through `/api/chat/stream` when the backend exposes that endpoint. Streaming allows the UI to display response text gradually as the server generates it, which feels faster than waiting for the full reply.
-
-If streaming is not available, the SDK falls back to a normal chat request to `/api/chat` and still returns a full response.
-
-The current SDK does not use WebSocket for chat. It uses HTTP fetch/streaming, which is enough for fast, chunked responses in supported browsers and environments.
-
-Response speed depends mainly on your backend and model latency. The SDK will show user messages immediately and then render assistant text as soon as the backend returns it.
-
-## Real-time chat experience
-
-The React SDK supports a streaming-friendly chat method. If your backend exposes `/api/chat/stream`, the widget will render incoming content in chunks.
-If streaming is unavailable, the SDK falls back to a standard chat request and still delivers a full response.
+```ts
+const controller = new AbortController();
+await sdk.streamChat(
+  'How do I export invoices?',
+  sessionId,                                  // or undefined for a new session
+  (token) => render(token),                   // each text delta
+  (result) => done(result),                   // { response, session_id, message_id, search_results, cached }
+  (err) => showError(err.message),            // BrainboxApiError
+  { signal: controller.signal, onMeta: (m) => setSession(m.session_id) }
+);
+controller.abort();                            // "stop generating": no callbacks fire after abort
+```
 
 ## Using the SDK class directly
 
 ```tsx
 import { BrainboxReactSDK } from 'spres-react';
 
-const sdk = new BrainboxReactSDK(
-  'https://api.yourbackend.com',
-  'YOUR_API_KEY',
-  'tenant-1'
-);
+const sdk = new BrainboxReactSDK('https://api.yourbackend.com', 'YOUR_API_KEY');
 
-const ingestResult = await sdk.ingest('logs', 'Error content');
-const chatResponse = await sdk.chat('What happened?');
+const chatResponse = await sdk.chat('What happened?');            // non-streaming
 const session = await sdk.createChatSession('Support Session');
+await sdk.sendFeedback({ session_id: chatResponse.session_id!, message_id: chatResponse.message_id, rating: 'up' });
 ```
 
 ## React hook
 
-`useBrainboxChat` is useful when you want to build a custom chat UI while reusing Brainbox chat state.
+`useBrainboxChat(sdk, initialSessionId?, options?)` powers both components and is the easiest way to build your own UI.
 
 ```tsx
-import { useBrainboxChat, BrainboxReactSDK } from 'spres-react';
-
-const sdk = new BrainboxReactSDK('https://api.yourbackend.com', 'YOUR_API_KEY', 'tenant-1');
+import { useBrainboxChat } from 'spres-react';
 
 export function ChatApp() {
-  const { messages, loading, error, sendMessage } = useBrainboxChat(sdk);
-
+  const chat = useBrainboxChat(sdk, undefined, { open: true, onReply: (m) => console.log(m.text) });
   return (
     <div>
-      <button onClick={() => sendMessage('Hello')}>Send</button>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      <pre>{JSON.stringify(messages, null, 2)}</pre>
+      {chat.messages.map((m) => (
+        <p key={m.id}>
+          {m.role}: {m.text} {m.status === 'streaming' ? '▍' : ''}
+        </p>
+      ))}
+      <button onClick={() => chat.sendMessage('Hello')} disabled={chat.loading}>Send</button>
+      {chat.streaming && <button onClick={chat.stop}>Stop</button>}
+      {chat.error && <button onClick={chat.retry}>Retry</button>}
     </div>
   );
 }
 ```
+
+Returns `messages` (each with `status`, `messageId`, `sources`, `feedback`), `loading`, `streaming`, `error`,
+`sessionId`, `sessions` / `sessionsLoaded` / `sessionsLoading` (sessions are only fetched when you call
+`refreshSessions()`), `unreadCount` / `markRead` (replies received while `options.open === false`), and the actions
+`sendMessage`, `stop`, `retry`, `sendFeedback(localId, 'up' | 'down')`, `createSession(title?)` (with a title the session
+is created on the server immediately), `loadSession`, `refreshSessions`, `uploadFile`, `uploadImage`, `sendVoiceNote`,
+`exportChat`, `clearError`, `reset`. Sending is guarded — a second message can't be sent while one is in flight.
 
 ## API keys
 
@@ -265,7 +313,7 @@ const { sources, totals } = await sdk.listSources();
 
 ### `TrainingPanel` component
 
-A ready-made training page (upload files, connect an API with test + field mapping, paste text, and a searchable list of every training source with status, audience, chunk/record counts, sync and delete). Each tab has an "Audience · who can see this" picker (default *Internal staff*), and each row's audience pill is a dropdown that relabels the source in place. Use it with a **secret** key inside an internal admin app.
+A ready-made training page in the same design system (drag-and-drop upload with per-file progress and colored file-type tiles, connect an API with test + field mapping, paste text, and a searchable list of every training source with status, audience, chunk/record counts, sync and delete). Each tab has an "Audience · who can see this" picker (default *Internal staff*), and each row's audience pill is a dropdown that relabels the source in place. Use it with a **secret** key inside an internal admin app.
 
 ```tsx
 import { BrainboxReactSDK, TrainingPanel } from 'spres-react';
@@ -277,9 +325,12 @@ export function TrainPage() {
       title="Train your AI"           // optional
       companyName="Acme"              // optional
       logoUrl="/logo.png"             // optional
-      primaryColor="#111114"          // buttons (default black)
-      accentColor="#a882f7"           // highlights (default lilac)
-      backgroundColor="#f3f3f5"       // page background
+      primaryColor="#0071E3"          // buttons (default: design-system blue)
+      accentColor="#0071E3"           // highlights, progress bars, focus rings
+      backgroundColor="#F5F5F7"       // page background
+      mode="light"                    // 'light' | 'dark' | 'auto'
+      sounds                          // success / error tones (default true)
+      toasts                          // toasts for uploads, training results and errors (default true)
       variant="default"               // 'embedded' = no outer padding/background (for use inside another app)
       readOnly={false}                // true hides the add-data forms and per-source actions
     />
@@ -303,8 +354,9 @@ const { sources, totals, loading, error, refresh, trainFile, trainText,
 
 ### Preview
 
-The preview app (`preview/`, `npm run dev` there) has three pages: `#/` (chat demo), `#/train` (the `TrainingPanel`) and
-`#/staff` (the staff dashboard, below). Connection settings live in `preview/src/config.js`.
+The preview app (`preview/`, `npm run dev` there) has four pages: `#/` (floating `ChatWidget`), `#/panel` (full-page
+`ChatPanel`), `#/train` (the `TrainingPanel`) and `#/staff` (the staff dashboard, below). Add `?theme=dark` or
+`?theme=auto` to preview the color modes and `?launcher=button|gif` for the other launchers. Connection settings live in `preview/src/config.js`.
 
 ## Staff dashboard
 
@@ -412,8 +464,9 @@ git push origin
 
 ## Notes
 
-- The React UI is designed for frontend chat and spport experiences.
-- Chat history is managed in memory by default.
+- The React UI is designed for frontend chat and support experiences.
+- Conversations are stored by the backend; the components remember the last session id in `localStorage`
+  (disable with `persistSession={false}`) and fetch the session list only when history is opened.
 - Use `sdk.ingest()` separately for data ingestion or log collection.
 - Customize the widget styling without changing backend behavior.
 

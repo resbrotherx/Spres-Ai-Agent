@@ -9,7 +9,14 @@
  *   grace@northwind.test (owner of another company, not a platform admin)
  * Four companies are seeded for the Platform pages (Companies / All users / All API keys).
  * `?smtp=0` simulates a server without SMTP (invite links must be copied manually).
- * Console helpers: window.__bbMock.simulateGap(), window.__bbMock.db
+ * Console helpers: window.__bbMock.simulateGap(), window.__bbMock.simulateMessage(), window.__bbMock.db
+ *
+ * Real-time: GET /api/staff/events is served as an SSE stream (fetch → Response with a ReadableStream body,
+ * contract v1: hello / notification / gap / conversation / training / staff / keys / overview + `: ping`).
+ * A generator emits realistic activity: a new knowledge gap every ~20 s, conversation messages every ~6 s,
+ * training status transitions as tasks progress, and notifications.
+ *   ?live=0  → no generated activity (the stream still delivers changes you make)
+ *   ?sse=0   → /api/staff/events returns 404 so the dashboard falls back to polling
  */
 
 const DAY = 86400000;
@@ -265,6 +272,33 @@ function seed(now) {
       ]
     });
   });
+  // Older answered conversations spread over the last 30 days (business-hours weighted) for the activity heatmap.
+  for (let i = 0; i < 70; i++) {
+    const [q, a] = ANSWERED[i % ANSWERED.length];
+    const [user_name, user_role] = people[(i * 7 + 3) % people.length];
+    const day = 1 + Math.floor(rnd() * 29);
+    const d = new Date(now - day * DAY);
+    const weekend = d.getDay() === 0 || d.getDay() === 6;
+    if (weekend && rnd() < 0.6) continue;
+    const hour = Math.min(22, Math.max(6, Math.round(8 + rnd() * 6 + (rnd() < 0.3 ? rnd() * 6 : 0))));
+    d.setHours(hour, Math.floor(rnd() * 60), 0, 0);
+    const start = d.getTime();
+    conversations.push({
+      session_id: `sess_hist_${i}`,
+      title: q.replace(/\?$/, ''),
+      user_id: user_name ? `u_hist_${i}` : null,
+      user_name,
+      user_role,
+      created_at: iso(start),
+      last_message_at: iso(start + 30e3),
+      has_gap: false,
+      messages: [
+        { id: msgId++, role: 'user', content: q, created_at: iso(start) },
+        { id: msgId++, role: 'assistant', content: a, created_at: iso(start + 7e3), gap_reason: null, feedback: i % 5 === 0 ? 'up' : null },
+        { id: msgId++, role: 'user', content: 'Thanks!', created_at: iso(start + 30e3) }
+      ]
+    });
+  }
   conversations.sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at));
 
   // 60 days of activity (the workspace launched 60 days ago).
@@ -390,7 +424,7 @@ function seed(now) {
     invites: {},
     loginFails: {},
     resets: {},
-    seq: { staff: 100, gap: 100, notif: 100, key: 100, src: 100 }
+    seq: { staff: 100, gap: 100, notif: 100, key: 100, src: 100, msg: 5000 }
   };
 }
 
@@ -402,6 +436,63 @@ const RANK = { viewer: 0, trainer: 1, admin: 2, owner: 3 };
 
 function createApi() {
   const db = seed(Date.now());
+
+  /* ----- live events (SSE) ----- */
+  const subscribers = new Set();
+  const publish = (name, data, filter) => {
+    subscribers.forEach((sub) => {
+      const u = db.staff.find((x) => x.id === sub.userId);
+      if (!u || !u.is_active || u.tenant_id !== db.TENANT) return;
+      if (filter && !filter(u)) return;
+      sub.send(name, data);
+    });
+  };
+  const subscribe = (userId, send) => {
+    const sub = { userId, send };
+    subscribers.add(sub);
+    return () => subscribers.delete(sub);
+  };
+  const gapSnap = new Map(db.gaps.map((g) => [g.id, `${g.status}|${g.occurrences}`]));
+  const diffGaps = () => {
+    db.gaps.forEach((g) => {
+      const key = `${g.status}|${g.occurrences}`;
+      const prev = gapSnap.get(g.id);
+      if (prev === key) return;
+      gapSnap.set(g.id, key);
+      const action = !prev ? 'created' : g.status === 'resolved' && !prev.startsWith('resolved') ? 'resolved' : g.status === 'dismissed' && !prev.startsWith('dismissed') ? 'dismissed' : 'updated';
+      publish('gap', { action, gap: { ...g } });
+    });
+  };
+  const srcSnap = new Map(db.sources.map((x) => [x.source_id, x.status]));
+  const diffSources = () => {
+    db.sources.forEach((x) => {
+      if (srcSnap.get(x.source_id) === x.status) return;
+      srcSnap.set(x.source_id, x.status);
+      publish('training', { action: 'status', source: { ...x } });
+    });
+  };
+  let lastOverview = '';
+  const overviewNow = () => {
+    const today = db.daily[db.daily.length - 1];
+    return { questions_today: today.questions, unanswered_today: today.unanswered, open_gaps: db.gaps.filter((g) => g.status === 'open').length };
+  };
+  const publishOverview = (force) => {
+    const o = overviewNow();
+    const key = JSON.stringify(o);
+    if (!force && key === lastOverview) return;
+    lastOverview = key;
+    publish('overview', o);
+  };
+  const conversationMessage = (conv, role, content, extra = {}) => {
+    const m = { id: ++db.seq.msg, role, content, created_at: new Date().toISOString(), ...(role === 'assistant' ? { gap_reason: null, feedback: null } : {}), ...extra };
+    conv.messages.push(m);
+    conv.last_message_at = m.created_at;
+    if (m.gap_reason) conv.has_gap = true;
+    db.conversations = [conv, ...db.conversations.filter((c) => c !== conv)];
+    if (role === 'user') db.daily[db.daily.length - 1].questions++;
+    publish('conversation', { action: 'message', session_id: conv.session_id, title: conv.title, user_name: conv.user_name, user_role: conv.user_role, role, preview: content.slice(0, 140), created_at: m.created_at, message_id: m.id, gap_reason: m.gap_reason || null });
+    return m;
+  };
 
   const publicUser = (u) => {
     const { password, ...rest } = u;
@@ -516,7 +607,9 @@ function createApi() {
   };
 
   const notifyAll = (n) => {
-    db.notifications.unshift({ id: ++db.seq.notif, created_at: new Date().toISOString(), read_by: new Set(), ...n });
+    const rec = { id: ++db.seq.notif, created_at: new Date().toISOString(), read_by: new Set(), ...n };
+    db.notifications.unshift(rec);
+    publish('notification', { id: rec.id, type: rec.type, title: rec.title, body: rec.body, link: rec.link, created_at: rec.created_at, read: false }, (u) => u.notify_in_app);
   };
 
   /* ----- platform admin ----- */
@@ -1162,6 +1255,24 @@ function createApi() {
     }]
   ];
 
+  function afterMutation(method, path, out) {
+    if (method === 'GET') return;
+    const res = out && out.__status ? out.body : out;
+    diffGaps();
+    diffSources();
+    publishOverview();
+    if (/^\/api\/(staff|platform\/users)(\/|$)/.test(path) && !/login|password|forgot|reset|me(\/|$)/.test(path)) {
+      const user = res && (res.user || (res.email ? res : null));
+      const action = method === 'DELETE' ? 'deleted' : /invite$|^\/api\/platform\/users$/.test(path) ? 'created' : 'updated';
+      publish('staff', { action, user: user ? { ...user, password: undefined } : { id: path.split('/').pop() } }, (u) => RANK[u.role] >= RANK.admin);
+    }
+    if (/^\/api\/(keys|platform\/keys)(\/|$)/.test(path)) {
+      const action = method === 'DELETE' ? 'revoked' : /roll$/.test(path) ? 'rolled' : 'created';
+      const key = res && res.key ? res.key : { id: path.split('/').pop() };
+      publish('keys', { action, key }, (u) => RANK[u.role] >= RANK.admin);
+    }
+  }
+
   function handle(method, path, query, headers, body) {
     for (const [m, re, fn] of routes) {
       if (m !== method) continue;
@@ -1169,6 +1280,12 @@ function createApi() {
       if (match) {
         try {
           const out = fn({ headers, body: body || {}, query, m: match });
+          try {
+            afterMutation(method, path, out);
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('[staff-mock] publish failed', err);
+          }
           if (out && out.__status) return { status: out.__status, json: out.body };
           return { status: 200, json: out };
         } catch (err) {
@@ -1182,15 +1299,109 @@ function createApi() {
     return { status: 404, json: { detail: 'Not Found' } };
   }
 
-  function simulateGap(question = 'Do you offer budget billing for low-income households?') {
-    const g = { id: ++db.seq.gap, tenant_id: db.TENANT, question, reason: 'no_context', status: 'open', occurrences: 1, best_distance: null, answer_given: 'I’m sorry, I don’t have information about that yet.', session_id: db.conversations[0]?.session_id || null, user_id: 'u_live', user_name: 'Taylor Brooks', user_role: 'customer', resolution_note: null, resolved_by: null, resolved_at: null, source_id: null, last_feedback_comment: null, created_at: new Date().toISOString(), last_seen_at: new Date().toISOString() };
+  const LIVE_QUESTIONS = [
+    ['Do you offer budget billing for low-income households?', 'no_context'],
+    ['Can I pause my service while I’m travelling for two months?', 'no_context'],
+    ['What is the reconnection fee after a disconnection?', 'low_confidence'],
+    ['Is there a referral bonus if I invite a neighbour?', 'llm_unknown'],
+    ['How do I add solar panels to my account for net metering?', 'no_context'],
+    ['Can a tenant open an account without the landlord?', 'low_confidence'],
+    ['Why was I charged a meter access fee?', 'llm_unknown'],
+    ['Do you support Apple Pay for one-off payments?', 'no_context'],
+    ['What is the green energy surcharge exactly?', 'low_confidence'],
+    ['How do I dispute an estimated reading from last winter?', 'no_context']
+  ];
+  const LIVE_PEOPLE = [['Taylor Brooks', 'customer'], ['Jordan Reyes', 'customer'], ['Sam Patel', 'vendor'], ['Riley Chen', 'customer'], [null, 'public'], ['Morgan Lee', 'internal']];
+  const LIVE_CHAT = [
+    ['How do I update my phone number?', 'Go to Account → Profile, edit your phone number and press Save. We’ll text a code to confirm it.'],
+    ['When will my refund arrive?', 'Refunds are issued to the original payment method within 3–5 business days after approval.'],
+    ['Is there an outage in Riverside?', 'There’s no reported outage in Riverside right now. If your power is off, report it on the Outages page.'],
+    ['Can I get my bill by email only?', 'Yes — switch on Paperless billing under Billing → Preferences and we’ll stop posting paper bills.'],
+    ['What does the service charge cover?', 'The daily service charge covers meter maintenance, network upkeep and customer support.']
+  ];
+  let liveIdx = 0;
+
+  function simulateGap(question, reasonArg) {
+    const pick = LIVE_QUESTIONS[liveIdx % LIVE_QUESTIONS.length];
+    const [user_name, user_role] = LIVE_PEOPLE[liveIdx % LIVE_PEOPLE.length];
+    liveIdx++;
+    const q = question || pick[0];
+    const reason = reasonArg || (question ? 'no_context' : pick[1]);
+    const nowIso = new Date().toISOString();
+    const answer = reason === 'low_confidence' ? 'I think this may depend on your account type, but I’m not certain.' : 'I’m sorry, I don’t have information about that yet.';
+    const conv = {
+      session_id: rid('sess_live'), title: q.replace(/\?$/, '').slice(0, 60), user_id: user_name ? rid('u') : null, user_name: user_name || null, user_role,
+      created_at: nowIso, last_message_at: nowIso, has_gap: false, messages: []
+    };
+    db.conversations.unshift(conv);
+    conversationMessage(conv, 'user', q);
+    conversationMessage(conv, 'assistant', answer, { gap_reason: reason });
+    const g = { id: ++db.seq.gap, tenant_id: db.TENANT, question: q, reason, status: 'open', occurrences: 1, best_distance: reason === 'no_context' ? null : 0.62, answer_given: answer, session_id: conv.session_id, user_id: conv.user_id, user_name: conv.user_name, user_role, resolution_note: null, resolved_by: null, resolved_at: null, source_id: null, last_feedback_comment: null, created_at: nowIso, last_seen_at: nowIso };
     db.gaps.unshift(g);
-    notifyAll({ type: 'gap', title: 'New question the AI couldn’t answer', body: `“${question}” — Taylor Brooks`, link: `#/gaps/${g.id}` });
+    db.daily[db.daily.length - 1].unanswered++;
+    diffGaps();
+    if (db.settings.notify_on_gap) notifyAll({ type: 'gap', title: 'New question the AI couldn’t answer', body: `“${q}” — ${conv.user_name || 'Anonymous visitor'}`, link: `#/gaps/${g.id}` });
+    publishOverview();
     return g;
   }
 
-  return { db, handle, simulateGap };
+  function simulateMessage(sessionId) {
+    const pool = db.conversations.filter((c) => c.messages.length);
+    const conv = sessionId ? db.conversations.find((c) => c.session_id === sessionId) || null : pool.length && Math.random() < 0.55 ? pool[Math.floor(Math.random() * Math.min(6, pool.length))] : null;
+    const [q, a] = LIVE_CHAT[Math.floor(Math.random() * LIVE_CHAT.length)];
+    let target = conv;
+    if (!target) {
+      const [user_name, user_role] = LIVE_PEOPLE[Math.floor(Math.random() * LIVE_PEOPLE.length)];
+      const nowIso = new Date().toISOString();
+      target = { session_id: rid('sess_live'), title: q.replace(/\?$/, ''), user_id: user_name ? rid('u') : null, user_name, user_role, created_at: nowIso, last_message_at: nowIso, has_gap: false, messages: [] };
+      db.conversations.unshift(target);
+    }
+    conversationMessage(target, 'user', q);
+    setTimeout(() => {
+      conversationMessage(target, 'assistant', a);
+      publishOverview();
+    }, 1400);
+    return target;
+  }
+
+  let generator = null;
+  function startGenerator() {
+    if (generator) return;
+    const timers = [];
+    // Training ticks: move tasks along and publish transitions.
+    timers.push(setInterval(() => {
+      tickTasks();
+      diffSources();
+    }, 1000));
+    timers.push(setInterval(() => publishOverview(), 10000));
+    if (new URLSearchParams(window.location.search).get('live') !== '0') {
+      const gapLoop = () => {
+        timers.push(setTimeout(() => {
+          if (subscribers.size) simulateGap();
+          gapLoop();
+        }, 17000 + Math.random() * 6000));
+      };
+      const msgLoop = () => {
+        timers.push(setTimeout(() => {
+          if (subscribers.size) simulateMessage();
+          msgLoop();
+        }, 5000 + Math.random() * 3000));
+      };
+      gapLoop();
+      msgLoop();
+      // Every ~45 s a source re-syncs so the Training page shows live status changes.
+      timers.push(setInterval(() => {
+        if (!subscribers.size) return;
+        const s = db.sources.find((x) => x.status === 'completed' && x.kind === 'api');
+        if (s) newTask(s, s.documents_count || 50);
+      }, 45000));
+    }
+    generator = timers;
+  }
+
+  return { db, handle, simulateGap, simulateMessage, subscribe, startGenerator, overviewNow, authUser: (headers) => auth(headers) };
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Interceptors                                                        */
@@ -1255,11 +1466,70 @@ export function installStaffMock({ apiUrl, latency = [120, 380] } = {}) {
     new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined)).forEach((v, k) => {
       headers[k.toLowerCase()] = v;
     });
+    if (hit.path === '/api/staff/events' && method === 'GET') return sseResponse(hit, headers, init.signal || (typeof input !== 'string' ? input.signal : undefined));
     const body = await parseBody(init.body, headers['content-type']);
     await delay();
     const res = api.handle(method, hit.path, hit.query, headers, body);
     return new Response(JSON.stringify(res.json), { status: res.status, headers: { 'Content-Type': 'application/json' } });
   };
+
+  // Server-Sent Events: a streaming Response whose body is a ReadableStream.
+  const sseOff = new URLSearchParams(window.location.search).get('sse') === '0';
+  function sseResponse(hit, headers, signal) {
+    if (sseOff) return new Response(JSON.stringify({ detail: 'Not Found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    const hdrs = { ...headers };
+    if (!hdrs.authorization && hit.query.token) hdrs.authorization = `Bearer ${hit.query.token}`;
+    let user;
+    try {
+      user = api.authUser(hdrs);
+    } catch (err) {
+      return new Response(JSON.stringify({ detail: err.detail || 'Unauthorized' }), { status: err.status || 401, headers: { 'Content-Type': 'application/json' } });
+    }
+    api.startGenerator();
+    const enc = new TextEncoder();
+    let cleanup = () => undefined;
+    const stream = new ReadableStream({
+      start(controller) {
+        let closed = false;
+        const write = (text) => {
+          if (closed) return;
+          try {
+            controller.enqueue(enc.encode(text));
+          } catch {
+            /* stream gone */
+          }
+        };
+        const send = (name, data) => write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
+        const unsub = api.subscribe(user.id, send);
+        // Small connect delay like a real network, then hello + current counts.
+        setTimeout(() => {
+          send('hello', { user_id: user.id, tenant_id: user.tenant_id, server_time: new Date().toISOString() });
+          send('overview', api.overviewNow());
+        }, 60);
+        const ping = setInterval(() => write(': ping\n\n'), 15000);
+        cleanup = (abort) => {
+          if (closed) return;
+          closed = true;
+          clearInterval(ping);
+          unsub();
+          try {
+            if (abort) controller.error(new DOMException('The operation was aborted.', 'AbortError'));
+            else controller.close();
+          } catch {
+            /* ignore */
+          }
+        };
+        if (signal) {
+          if (signal.aborted) cleanup(true);
+          else signal.addEventListener('abort', () => cleanup(true), { once: true });
+        }
+      },
+      cancel() {
+        cleanup(false);
+      }
+    });
+    return new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
+  }
 
   // XMLHttpRequest (axios)
   const RealXHR = window.XMLHttpRequest;
@@ -1330,7 +1600,7 @@ export function installStaffMock({ apiUrl, latency = [120, 380] } = {}) {
   }
   window.XMLHttpRequest = MockableXHR;
 
-  const handle = { db: api.db, simulateGap: api.simulateGap, apiUrl: base.href };
+  const handle = { db: api.db, simulateGap: (q) => api.simulateGap(q), simulateMessage: (sessionId) => api.simulateMessage(sessionId), apiUrl: base.href };
   window.__bbMock = handle;
   // eslint-disable-next-line no-console
   console.info('[staff-mock] enabled for', `${base.origin}${basePath}/api/*`, '— sign in with owner@acme.test / password123');

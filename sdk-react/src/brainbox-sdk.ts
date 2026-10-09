@@ -15,7 +15,9 @@ import {
   TrainingAudience,
   TrainingSourcesResponse,
   TrainingTaskResponse,
-  UpdateTrainingSourcePayload
+  UpdateTrainingSourcePayload,
+  StreamChatOptions,
+  StreamMeta
 } from './types';
 
 /** Message shown when a publishable (browser) key hits a secret-only endpoint such as training. */
@@ -63,51 +65,60 @@ function formatDetail(detail: unknown): string | null {
   return String(detail);
 }
 
+/** Build a BrainboxApiError from an HTTP status + parsed body (`hasResponse=false` = network failure). */
+function errorFromResponse(status: number | undefined, data: any, hasResponse: boolean): BrainboxApiError {
+  const detail = data && typeof data === 'object' ? data.detail ?? data.error ?? data.message : undefined;
+  let message = formatDetail(detail);
+  const raw = (message || '').toLowerCase();
+  if (status === 401) {
+    return new BrainboxApiError(
+      'Invalid or missing API key (401). Check the key passed to BrainboxReactSDK — it may be revoked or expired.',
+      status,
+      detail,
+      'auth'
+    );
+  }
+  if (status === 403 && raw.includes('secret')) {
+    return new BrainboxApiError(SECRET_KEY_REQUIRED_MESSAGE, status, detail, 'scope');
+  }
+  if (status === 403 && raw.includes('tenant_id')) {
+    return new BrainboxApiError(
+      "The tenant ID doesn't match this API key's tenant (403). Use the tenant the key was created for, or omit it.",
+      status,
+      detail,
+      'tenant'
+    );
+  }
+  // FastAPI's generic 404 ("Not Found") means the route itself is missing.
+  if (status === 404 && (!message || message === 'Not Found')) message = null;
+  if (!message) {
+    if (!hasResponse) {
+      message = 'Network error: could not reach the Brainbox server.';
+    } else if (status === 404) {
+      message = 'Endpoint not found (404). The training API may not be available on this server yet.';
+    } else if (status === 403) {
+      message = 'Not allowed (403). Check your API key.';
+    } else {
+      message = `Request failed with status ${status}.`;
+    }
+  }
+  return new BrainboxApiError(message, status, detail);
+}
+
 /** Convert an axios (or other) error into a BrainboxApiError with a readable message. */
 export function toBrainboxError(error: unknown): BrainboxApiError {
   if (error instanceof BrainboxApiError) return error;
   if (axios.isAxiosError(error)) {
-    const status = error.response?.status;
-    const data: any = error.response?.data;
-    const detail = data && typeof data === 'object' ? data.detail ?? data.error ?? data.message : undefined;
-    let message = formatDetail(detail);
-    const raw = (message || '').toLowerCase();
-    if (status === 401) {
-      return new BrainboxApiError(
-        'Invalid or missing API key (401). Check the key passed to BrainboxReactSDK — it may be revoked or expired.',
-        status,
-        detail,
-        'auth'
-      );
-    }
-    if (status === 403 && raw.includes('secret')) {
-      return new BrainboxApiError(SECRET_KEY_REQUIRED_MESSAGE, status, detail, 'scope');
-    }
-    if (status === 403 && raw.includes('tenant_id')) {
-      return new BrainboxApiError(
-        "The tenant ID doesn't match this API key's tenant (403). Use the tenant the key was created for, or omit it.",
-        status,
-        detail,
-        'tenant'
-      );
-    }
-    // FastAPI's generic 404 ("Not Found") means the route itself is missing.
-    if (status === 404 && (!message || message === 'Not Found')) message = null;
-    if (!message) {
-      if (!error.response) {
-        message = 'Network error: could not reach the Brainbox server.';
-      } else if (status === 404) {
-        message = 'Endpoint not found (404). The training API may not be available on this server yet.';
-      } else if (status === 403) {
-        message = 'Not allowed (403). Check your API key.';
-      } else {
-        message = `Request failed with status ${status}.`;
-      }
-    }
-    return new BrainboxApiError(message, status, detail);
+    return errorFromResponse(error.response?.status, error.response?.data, !!error.response);
   }
   if (error instanceof Error) return new BrainboxApiError(error.message);
   return new BrainboxApiError('Unknown error');
+}
+
+/** True for an AbortController cancellation (fetch AbortError or axios CanceledError). */
+export function isAbortError(error: unknown): boolean {
+  const e = error as any;
+  return !!e && (e.name === 'AbortError' || e.name === 'CanceledError' || e.code === 'ERR_CANCELED');
 }
 
 /** A static key/token, or a function returning the current one (e.g. a staff JWT that can change after login). */
@@ -118,6 +129,8 @@ export class BrainboxReactSDK {
   private credential: BrainboxCredential;
   private tenantId?: string;
   private client: AxiosInstance;
+  /** Set after the server answers 404/405 on /api/chat/stream, so later messages skip the probe. */
+  private streamUnsupported = false;
 
   /**
    * @param apiKey   Publishable key (`pk_live_...`) for chat in browsers; secret key (`sk_live_...`)
@@ -150,6 +163,16 @@ export class BrainboxReactSDK {
     return (typeof c === 'function' ? c() : c) || '';
   }
 
+  /** Base URL of the Brainbox API (no trailing slash). */
+  getApiUrl(): string {
+    return this.apiUrl;
+  }
+
+  /** Tenant passed to the constructor, if any (otherwise the key's tenant is used server-side). */
+  getTenantId(): string | undefined {
+    return this.tenantId;
+  }
+
   /** `{ tenant_id }` when a tenant was configured, else `{}` (the key's tenant is used). */
   private tenant(): { tenant_id?: string } {
     return this.tenantId ? { tenant_id: this.tenantId } : {};
@@ -177,46 +200,154 @@ export class BrainboxReactSDK {
     return response.data;
   }
 
-  async chat(question: string, sessionId?: string): Promise<BrainboxChatResponse> {
+  /** Non-streaming chat (POST /api/chat). */
+  async chat(question: string, sessionId?: string, options: { signal?: AbortSignal } = {}): Promise<BrainboxChatResponse> {
     const payload: ChatPayload = {
       ...this.tenant(),
       question,
       session_id: sessionId
     };
 
-    const response = await this.client.post('/api/chat', payload);
+    const response = await this.client.post('/api/chat', payload, { signal: options.signal });
     return response.data;
   }
 
+  /**
+   * Streaming chat over Server-Sent Events (POST /api/chat/stream).
+   *
+   * Tokens are delivered to `onChunk` as they arrive; `onComplete` receives the final
+   * response (its `response` is the authoritative full text). When the server has no
+   * streaming endpoint (404/405) the SDK transparently falls back to POST /api/chat and
+   * delivers the whole answer as a single chunk.
+   *
+   * Pass `options.signal` to cancel: the request is aborted and neither `onComplete` nor
+   * `onError` is called.
+   */
   async streamChat(
     question: string,
     sessionId: string | undefined,
     onChunk: (chunk: string) => void,
-    onComplete?: (result: any) => void,
-    onError?: (error: Error) => void
+    onComplete?: (result: BrainboxChatResponse) => void,
+    onError?: (error: BrainboxApiError) => void,
+    options: StreamChatOptions = {}
   ): Promise<void> {
-    try {
-      const result = await this.chat(question, sessionId);
-      const fullText = result.response || JSON.stringify(result);
-      const words = fullText.split(" ");
-      let acc = "";
-      for (let i = 0; i < words.length; i++) {
-        acc += (i === 0 ? "" : " ") + words[i];
-        onChunk(i === 0 ? acc : " " + words[i]);
-        await new Promise(r => setTimeout(r, 18)); // typing speed
-      }
+    const { signal, onMeta } = options;
+    const fallback = async () => {
+      const result = await this.chat(question, sessionId, { signal });
+      if (signal?.aborted) return;
+      if (result?.session_id) onMeta?.({ session_id: result.session_id, user_message_id: result.user_message_id });
+      const text = typeof result?.response === 'string' ? result.response : '';
+      if (text) onChunk(text);
       onComplete?.(result);
-    } catch (error: any) {
-      onError?.(new Error(error?.message || 'Unknown stream error'));
+    };
+
+    try {
+      if (this.streamUnsupported || typeof fetch !== 'function') {
+        await fallback();
+        return;
+      }
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream'
+      };
+      const token = this.apiKey;
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const payload: ChatPayload = { ...this.tenant(), question, session_id: sessionId };
+
+      let res: Response;
+      try {
+        res = await fetch(`${this.apiUrl}/api/chat/stream`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal
+        });
+      } catch (err) {
+        if (isAbortError(err)) return;
+        throw errorFromResponse(undefined, null, false);
+      }
+
+      const readJson = async (): Promise<any> => {
+        try {
+          return await res.json();
+        } catch {
+          return null;
+        }
+      };
+
+      if (!res.ok) {
+        const data = await readJson();
+        const detail = data && typeof data === 'object' ? data.detail : undefined;
+        // Route missing (FastAPI "Not Found") or method not allowed → server predates streaming.
+        if (res.status === 405 || (res.status === 404 && (detail == null || detail === 'Not Found'))) {
+          this.streamUnsupported = true;
+          await fallback();
+          return;
+        }
+        throw errorFromResponse(res.status, data, true);
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('text/event-stream')) {
+        // A proxy (or an older server) answered with a plain JSON chat response.
+        const data = (await readJson()) as BrainboxChatResponse | null;
+        if (!data) throw new BrainboxApiError('Unexpected response from the chat server.', res.status);
+        if (data.session_id) onMeta?.({ session_id: data.session_id, user_message_id: data.user_message_id });
+        if (data.response) onChunk(data.response);
+        onComplete?.(data);
+        return;
+      }
+
+      let streamed = '';
+      let meta: StreamMeta | null = null;
+      let finished = false;
+      const handleEvent = (event: string, data: string) => {
+        if (finished) return;
+        let parsed: any = null;
+        try {
+          parsed = data ? JSON.parse(data) : null;
+        } catch {
+          parsed = null;
+        }
+        if (event === 'meta' && parsed) {
+          meta = parsed as StreamMeta;
+          onMeta?.(meta);
+        } else if (event === 'token') {
+          const t = parsed && typeof parsed.t === 'string' ? parsed.t : '';
+          if (t) {
+            streamed += t;
+            onChunk(t);
+          }
+        } else if (event === 'done') {
+          finished = true;
+          const result: BrainboxChatResponse = {
+            ...(parsed || {}),
+            response: parsed && typeof parsed.response === 'string' ? parsed.response : streamed,
+            session_id: parsed?.session_id ?? meta?.session_id
+          };
+          onComplete?.(result);
+        } else if (event === 'error') {
+          finished = true;
+          const detail = parsed?.detail || 'The assistant could not finish this answer.';
+          onError?.(new BrainboxApiError(String(detail), parsed?.status, parsed?.detail));
+        }
+      };
+
+      await readSse(res, handleEvent, signal);
+      if (signal?.aborted) return;
+      if (!finished) {
+        const m = meta as StreamMeta | null;
+        if (streamed) {
+          onComplete?.({ response: streamed, session_id: m?.session_id, user_message_id: m?.user_message_id });
+        } else {
+          throw new BrainboxApiError('The connection closed before the answer arrived. Please try again.');
+        }
+      }
+    } catch (error) {
+      if (isAbortError(error) || signal?.aborted) return;
+      onError?.(toBrainboxError(error));
     }
   }
-  //     onChunk(result.response || JSON.stringify(result));
-  //     onComplete?.(result);
-  //   } catch (error: any) {
-  //     const message = error?.message || 'Unknown stream error';
-  //     onError?.(new Error(message));
-  //   }
-  // }
 
   async createChatSession(title?: string): Promise<any> {
     const payload: ChatSessionPayload = {
@@ -418,5 +549,61 @@ export class BrainboxReactSDK {
     return this.request(() =>
       this.client.get<IngestStatus>(`/api/ingest/status/${encodeURIComponent(taskId)}`)
     );
+  }
+}
+
+/** Read a `text/event-stream` body and dispatch each `event:` / `data:` block. */
+async function readSse(
+  res: Response,
+  onEvent: (event: string, data: string) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  let buffer = '';
+  const flush = (final: boolean) => {
+    const parts = buffer.split(/\r?\n\r?\n/);
+    buffer = final ? '' : parts.pop() || '';
+    for (const block of parts) {
+      if (!block.trim()) continue;
+      let event = 'message';
+      const data: string[] = [];
+      for (const line of block.split(/\r?\n/)) {
+        if (!line || line.startsWith(':')) continue; // comments / heartbeats
+        const idx = line.indexOf(':');
+        const field = idx === -1 ? line : line.slice(0, idx);
+        let value = idx === -1 ? '' : line.slice(idx + 1);
+        if (value.startsWith(' ')) value = value.slice(1);
+        if (field === 'event') event = value;
+        else if (field === 'data') data.push(value);
+      }
+      onEvent(event, data.join('\n'));
+    }
+  };
+
+  const body = res.body;
+  if (!body || typeof body.getReader !== 'function') {
+    buffer = (await res.text()) + '\n\n';
+    flush(true);
+    return;
+  }
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  const onAbort = () => {
+    reader.cancel().catch(() => undefined);
+  };
+  signal?.addEventListener('abort', onAbort);
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      flush(false);
+      if (signal?.aborted) break;
+    }
+    if (!signal?.aborted) {
+      buffer += decoder.decode() + '\n\n';
+      flush(true);
+    }
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
   }
 }

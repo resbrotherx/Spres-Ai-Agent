@@ -20,68 +20,39 @@ export interface AuthProps {
 function AuthLayout({ brandName, logoUrl, children }: { brandName: string; logoUrl?: string; children: ReactNode }) {
   return (
     <div className="bb-staff-auth">
-      <section className="bb-staff-auth-brand" aria-hidden="false">
-        <div className="bb-staff-auth-logo">
-          <BrandMark logoUrl={logoUrl} size={40} />
-          <span>{brandName}</span>
-          <span className="bb-staff-pill" style={{ background: 'rgba(255,255,255,.12)', color: '#bae6fd', marginLeft: 4 }}>
-            Staff
-          </span>
+      <div className="bb-staff-auth-bg" aria-hidden="true">
+        <span className="is-a" />
+        <span className="is-b" />
+        <span className="is-c" />
+      </div>
+      <div className="bb-staff-auth-center">
+        <div className="bb-staff-auth-brandrow">
+          <BrandMark logoUrl={logoUrl} size={44} />
+          <span className="bb-staff-auth-brandname">{brandName}</span>
+          <span className="bb-staff-auth-tag">Staff console</span>
         </div>
-        <div className="bb-staff-auth-pitch">
-          <h2>
-            Every question answered. <em>Every gap closed.</em>
-          </h2>
-          <p>The control room for your AI assistant — see what customers and staff ask, catch what it couldn’t answer, and teach it in minutes.</p>
-          <ul className="bb-staff-auth-features">
-            <li>
-              <span>
-                <Icon name="gaps" size={17} />
-              </span>
-              <span>
-                <b>Knowledge-gap inbox</b>
-                Unanswered questions land here and alert your whole team by email and in-app.
-              </span>
-            </li>
-            <li>
-              <span>
-                <Icon name="training" size={17} />
-              </span>
-              <span>
-                <b>Answer once, train forever</b>
-                Reply to a gap and the AI learns it instantly — for the right audience.
-              </span>
-            </li>
-            <li>
-              <span>
-                <Icon name="shield" size={17} />
-              </span>
-              <span>
-                <b>Roles &amp; permissions</b>
-                Owners, admins, trainers and viewers — everyone sees exactly what they should.
-              </span>
-            </li>
-          </ul>
-        </div>
-        <div className="bb-staff-auth-card">
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontWeight: 600 }}>
-            <Icon name="lock" size={15} /> Secure staff access
-          </span>
-          <span>Sessions are signed tokens scoped to your organisation. Ask an admin for an invite if you don’t have an account.</span>
-        </div>
-      </section>
-      <section className="bb-staff-auth-form-side">{children}</section>
+        <div className="bb-staff-auth-card">{children}</div>
+        <ul className="bb-staff-auth-features" aria-label="What you can do here">
+          <li>
+            <Icon name="gaps" size={15} /> Knowledge-gap inbox
+          </li>
+          <li>
+            <Icon name="sparkles" size={15} /> Answer once, train instantly
+          </li>
+          <li>
+            <Icon name="shield" size={15} /> Role-based access
+          </li>
+        </ul>
+        <p className="bb-staff-auth-legal">
+          <Icon name="lock" size={12} /> Secure staff access · sessions are scoped to your organisation
+        </p>
+      </div>
     </div>
   );
 }
 
-function MobileLogo({ brandName, logoUrl }: { brandName: string; logoUrl?: string }) {
-  return (
-    <div className="bb-staff-auth-mobile-logo">
-      <BrandMark logoUrl={logoUrl} size={34} />
-      <span>{brandName}</span>
-    </div>
-  );
+function MobileLogo(_props: { brandName: string; logoUrl?: string }) {
+  return null;
 }
 
 function pwScore(pw: string): number {
@@ -143,8 +114,8 @@ export function LoginPage(props: AuthProps & { next?: string }) {
       {mode === 'sent' ? (
         <div className="bb-staff-auth-form">
           <MobileLogo brandName={brandName} logoUrl={logoUrl} />
-          <div className="bb-staff-empty-icon" style={{ width: 56, height: 56 }}>
-            <Icon name="mail" size={26} />
+          <div className="bb-staff-empty-icon" style={{ margin: '0 auto' }}>
+            <Icon name="mail" size={30} strokeWidth={1.5} />
           </div>
           <div>
             <h1>Check your inbox</h1>
@@ -196,8 +167,9 @@ export function LoginPage(props: AuthProps & { next?: string }) {
             {mode === 'login' ? 'Sign in' : 'Send reset link'}
           </Button>
           {mode === 'forgot' ? (
-            <button type="button" className="bb-staff-link-btn" style={{ alignSelf: 'center' }} onClick={() => { setError(null); setMode('login'); }}>
-              ← Back to sign in
+            <button type="button" className="bb-staff-link-btn" style={{ alignSelf: 'center', display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={() => { setError(null); setMode('login'); }}>
+              <Icon name="chevronLeft" size={14} />
+              Back to sign in
             </button>
           ) : (
             <p className="bb-staff-auth-foot">Don’t have an account? Ask an admin on your team to invite you.</p>

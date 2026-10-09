@@ -1,3 +1,4 @@
+import { useLiveRefresh } from '../live';
 import { useEffect, useId, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Icon } from '../icons';
@@ -33,7 +34,7 @@ const TABS: { key: TabKey; label: string; icon: StaffIconName }[] = [
 ];
 
 const DEFAULT_WIDGET: WidgetSettings = {
-  theme: { primary: '#b93fff', panel: '#fff8ff', ink: '#08080a' },
+  theme: { primary: '#0071E3', panel: '#FFFFFF', ink: '#1D1D1F' },
   branding: { botName: 'Brainbox AI', title: null, subtitle: 'Your AI assistant', logoUrl: null },
   launcher: { type: 'button', text: 'Chat' },
   welcomeMessages: ["Hi {{name}}! I'm {{botName}}. How can I help you today?"],
@@ -75,7 +76,7 @@ function ColorField({ label, value, onChange, disabled }: { label: string; value
   const id = useId();
   const valid = /^#[0-9a-f]{6}$/i.test(value);
   return (
-    <Field label={label} htmlFor={id} error={value && !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value) ? 'Use a hex color like #1d4ed8' : null}>
+    <Field label={label} htmlFor={id} error={value && !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value) ? 'Use a hex color like #0071E3' : null}>
       <div className="bb-staff-color">
         <input type="color" aria-label={`${label} picker`} value={valid ? value : '#000000'} onChange={(e) => onChange(e.target.value)} disabled={disabled} />
         <input id={id} className="bb-staff-input bb-staff-mono" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} maxLength={7} />
@@ -121,8 +122,9 @@ function ListEditor({ label, items, onChange, placeholder, disabled, hint, max =
 /* ------------------------------------------------------------------ */
 
 function KeysTab() {
-  const { client, toast, can } = useStaff();
+  const { client, toast, can, live } = useStaff();
   const { data, setData, error, loading, reload } = useAsync(() => (can('admin') ? client.listKeys() : Promise.resolve([] as ApiKeyInfo[])), [client]);
+  useLiveRefresh(live, () => void reload(true), ['keys']);
   const [creating, setCreating] = useState(false);
   const [confirm, setConfirm] = useState<{ id: string | number; action: 'roll' | 'revoke' } | null>(null);
   const [busy, setBusy] = useState<string | number | null>(null);
@@ -194,7 +196,7 @@ function KeysTab() {
                     const expired = k.expired ?? (!!k.expires_at && new Date(k.expires_at).getTime() < Date.now());
                     return (
                       <tr key={k.id}>
-                        <td className="is-primary" style={{ fontWeight: 600 }}>
+                        <td className="is-primary" style={{ fontWeight: 500 }}>
                           {k.name}
                         </td>
                         <td>
@@ -510,7 +512,7 @@ export function SupportChat() {
                   <tbody>
                     {odoo.map(([k, v, note]) => (
                       <tr key={k}>
-                        <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{k}</td>
+                        <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{k}</td>
                         <td style={{ minWidth: 0 }}>
                           <code className="bb-staff-mono" style={{ wordBreak: 'break-all' }}>
                             {v || '—'}

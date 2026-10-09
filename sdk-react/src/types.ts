@@ -2,40 +2,115 @@ import type { BrainboxReactSDK } from './brainbox-sdk';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
+/** Lifecycle of a message in the UI. */
+export type ChatMessageStatus = 'pending' | 'streaming' | 'done' | 'stopped' | 'error';
+
+/** A knowledge-base hit the answer was based on (`search_results` from the backend). */
+export interface ChatSource {
+  title?: string;
+  source?: string;
+  url?: string;
+  text?: string;
+  content?: string;
+  score?: number;
+  [key: string]: any;
+}
+
 export interface ChatMessage {
+  /** Local id (stable for React keys). */
   id: string;
   role: ChatRole;
   text: string;
+  /** ISO timestamp. */
   timestamp: string;
   userInitials?: string;
+  /** Server id of the stored message — used for 👍/👎 feedback. */
+  messageId?: string | number;
+  /** `streaming` while tokens arrive; `stopped` when the user pressed stop. */
+  status?: ChatMessageStatus;
+  /** Knowledge-base hits for an assistant answer. */
+  sources?: ChatSource[] | null;
+  /** The user's rating of an assistant answer. */
+  feedback?: 'up' | 'down';
   metadata?: {
     context_used?: boolean;
+    cached?: boolean;
     [key: string]: any;
   };
 }
 
+/** Light, dark, or follow the operating system. */
+export type BrainboxColorMode = 'light' | 'dark' | 'auto';
+
+export interface ChatQuickAction {
+  label: string;
+  /** Text sent when the chip is clicked (defaults to `label`). */
+  prompt?: string;
+  /** Icon name: 'sparkles' | 'help' | 'doc' | 'bulb' | 'chat' | 'book' | 'wrench' | 'search'. */
+  icon?: string;
+}
+
+export interface ChatPromptCard {
+  title: string;
+  description?: string;
+  prompt?: string;
+  icon?: string;
+}
+
+/** Copy/content overrides (`data` / `manualData`). Every field is optional. */
+export interface ChatUiData {
+  brand?: { name?: string; subtitle?: string; logoUrl?: string; workspaceName?: string; greetingName?: string };
+  bot?: { name?: string; avatarUrl?: string };
+  user?: { name?: string; email?: string; avatarUrl?: string };
+  /** Welcome title, e.g. "Hi {{name}}". `{{name}}` / `{{botName}}` are interpolated. */
+  greeting?: string;
+  /** Extra welcome lines shown as assistant bubbles before the first message. */
+  introMessages?: string[];
+  /** Widget welcome chips. */
+  quickActions?: (string | ChatQuickAction)[];
+  /** Full-page (ChatPanel) empty-state cards. */
+  promptCards?: ChatPromptCard[];
+  composer?: { placeholder?: string };
+  [key: string]: any;
+}
+
+export interface ChatPerson {
+  name?: string;
+  email?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  avatarUrl?: string;
+  [key: string]: any;
+}
+
 export interface CustomizationProps {
   // Colors
+  /** Accent color: user bubbles, send button, focus rings. Defaults to Apple blue (#0071E3). */
   primaryColor?: string;
+  /** Second brand color: used with `primaryColor` for the launcher/brand gradient. */
   accentColor?: string;
+  /** Window / page surface color. */
   backgroundColor?: string;
+  /** CSS border of the floating window. */
   border?: string;
+  /** Corner radius of the floating window (default 18px). */
   borderRadius?: string;
+  /** 'light' (default), 'dark', or 'auto' (follows prefers-color-scheme). */
+  mode?: BrainboxColorMode;
+  /** UI sounds (send / receive / error). Default true; users can mute from the header. */
+  sounds?: boolean;
 
   // Branding
   logoUrl?: string;
   logoText?: string;
-  data?: Record<string, any>;
-  manualData?: Record<string, any>;
-  user?: {
-    name?: string;
-    email?: string;
-    username?: string;
-    firstName?: string;
-    lastName?: string;
-    avatarUrl?: string;
-    [key: string]: any;
-  };
+  companyName?: string;
+  companyDescription?: string;
+  /** Avatar image (e.g. an animated GIF) for the assistant. Defaults to the Brainbox logo. */
+  avatarGifUrl?: string;
+  data?: ChatUiData;
+  manualData?: ChatUiData;
+  user?: ChatPerson;
   bot?: {
     name?: string;
     avatarUrl?: string;
@@ -48,44 +123,99 @@ export interface CustomizationProps {
   newChatButtonText?: string;
   searchPlaceholder?: string;
   sendButtonText?: string;
+  placeholder?: string;
 
   // Features
   showExportButton?: boolean;
   showVoiceInput?: boolean;
   showFileUpload?: boolean;
   showImageUpload?: boolean;
+  /** Show 👍/👎 under answers (default true). */
+  showFeedback?: boolean;
+  /** Session to open on mount. Otherwise the last session (remembered in localStorage) is restored. */
+  initialSessionId?: string;
+  /** Remember and restore the last session id in localStorage (default true). */
+  persistSession?: boolean;
+  /** @deprecated Kept for backwards compatibility; the design is unified. */
+  design?: string;
 }
+
+export type ChatWidgetPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'center';
 
 export interface ChatWidgetProps extends CustomizationProps {
   sdk: BrainboxReactSDK;
-  position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'center';
+  position?: ChatWidgetPosition;
+  /** 'icon' (default) = 56px gradient circle, 'button' = pill with `buttonText`, 'gif' = `launcherGifUrl` image. */
+  launcherType?: 'icon' | 'button' | 'gif';
+  launcherGifUrl?: string;
   buttonText?: string;
-  placeholder?: string;
+  /** Window width (default 380px). */
   width?: string;
+  /** Window height (default 600px). */
   height?: string;
-  design?: 'support' | 'assistant';
   defaultOpen?: boolean;
+  /** Called whenever the window opens or closes. */
+  onOpenChange?: (open: boolean) => void;
+  /** z-index of the floating layer (default 9999). */
+  zIndex?: number;
 }
 
 export interface ChatPanelProps extends CustomizationProps {
   sdk: BrainboxReactSDK;
-  initialSessionId?: string;
-  design?: 'cloud' | 'classic';
+  /** CSS height of the panel (default 100%; give the parent a height or pass e.g. "100vh"). */
+  height?: string;
+  /** Start with the sessions sidebar collapsed. */
+  defaultSidebarCollapsed?: boolean;
+  /** @deprecated ChatPanel is always full-page; these widget props are accepted and ignored. */
+  position?: string;
+  buttonText?: string;
+  width?: string;
+}
+
+export interface UseBrainboxChatOptions {
+  /** Remember the last session id in localStorage (default true). */
+  persistSession?: boolean;
+  /** Part of the storage key so different signed-in users don't share a session. */
+  userKey?: string;
+  /** Whether the chat UI is visible. While false, finished replies increase `unreadCount`. */
+  open?: boolean;
+  /** Called when an assistant reply finishes. */
+  onReply?: (message: ChatMessage) => void;
+  /** Called when sending fails. */
+  onError?: (message: string) => void;
 }
 
 export interface UseBrainboxChatHook {
   messages: ChatMessage[];
+  /** True while waiting for an answer (before and during streaming) or while a session loads. */
   loading: boolean;
+  /** True while tokens are arriving. */
+  streaming: boolean;
   error: string | null;
   sessionId: string | null;
+  /** Sessions (newest first). Empty until `refreshSessions()` has been called once. */
   sessions?: ChatSession[];
+  sessionsLoaded: boolean;
+  sessionsLoading: boolean;
+  /** Replies received while `options.open` was false. */
+  unreadCount: number;
+  markRead: () => void;
   sendMessage: (text: string) => Promise<void>;
+  /** Abort the answer that is streaming (the partial text is kept). */
+  stop: () => void;
+  /** Re-ask the last question after an error. */
+  retry: () => Promise<void>;
+  /** Rate an assistant answer (👍/👎) by its local message id. */
+  sendFeedback: (localMessageId: string, rating: 'up' | 'down') => Promise<void>;
   sendVoiceNote: (note: Blob) => Promise<void>;
   uploadFile: (file: File) => Promise<void>;
   uploadImage: (image: File) => Promise<void>;
-  createSession: (title?: string) => Promise<void>;
+  /** Start a new conversation. With a `title` the session is created on the server right away. */
+  createSession: (title?: string) => Promise<string | null>;
   loadSession: (sessionId: string) => Promise<void>;
+  refreshSessions: () => Promise<void>;
   exportChat: (format: 'json' | 'pdf') => Promise<void>;
+  clearError: () => void;
   reset: () => void;
 }
 
@@ -96,6 +226,23 @@ export interface BrainboxChatResponse {
   message_id?: string | number;
   /** Id of the stored user message. */
   user_message_id?: string | number;
+  reasoning?: string;
+  search_results?: ChatSource[] | null;
+  cached?: boolean;
+  [key: string]: any;
+}
+
+/** First SSE event of /api/chat/stream. */
+export interface StreamMeta {
+  session_id?: string;
+  user_message_id?: string | number;
+}
+
+export interface StreamChatOptions {
+  /** Abort the request (stop generating). */
+  signal?: AbortSignal;
+  /** Called once the server has stored the question (carries the session id). */
+  onMeta?: (meta: StreamMeta) => void;
 }
 
 /** POST /api/chat/feedback. A 'down' rating reports a knowledge gap to staff. */
@@ -111,6 +258,7 @@ export interface ChatSession {
   session_id: string;
   title: string;
   created_at: string;
+  updated_at?: string;
 }
 
 /** `tenant_id` is optional: the backend takes the tenant from the API key (and rejects a mismatch). */
@@ -270,6 +418,12 @@ export interface TrainingPanelProps {
   variant?: 'default' | 'embedded';
   /** Hide the "add training data" forms and the per-source actions (sync, delete, audience). */
   readOnly?: boolean;
+  /** 'light' (default), 'dark' or 'auto'. */
+  mode?: BrainboxColorMode;
+  /** Success / error sounds (default true). */
+  sounds?: boolean;
+  /** Show toasts for uploads, training results and errors (default true). */
+  toasts?: boolean;
 }
 
 export interface UseBrainboxTrainingHook {

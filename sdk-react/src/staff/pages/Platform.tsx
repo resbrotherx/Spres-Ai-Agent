@@ -1,3 +1,4 @@
+import { useLiveRefresh } from '../live';
 /* Platform admin pages: Companies (tenants), Company detail, All users, All API keys. */
 import { useId, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -524,7 +525,7 @@ function KeysTable({ keys, showCompany, onChange }: { keys: PlatformApiKey[]; sh
                     </a>
                   </td>
                 ) : null}
-                <td className={showCompany ? undefined : 'is-primary'} style={{ fontWeight: 600 }}>
+                <td className={showCompany ? undefined : 'is-primary'} style={{ fontWeight: 500 }}>
                   <span className="bb-staff-cell-label">Name</span>
                   {k.name}
                 </td>
@@ -858,9 +859,13 @@ function NewCompanyModal({ onClose, onCreated }: { onClose: () => void; onCreate
 }
 
 export function CompaniesPage() {
-  const { client, query, href, navigate } = useStaff();
+  const { client, query, href, navigate, live } = useStaff();
   const list = useAsync(() => client.listTenants(), [client]);
   const ov = useAsync(() => client.platformOverview(), [client]);
+  useLiveRefresh(live, () => {
+    void list.reload(true);
+    void ov.reload(true);
+  });
   const [creating, setCreating] = useState(false);
   const q = (query.q || '').trim().toLowerCase();
   const rows = useMemo(
@@ -951,7 +956,7 @@ export function CompaniesPage() {
                         </td>
                         <td className="is-num">
                           <span className="bb-staff-cell-label">Open gaps</span>
-                          {t.open_gaps ? <b style={{ color: '#c2410c' }}>{fmtNum(t.open_gaps)}</b> : <span className="bb-staff-muted">0</span>}
+                          {t.open_gaps ? <b style={{ color: 'var(--bbs-warning-text)', fontWeight: 500 }}>{fmtNum(t.open_gaps)}</b> : <span className="bb-staff-muted">0</span>}
                         </td>
                         <td className="bb-staff-muted" title={fmtDateTime(t.last_activity_at)}>
                           <span className="bb-staff-cell-label">Last activity</span>
@@ -993,9 +998,10 @@ export function CompaniesPage() {
 type DetailTab = 'staff' | 'keys' | 'usage';
 
 export function CompanyDetailPage({ tenantId, tab: tabParam }: { tenantId: string; tab?: string }) {
-  const { client, href, toast } = useStaff();
+  const { client, href, toast, live } = useStaff();
   const { data, setData, error, loading, reload } = useAsync(() => client.getTenant(tenantId), [client, tenantId]);
   const tab: DetailTab = tabParam === 'keys' || tabParam === 'usage' ? tabParam : 'staff';
+  useLiveRefresh(live, () => void reload(true), ['staff', 'keys']);
   const [adding, setAdding] = useState(false);
   const [creatingKey, setCreatingKey] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -1054,7 +1060,7 @@ export function CompanyDetailPage({ tenantId, tab: tabParam }: { tenantId: strin
               </form>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h2 className="bb-staff-truncate" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-.02em' }} title={data.display_name}>
+                <h2 className="bb-staff-truncate" style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-.01em' }} title={data.display_name}>
                   {data.display_name === data.tenant_id ? shortId(data.tenant_id, 36) : data.display_name}
                 </h2>
                 <IconButton icon="sliders" label="Rename company" size="sm" onClick={() => setRenaming(data.display_name === data.tenant_id ? '' : data.display_name)} />
@@ -1166,7 +1172,7 @@ export function CompanyDetailPage({ tenantId, tab: tabParam }: { tenantId: strin
 /* ------------------------------------------------------------------ */
 
 export function AllUsersPage() {
-  const { client, query, navigate, href } = useStaff();
+  const { client, query, navigate, href, live } = useStaff();
   const q = useDebounced(query.q || '', 300);
   const tenant = query.company || '';
   const role = (query.role || '') as StaffRole | '';
@@ -1177,6 +1183,7 @@ export function AllUsersPage() {
     () => client.listPlatformUsers({ q, tenant_id: tenant, role, status, ...(paOnly ? { platform_admin: true } : {}) }),
     [client, q, tenant, role, status, paOnly]
   );
+  useLiveRefresh(live, () => void reload(true), ['staff']);
   const [adding, setAdding] = useState(false);
   const setQ = (patch: Record<string, string | undefined>) => navigate('/platform/users', { ...query, ...patch }, { replace: true });
 
@@ -1254,12 +1261,13 @@ export function AllUsersPage() {
 /* ------------------------------------------------------------------ */
 
 export function AllKeysPage() {
-  const { client, query, navigate } = useStaff();
+  const { client, query, navigate, live } = useStaff();
   const tenant = query.company || '';
   const type = (query.type || '') as ApiKeyType | '';
   const state = query.state || 'active';
   const tenants = useAsync(() => client.listTenants(), [client]);
   const { data, setData, error, loading, reload } = useAsync(() => client.listPlatformKeys(tenant || undefined), [client, tenant]);
+  useLiveRefresh(live, () => void reload(true), ['keys']);
   const [creating, setCreating] = useState(false);
   const setQ = (patch: Record<string, string | undefined>) => navigate('/platform/keys', { ...query, ...patch }, { replace: true });
   const q = (query.q || '').trim().toLowerCase();

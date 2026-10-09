@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Icon } from '../icons';
+import { useLiveEvent, useLiveRefresh } from '../live';
+import { Transcript } from './Conversations';
 import type { TrainingAudience } from '../../types';
 import type { AnswerGapResponse, GapReason, GapStatus, KnowledgeGap } from '../types';
 import { GAP_REASONS } from '../types';
@@ -12,15 +14,17 @@ import {
   EmptyState,
   ErrorState,
   Field,
+  LiveDot,
   Pager,
   ReasonChip,
   RolePill,
   Skeleton,
+  Segmented,
   SkeletonRows,
   StatusPill,
   useStaff
 } from '../ui';
-import { errMsg, fmtDateTime, fmtNum, REASON_COLORS, REASON_HELP, REASON_LABELS, relTime, useAsync, useDebounced } from '../util';
+import { errMsg, fmtDateTime, fmtNum, REASON_HELP, REASON_LABELS, relTime, useAsync, useDebounced } from '../util';
 
 const PAGE_SIZE = 20;
 const TABS: { key: GapStatus; label: string }[] = [
@@ -48,10 +52,22 @@ function defaultAudience(role?: string | null): TrainingAudience {
 /* Training task status (polls /api/ingest/status)                     */
 /* ------------------------------------------------------------------ */
 
-function TaskStatus({ taskId, sourceName }: { taskId: string; sourceName?: string }) {
-  const { client, href } = useStaff();
+function TaskStatus({ taskId, sourceId, sourceName }: { taskId: string; sourceId?: string; sourceName?: string }) {
+  const { client, href, live, liveStatus, toast } = useStaff();
   const [status, setStatus] = useState<string>('queued');
   const [error, setError] = useState<string | null>(null);
+  const announced = useRef(false);
+  const s = String(status).toLowerCase();
+  const done = s === 'completed' || s === 'success';
+  const failed = s === 'failed' || s === 'error';
+
+  useLiveEvent(live, 'training', (e) => {
+    if (!sourceId || e.source.source_id !== sourceId) return;
+    setStatus(e.source.status);
+    if (e.source.error_message) setError(e.source.error_message);
+  });
+
+  // Poll /api/ingest/status unless the live stream is delivering training events.
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
@@ -61,7 +77,7 @@ function TaskStatus({ taskId, sourceName }: { taskId: string; sourceName?: strin
         if (!alive) return;
         setStatus(res.status);
         if (res.error_message) setError(res.error_message);
-        if (!['completed', 'failed', 'success', 'error'].includes(String(res.status).toLowerCase())) timer = setTimeout(tick, 2000);
+        if (!['completed', 'failed', 'success', 'error'].includes(String(res.status).toLowerCase())) timer = setTimeout(tick, liveStatus === 'live' ? 8000 : 2000);
       } catch (err) {
         if (alive) setError(errMsg(err));
       }
@@ -71,22 +87,42 @@ function TaskStatus({ taskId, sourceName }: { taskId: string; sourceName?: strin
       alive = false;
       clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, taskId]);
-  const s = String(status).toLowerCase();
-  const done = s === 'completed' || s === 'success';
-  const failed = s === 'failed' || s === 'error';
+
+  useEffect(() => {
+    if (announced.current || (!done && !failed)) return;
+    announced.current = true;
+    if (done) toast('Assistant trained', 'success', { body: sourceName ? `“${sourceName}” is now part of its knowledge.` : 'It will use this answer from now on.' });
+    else toast('Training failed', 'error', { body: error || 'Open Training to retry.' });
+  }, [done, failed]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const steps = ['queued', 'processing', 'completed'];
+  const at = done ? 2 : failed ? -1 : s === 'processing' ? 1 : 0;
   return (
-    <Alert tone={failed ? 'error' : done ? 'success' : 'info'}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <strong>{done ? 'Trained — the assistant now knows this.' : failed ? 'Training failed' : 'Training the assistant…'}</strong>
-        <StatusPill status={done ? 'completed' : failed ? 'failed' : s === 'processing' ? 'processing' : 'queued'} label={done ? 'completed' : s} />
+    <div className={`bb-staff-task${done ? ' is-done' : failed ? ' is-failed' : ''}`} role="status" aria-live="polite">
+      <div className="bb-staff-task-head">
+        <span className="bb-staff-task-icon">
+          <Icon name={done ? 'check' : failed ? 'alert' : 'loader'} size={16} strokeWidth={done ? 2.5 : 1.75} />
+        </span>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <strong>{done ? 'Trained — the assistant now knows this' : failed ? 'Training failed' : 'Training the assistant…'}</strong>
+          <div className="bb-staff-task-sub">
+            {sourceName ? <>“{sourceName}” · </> : null}
+            <a href={href('/training')}>View in Training</a>
+          </div>
+        </div>
+        <StatusPill status={done ? 'completed' : failed ? 'failed' : s === 'processing' ? 'processing' : 'queued'} label={done ? 'Completed' : failed ? 'Failed' : s === 'processing' ? 'Processing' : 'Queued'} />
       </div>
-      <div style={{ marginTop: 4, fontSize: 12.5 }}>
-        {sourceName ? <>Source “{sourceName}” · </> : null}
-        Task <span className="bb-staff-mono">{taskId}</span> · <a href={href('/training')}>View in Training</a>
-      </div>
-      {error && failed ? <div style={{ marginTop: 4 }}>{error}</div> : null}
-    </Alert>
+      {!failed ? (
+        <div className="bb-staff-task-steps" aria-hidden="true">
+          {steps.map((st, i) => (
+            <span key={st} className={i < at ? 'is-done' : i === at ? (done ? 'is-done' : 'is-active') : ''} />
+          ))}
+        </div>
+      ) : null}
+      {error && failed ? <div className="bb-staff-task-error">{error}</div> : null}
+    </div>
   );
 }
 
@@ -95,7 +131,7 @@ function TaskStatus({ taskId, sourceName }: { taskId: string; sourceName?: strin
 /* ------------------------------------------------------------------ */
 
 function GapDrawer({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: (g: KnowledgeGap) => void }) {
-  const { client, can, toast, href, query, refreshCounts, user } = useStaff();
+  const { client, can, toast, href, query, refreshCounts, user, live } = useStaff();
   const uid = useId();
   const { data: gap, setData: setGap, error, loading, reload } = useAsync(() => client.getGap(id), [client, id]);
   const [answer, setAnswer] = useState('');
@@ -122,6 +158,15 @@ function GapDrawer({ id, onClose, onChanged }: { id: string; onClose: () => void
     refreshCounts();
   };
 
+  useLiveEvent(live, 'gap', (e) => {
+    if (String(e.gap.id) === String(id)) setGap(e.gap);
+  });
+
+  const conv = useAsync(() => (gap?.session_id ? client.getConversation(gap.session_id).catch(() => null) : Promise.resolve(null)), [client, gap?.session_id]);
+  useLiveEvent(live, 'conversation', (e) => {
+    if (gap?.session_id && e.session_id === gap.session_id) void conv.reload(true);
+  });
+
   const submitAnswer = async (e: FormEvent) => {
     e.preventDefault();
     if (!gap || !answer.trim()) return;
@@ -132,9 +177,9 @@ function GapDrawer({ id, onClose, onChanged }: { id: string; onClose: () => void
       apply(res.gap);
       setAnswer('');
       const n = res.resolved_similar || 0;
-      toast(n ? `Answer saved — training now. ${n} similar question${n === 1 ? '' : 's'} also resolved.` : 'Answer saved — training the assistant now.');
+      toast('Answer saved', 'success', { body: n ? `Training now · ${n} similar question${n === 1 ? '' : 's'} also resolved.` : 'Training the assistant now.' });
     } catch (err) {
-      toast(errMsg(err), 'error');
+      toast('Couldn’t save the answer', 'error', { body: errMsg(err) });
     } finally {
       setBusy(null);
     }
@@ -142,15 +187,19 @@ function GapDrawer({ id, onClose, onChanged }: { id: string; onClose: () => void
 
   const setStatus = async (status: GapStatus, resolution_note?: string) => {
     if (!gap) return;
+    const before = gap;
+    // Optimistic: reflect the change immediately, roll back if the server refuses.
+    apply({ ...gap, status, resolution_note: resolution_note || gap.resolution_note, resolved_by: status === 'open' ? null : user.full_name || user.email, resolved_at: status === 'open' ? null : new Date().toISOString() });
+    setDismissing(false);
     setBusy(status === 'open' ? 'reopen' : 'dismiss');
     try {
       const g = await client.updateGap(gap.id, { status, ...(resolution_note ? { resolution_note } : {}) });
       apply(g);
-      setDismissing(false);
       setNote('');
-      toast(status === 'open' ? 'Gap reopened.' : 'Gap dismissed.');
+      toast(status === 'open' ? 'Gap reopened' : 'Gap dismissed', 'success', status === 'open' ? undefined : { action: { label: 'Undo', onClick: () => void client.updateGap(g.id, { status: 'open' }).then(apply).catch(() => undefined) } });
     } catch (err) {
-      toast(errMsg(err), 'error');
+      apply(before);
+      toast('Couldn’t update the gap', 'error', { body: errMsg(err) });
     } finally {
       setBusy(null);
     }
@@ -165,7 +214,7 @@ function GapDrawer({ id, onClose, onChanged }: { id: string; onClose: () => void
           Gap #{gap.id}
         </span>
       </div>
-      <h3 style={{ fontSize: 18, fontWeight: 650, letterSpacing: '-.015em', lineHeight: 1.35 }}>{gap.question}</h3>
+      <h3 className="bb-staff-drawer-q">{gap.question}</h3>
     </div>
   ) : (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -246,27 +295,41 @@ function GapDrawer({ id, onClose, onChanged }: { id: string; onClose: () => void
             </div>
           </dl>
 
-          <div>
-            <div className="bb-staff-section-label">
-              <Icon name="brain" size={14} /> What the assistant said
+          {conv.data && conv.data.messages.length ? (
+            <div>
+              <div className="bb-staff-section-label">
+                <Icon name="chat" size={14} /> Conversation context <LiveDot />
+              </div>
+              <div className="bb-staff-context">
+                <Transcript detail={conv.data} highlight={gap.question} limit={8} compact />
+              </div>
             </div>
-            {gap.answer_given ? (
+          ) : null}
+          <div>
+            {conv.data && conv.data.messages.length ? null : (
+              <>
+                <div className="bb-staff-section-label">
+                  <Icon name="brain" size={14} /> What the assistant said
+                </div>
+                {gap.answer_given ? (
               <div className="bb-staff-quote is-bot">{gap.answer_given}</div>
             ) : (
               <div className="bb-staff-quote bb-staff-muted">No answer was recorded.</div>
+                )}
+              </>
             )}
             {gap.last_feedback_comment ? (
               <div style={{ marginTop: 12 }}>
                 <div className="bb-staff-section-label">
                   <Icon name="thumbsDown" size={14} /> User feedback
                 </div>
-                <div className="bb-staff-quote" style={{ borderLeft: '3px solid #dc2626' }}>
+                <div className="bb-staff-quote is-danger">
                   {gap.last_feedback_comment}
                 </div>
               </div>
             ) : null}
             {gap.session_id ? (
-              <a href={href(`/conversations/${encodeURIComponent(gap.session_id)}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, fontWeight: 600, fontSize: 13 }}>
+              <a href={href(`/conversations/${encodeURIComponent(gap.session_id)}`)} className="bb-staff-inline-link">
                 <Icon name="chat" size={15} /> Open the full conversation
               </a>
             ) : null}
@@ -294,10 +357,10 @@ function GapDrawer({ id, onClose, onChanged }: { id: string; onClose: () => void
             </Alert>
           ) : null}
 
-          {result ? <TaskStatus taskId={result.task_id} sourceName={result.source?.name} /> : null}
+          {result ? <TaskStatus taskId={result.task_id} sourceId={result.source?.source_id} sourceName={result.source?.name} /> : null}
 
           {gap.status === 'open' && canTrain && dismissing ? (
-            <div className="bb-staff-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, boxShadow: 'none' }}>
+            <div className="bb-staff-card bb-staff-subcard">
               <Field label="Why dismiss this question? (optional)" htmlFor={`${uid}-note`} hint="E.g. spam, out of scope, already covered elsewhere.">
                 <textarea id={`${uid}-note`} className="bb-staff-input" style={{ minHeight: 80 }} value={note} onChange={(e) => setNote(e.target.value)} data-autofocus autoFocus />
               </Field>
@@ -313,9 +376,9 @@ function GapDrawer({ id, onClose, onChanged }: { id: string; onClose: () => void
           ) : null}
 
           {gap.status === 'open' && canTrain && !dismissing ? (
-            <form onSubmit={submitAnswer} className="bb-staff-card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14, borderColor: '#bfdbfe', background: 'linear-gradient(180deg,#f8fbff,#fff)', boxShadow: 'none' }}>
+            <form onSubmit={submitAnswer} className="bb-staff-card bb-staff-subcard is-answer">
               <div>
-                <h4 style={{ fontSize: 15, fontWeight: 650, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h4 className="bb-staff-subcard-title">
                   <Icon name="sparkles" size={17} /> Answer &amp; train
                 </h4>
                 <p className="bb-staff-hint" style={{ marginTop: 3 }}>
@@ -374,7 +437,7 @@ function GapDrawer({ id, onClose, onChanged }: { id: string; onClose: () => void
 /* ------------------------------------------------------------------ */
 
 export function GapsPage({ gapId }: { gapId?: string }) {
-  const { client, query, navigate, href } = useStaff();
+  const { client, query, navigate, href, live } = useStaff();
   const status = (['open', 'resolved', 'dismissed'].includes(query.status) ? query.status : 'open') as GapStatus;
   const reason = (GAP_REASONS as string[]).includes(query.reason) ? (query.reason as GapReason) : '';
   const page = Math.max(1, Number(query.page) || 1);
@@ -383,6 +446,46 @@ export function GapsPage({ gapId }: { gapId?: string }) {
     () => client.listGaps({ status, reason, q, page, page_size: PAGE_SIZE }),
     [client, status, reason, q, page]
   );
+  const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  const known = useRef<Set<string>>(new Set());
+
+  // Highlight rows that appear after the first load (live inserts and polling refreshes alike).
+  useEffect(() => {
+    if (!data) return;
+    const ids = data.items.map((g) => String(g.id));
+    const added = known.current.size ? ids.filter((id) => !known.current.has(id)) : [];
+    ids.forEach((id) => known.current.add(id));
+    if (added.length) {
+      setFresh((f) => new Set([...Array.from(f), ...added]));
+      setTimeout(() => setFresh((f) => new Set(Array.from(f).filter((x) => !added.includes(x)))), 2600);
+    }
+  }, [data]);
+  useEffect(() => {
+    known.current = new Set();
+  }, [status, reason, q, page]);
+
+  useLiveRefresh(live, () => void reload(true));
+
+  useLiveEvent(live, 'gap', (e) => {
+    const g = e.gap;
+    setData((d) => {
+      if (!d) return d;
+      const counts = { ...d.counts };
+      const existing = d.items.find((x) => String(x.id) === String(g.id));
+      if (existing && existing.status !== g.status) {
+        counts[existing.status] = Math.max(0, counts[existing.status] - 1);
+        counts[g.status] = (counts[g.status] || 0) + 1;
+      } else if (!existing && e.action === 'created') {
+        counts[g.status] = (counts[g.status] || 0) + 1;
+      }
+      const matches = g.status === status && (!reason || g.reason === reason) && (!q || g.question.toLowerCase().includes(q.toLowerCase()));
+      let items = d.items;
+      if (existing) items = matches ? items.map((x) => (String(x.id) === String(g.id) ? g : x)) : items.filter((x) => String(x.id) !== String(g.id));
+      else if (matches && page === 1 && e.action === 'created') items = [g, ...items].slice(0, PAGE_SIZE);
+      const total = d.total + (items.length - d.items.length);
+      return { ...d, items, counts, total };
+    });
+  });
 
   const setQuery = (patch: Record<string, string | number | undefined>, replace = false) => {
     const base = gapId ? `/gaps/${gapId}` : '/gaps';
@@ -392,33 +495,41 @@ export function GapsPage({ gapId }: { gapId?: string }) {
   delete listQuery.answer;
 
   const onChanged = (g: KnowledgeGap) => {
-    setData((d) => (d ? { ...d, items: d.items.map((x) => (x.id === g.id ? g : x)) } : d));
-    void reload(true);
+    setData((d) => {
+      if (!d) return d;
+      const existing = d.items.find((x) => x.id === g.id);
+      const counts = { ...d.counts };
+      if (existing && existing.status !== g.status) {
+        counts[existing.status] = Math.max(0, counts[existing.status] - 1);
+        counts[g.status] = (counts[g.status] || 0) + 1;
+      }
+      return { ...d, counts, items: d.items.map((x) => (x.id === g.id ? g : x)) };
+    });
   };
 
   const counts = data?.counts;
 
   return (
     <div className="bb-staff-stack">
-      <div className="bb-staff-page-head" style={{ marginBottom: 0 }}>
+      <div className="bb-staff-page-head">
         <div>
-          <h2>Knowledge gaps</h2>
+          <h2>
+            Knowledge gaps <LiveDot />
+          </h2>
           <p>Questions your assistant couldn’t answer. Answer them once and the AI learns.</p>
         </div>
       </div>
 
       <section className="bb-staff-card">
-        <div className="bb-staff-tabs" role="tablist" aria-label="Gap status" style={{ padding: '0 12px' }}>
-          {TABS.map((t) => (
-            <button key={t.key} type="button" role="tab" aria-selected={status === t.key} className="bb-staff-tab" onClick={() => setQuery({ status: t.key, page: undefined })}>
-              {t.label}
-              <span className="bb-staff-count">{counts ? fmtNum(counts[t.key]) : '·'}</span>
-            </button>
-          ))}
-        </div>
-        <div className="bb-staff-filters">
+        <div className="bb-staff-toolbar">
+          <Segmented<GapStatus>
+            label="Gap status"
+            value={status}
+            onChange={(v) => setQuery({ status: v, page: undefined })}
+            options={TABS.map((t) => ({ value: t.key, label: t.label, count: counts ? counts[t.key] : null }))}
+          />
           <div className="bb-staff-search">
-            <Icon name="search" size={16} />
+            <Icon name="search" size={15} />
             <input
               className="bb-staff-input bb-staff-input-sm"
               type="search"
@@ -428,16 +539,17 @@ export function GapsPage({ gapId }: { gapId?: string }) {
               onChange={(e) => setQuery({ q: e.target.value, page: undefined }, true)}
             />
           </div>
-          <div className="bb-staff-chips" role="group" aria-label="Filter by reason">
-            <button type="button" className="bb-staff-chip" aria-pressed={!reason} onClick={() => setQuery({ reason: undefined, page: undefined })}>
-              All reasons
-            </button>
-            {GAP_REASONS.map((r) => (
-              <button key={r} type="button" className="bb-staff-chip" aria-pressed={reason === r} onClick={() => setQuery({ reason: reason === r ? undefined : r, page: undefined })} title={REASON_HELP[r]}>
-                <i style={{ background: REASON_COLORS[r] }} />
-                {REASON_LABELS[r]}
-              </button>
-            ))}
+        </div>
+        <div className="bb-staff-toolbar is-sub">
+          <span className="bb-staff-toolbar-label">Reason</span>
+          <div className="bb-staff-scroll-x">
+            <Segmented<string>
+              size="sm"
+              label="Filter by reason"
+              value={reason}
+              onChange={(v) => setQuery({ reason: v || undefined, page: undefined })}
+              options={[{ value: '', label: 'All' }, ...GAP_REASONS.map((r) => ({ value: r as string, label: REASON_LABELS[r], title: REASON_HELP[r] }))]}
+            />
           </div>
         </div>
 
@@ -445,7 +557,7 @@ export function GapsPage({ gapId }: { gapId?: string }) {
         {loading && !data ? <SkeletonRows rows={6} /> : null}
         {data ? (
           data.items.length ? (
-            <div role="list" aria-busy={loading}>
+            <div role="list" aria-busy={loading} aria-live="polite" aria-relevant="additions">
               <div className="bb-staff-gap-row is-head" aria-hidden="true">
                 <span>Question</span>
                 <span className="bb-staff-col-reason">Reason</span>
@@ -458,11 +570,14 @@ export function GapsPage({ gapId }: { gapId?: string }) {
                   key={g.id}
                   role="listitem"
                   href={href(`/gaps/${g.id}`, listQuery)}
-                  className={`bb-staff-gap-row${String(g.id) === gapId ? ' is-active' : ''}`}
+                  className={`bb-staff-gap-row${String(g.id) === gapId ? ' is-active' : ''}${fresh.has(String(g.id)) ? ' is-new' : ''}`}
                   aria-label={`${g.question} — ${REASON_LABELS[g.reason]}, asked ${g.occurrences} times`}
                 >
                   <div style={{ minWidth: 0 }}>
-                    <div className="bb-staff-gap-q bb-staff-clamp2">{g.question}</div>
+                    <div className="bb-staff-gap-q bb-staff-clamp2">
+                      {fresh.has(String(g.id)) ? <span className="bb-staff-new-tag">New</span> : null}
+                      {g.question}
+                    </div>
                     {g.status !== 'open' && g.resolved_by ? (
                       <div className="bb-staff-gap-sub">
                         {g.status === 'resolved' ? 'Resolved' : 'Dismissed'} by {g.resolved_by} · {relTime(g.resolved_at)}
@@ -481,15 +596,13 @@ export function GapsPage({ gapId }: { gapId?: string }) {
                   <span className="bb-staff-col-who bb-staff-person">
                     <Avatar name={g.user_name || 'Anonymous visitor'} email={String(g.user_id || g.id)} size="sm" />
                     <span className="bb-staff-person-text">
-                      <span className="bb-staff-person-name bb-staff-truncate" style={{ display: 'block', fontSize: 13 }}>
-                        {g.user_name || 'Anonymous'}
-                      </span>
+                      <span className="bb-staff-person-name bb-staff-truncate">{g.user_name || 'Anonymous'}</span>
                       <span className="bb-staff-person-sub" style={{ textTransform: 'capitalize' }}>
                         {g.user_role || 'visitor'}
                       </span>
                     </span>
                   </span>
-                  <span className="bb-staff-col-seen bb-staff-muted" style={{ fontSize: 12.5 }} title={fmtDateTime(g.last_seen_at)}>
+                  <span className="bb-staff-col-seen bb-staff-muted" title={fmtDateTime(g.last_seen_at)}>
                     {relTime(g.last_seen_at)}
                   </span>
                 </a>
@@ -501,7 +614,7 @@ export function GapsPage({ gapId }: { gapId?: string }) {
               {query.q || reason
                 ? 'Try a different search or clear the filters.'
                 : status === 'open'
-                  ? 'When the assistant can’t answer a question, it lands here and your team gets notified.'
+                  ? 'When the assistant can’t answer a question, it lands here instantly and your team gets notified.'
                   : 'Nothing here yet.'}
             </EmptyState>
           )

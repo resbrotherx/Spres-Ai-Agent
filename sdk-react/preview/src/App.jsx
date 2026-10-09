@@ -4,54 +4,54 @@ import { BrainboxReactSDK, ChatPanel, ChatWidget, TrainingPanel, StaffDashboard 
 import { API_URL, API_KEY, TENANT_ID } from './config';
 const sdk = new BrainboxReactSDK(API_URL, API_KEY, TENANT_ID);
 
-function ChatDemo() {
-  return (
-    <div style={{ minHeight: '100vh', background: '#F3F4F6'}}>
+const PARAMS = new URLSearchParams(window.location.search);
+// ?theme=dark|auto|light to preview the color modes; ?launcher=button|gif|icon for the widget launcher.
+const THEME = PARAMS.get('theme') || 'light';
+const LAUNCHER = PARAMS.get('launcher') || 'icon';
 
-   
-        <ChatWidget
-          sdk={sdk}
-          position="bottom-right"
-          primaryColor="#2563EB"
-          //accentColor="#18d72e"
-         // backgroundColor="#0c1217"
-          buttonText="Ai"
-          placeholder="Ask a question..."
-          width="360px"
-          height="520px"
-          defaultOpen = {false}
-          design = "Ai"
-          logoUrl="https://i.pinimg.com/originals/eb/bd/f7/ebbdf7ce4f7f502d1f28b96b5cbd7a1f.gif"
-          logoText = "Smart Power Billing"
-          companyName = "Sterling Technologies"
-          companyDescription="Ask us anything about your account."
-          user={{ name: "Patrick Fra" }}
-          launcherType="button"
-          launcherGifUrl="https://miro.medium.com/v2/1*9I6EIL5NG20A8se5afVmOg.gif"
-         // bot = "void 0,"
-          //data = "oppp"
-          // manualData = void 0
-        />
-        <ChatPanel
-          sdk={sdk}
-          position="bottom-right"
-          primaryColor="#0e0e12"
-          accentColor="#293756"
-          backgroundColor="#f6f7f8"
-          buttonText="Support"
-          placeholder="Ask a question..."
-          width="360px"
-          logoUrl="https://i.pinimg.com/originals/eb/bd/f7/ebbdf7ce4f7f502d1f28b96b5cbd7a1f.gif"
-          //height="520px"
-          //design="support"
-          user={{ name: "Sarah Connor", email: "sarah@acme.com" }}
-          companyName = "Sterling"
-          avatarGifUrl = "https://cdn.dribbble.com/userupload/23400373/file/original-aaa8682220d5fd60c715fce6b52f7f3e.gif"
-          showExportButton = {true}
-          showFileUpload = {true}
-          showImageUpload = {true}
-          showVoiceInput = {true}
-        />
+const demoPageStyles = `
+.preview-demo { min-height: calc(100vh - 53px); box-sizing: border-box; padding: 64px 24px; background: #F5F5F7; color: #1D1D1F;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+.preview-demo.is-dark { background: #000; color: #F5F5F7; }
+.preview-demo-inner { max-width: 720px; margin: 0 auto; }
+.preview-demo h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 8px; }
+.preview-demo p { font-size: 17px; color: #6E6E73; margin: 0 0 6px; line-height: 1.45; }
+.preview-demo.is-dark p { color: #A1A1A6; }
+.preview-demo code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; background: rgba(120,120,128,.12); padding: 1px 5px; border-radius: 5px; }
+`;
+
+function ChatDemo() {
+  const dark = THEME === 'dark' || (THEME === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+  return (
+    <div className={`preview-demo${dark ? ' is-dark' : ''}`}>
+      <style>{demoPageStyles}</style>
+      <div className="preview-demo-inner">
+        <h1>ChatWidget</h1>
+        <p>The floating assistant lives in the bottom-right corner. Answers stream in token by token.</p>
+        <p>
+          Try <code>?theme=dark</code>, <code>?theme=auto</code> or <code>?launcher=button</code>.
+        </p>
+      </div>
+      <ChatWidget
+        sdk={sdk}
+        position="bottom-right"
+        mode={THEME}
+        launcherType={LAUNCHER}
+        buttonText="Ask us"
+        launcherGifUrl="https://miro.medium.com/v2/1*9I6EIL5NG20A8se5afVmOg.gif"
+        companyName="Sterling Technologies"
+        companyDescription="Typically replies in seconds"
+        placeholder="Ask a question…"
+        showExportButton
+      />
+    </div>
+  );
+}
+
+function PanelDemo() {
+  return (
+    <div style={{ height: 'calc(100vh - 53px)' }}>
+      <ChatPanel sdk={sdk} mode={THEME} companyName="Sterling Technologies" showExportButton showFileUpload={false} showImageUpload={false} />
     </div>
   );
 }
@@ -61,7 +61,8 @@ function ChatDemo() {
 /* ---------------------------------------------------------------- */
 
 const ROUTES = [
-  { path: '/', label: 'Chat' },
+  { path: '/', label: 'Chat widget' },
+  { path: '/panel', label: 'Chat page' },
   { path: '/train', label: 'Train AI' },
   { path: '/staff', label: 'Staff dashboard' }
 ];
@@ -135,18 +136,17 @@ function TopNav({ path }) {
 
 function TrainPage() {
   return (
-    <div style={{ minHeight: 'calc(100vh - 53px)', background: '#f3f3f5' }}>
-      <TrainingPanel
-        sdk={sdk}
-        companyName="Sterling Technologies"
-        logoUrl="https://i.pinimg.com/originals/eb/bd/f7/ebbdf7ce4f7f502d1f28b96b5cbd7a1f.gif"
-      />
+    <div style={{ minHeight: 'calc(100vh - 53px)' }}>
+      <TrainingPanel sdk={sdk} companyName="Sterling Technologies" mode={THEME} />
     </div>
   );
 }
 
 function StaffPage() {
-  return <StaffDashboard apiUrl={API_URL} routePrefix="/staff" offsetTop={NAV_HEIGHT} brandName="Brainbox" />;
+  // ?theme=dark|light|auto sets the dashboard's default appearance (users can still switch it in the account menu).
+  const mode = new URLSearchParams(window.location.search).get('theme');
+  const theme = mode === 'dark' || mode === 'light' || mode === 'auto' ? { mode } : undefined;
+  return <StaffDashboard apiUrl={API_URL} routePrefix="/staff" offsetTop={NAV_HEIGHT} brandName="Brainbox" theme={theme} />;
 }
 
 export default function App() {
@@ -154,7 +154,7 @@ export default function App() {
   return (
     <>
       <TopNav path={path} />
-      {path === '/staff' ? <StaffPage /> : path === '/train' ? <TrainPage /> : <ChatDemo />}
+      {path === '/staff' ? <StaffPage /> : path === '/train' ? <TrainPage /> : path === '/panel' ? <PanelDemo /> : <ChatDemo />}
     </>
   );
 }

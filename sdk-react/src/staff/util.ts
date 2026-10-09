@@ -55,12 +55,13 @@ export function initials(name?: string | null, email?: string | null): string {
 }
 
 const AVATAR_GRADIENTS = [
-  ['#3b82f6', '#1d4ed8'],
-  ['#0ea5e9', '#0369a1'],
-  ['#6366f1', '#4338ca'],
-  ['#14b8a6', '#0f766e'],
-  ['#0284c7', '#1e3a8a'],
-  ['#8b5cf6', '#5b21b6']
+  ['#5AA0F7', '#0071E3'],
+  ['#8E8CF2', '#5E5CE6'],
+  ['#5CCBDB', '#30A0B7'],
+  ['#5FD47D', '#2DAF4F'],
+  ['#FFB547', '#F08C00'],
+  ['#C38BF2', '#A55BE0'],
+  ['#9CA3AF', '#6E6E73']
 ];
 
 export function avatarBg(seed: string): string {
@@ -87,11 +88,11 @@ export const REASON_HELP: Record<GapReason, string> = {
 };
 
 export const REASON_COLORS: Record<GapReason, string> = {
-  no_context: '#1d4ed8',
-  low_confidence: '#d97706',
-  llm_unknown: '#4f46e5',
-  negative_feedback: '#dc2626',
-  llm_unavailable: '#64748b'
+  no_context: '#0071E3',
+  low_confidence: '#FF9F0A',
+  llm_unknown: '#5E5CE6',
+  negative_feedback: '#FF3B30',
+  llm_unavailable: '#8E8E93'
 };
 
 export const ROLE_INFO: Record<StaffRole, { label: string; desc: string }> = {

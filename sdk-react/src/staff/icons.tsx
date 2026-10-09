@@ -51,9 +51,123 @@ export type StaffIconName =
   | 'globe'
   | 'building'
   | 'brain'
-  | 'cpu';
+  | 'cpu'
+  | 'command'
+  | 'moon'
+  | 'sun'
+  | 'monitor'
+  | 'volume'
+  | 'volumeOff'
+  | 'activity'
+  | 'inbox'
+  | 'sidebar'
+  | 'file'
+  | 'clockArrow'
+  | 'grid'
+  | 'target'
+  | 'thumbsUp'
+  | 'arrowUpRight'
+  | 'arrowDownRight'
+  | 'wifiOff'
+  | 'zap'
+  | 'pie'
+  | 'barChart'
+  | 'enter'
+  | 'hash'
+  | 'filter';
 
 const PATHS: Record<StaffIconName, ReactNode> = {
+  command: <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />,
+  moon: <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />,
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </>
+  ),
+  monitor: (
+    <>
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path d="M8 21h8M12 17v4" />
+    </>
+  ),
+  volume: (
+    <>
+      <path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5Z" />
+      <path d="M16 9a5 5 0 0 1 0 6M19.4 18.4a9 9 0 0 0 0-12.8" />
+    </>
+  ),
+  volumeOff: (
+    <>
+      <path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5Z" />
+      <path d="m22 9-6 6M16 9l6 6" />
+    </>
+  ),
+  activity: <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />,
+  inbox: (
+    <>
+      <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z" />
+    </>
+  ),
+  sidebar: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+    </>
+  ),
+  file: (
+    <>
+      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+    </>
+  ),
+  clockArrow: (
+    <>
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5M12 7v5l4 2" />
+    </>
+  ),
+  grid: (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+    </>
+  ),
+  target: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1" />
+    </>
+  ),
+  thumbsUp: (
+    <>
+      <path d="M7 10v12" />
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+    </>
+  ),
+  arrowUpRight: <path d="M7 17 17 7M7 7h10v10" />,
+  arrowDownRight: <path d="m7 7 10 10M17 7v10H7" />,
+  wifiOff: (
+    <>
+      <path d="M12 20h.01M8.5 16.43a5 5 0 0 1 7 0M5 12.86a10 10 0 0 1 5.17-2.69M19 12.86a10 10 0 0 0-2-1.43M2 8.82a15 15 0 0 1 4.18-2.66M22 8.82a15 15 0 0 0-11.29-3.76" />
+      <path d="m2 2 20 20" />
+    </>
+  ),
+  zap: <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />,
+  pie: (
+    <>
+      <path d="M21 12A9 9 0 1 1 12 3v9Z" />
+      <path d="M15 3.5A9 9 0 0 1 20.5 9H15Z" />
+    </>
+  ),
+  barChart: <path d="M3 3v16a2 2 0 0 0 2 2h16M8 17v-5M13 17V8M18 17v-9" />,
+  enter: <path d="M9 10 4 15l5 5M20 4v7a4 4 0 0 1-4 4H4" />,
+  hash: <path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18" />,
+  filter: <path d="M22 3H2l8 9.46V19l4 2v-8.54Z" />,
   overview: (
     <>
       <rect x="3" y="3" width="7" height="9" rx="1.5" />
@@ -311,7 +425,7 @@ const PATHS: Record<StaffIconName, ReactNode> = {
 export function Icon({
   name,
   size = 18,
-  strokeWidth = 1.9,
+  strokeWidth = 1.75,
   className
 }: {
   name: StaffIconName;

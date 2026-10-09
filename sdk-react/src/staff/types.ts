@@ -450,6 +450,9 @@ export interface BrainboxStaffClientOptions {
 }
 
 export interface StaffDashboardTheme {
+  /** Color scheme: 'light' (default), 'dark' or 'auto' (follows the OS). Users can override it from the account menu. */
+  mode?: 'light' | 'dark' | 'auto';
+  /** Accent color (buttons, links, charts). Default #0071E3. */
   primary?: string;
   primaryHover?: string;
   accent?: string;
@@ -475,4 +478,59 @@ export interface StaffDashboardProps {
   /** Provide your own client (e.g. shared with other code); otherwise one is created from apiUrl. */
   client?: import('./staffClient').BrainboxStaffClient;
   className?: string;
+  /** UI sounds (WebAudio, generated). Default true; users can mute from the top bar (persisted). */
+  sounds?: boolean;
+  /** Real-time updates via `GET /api/staff/events` (SSE), falling back to polling. Default true. */
+  live?: boolean;
+}
+
+/* ------------------------------------------------------------------ */
+/* Real-time events (GET /api/staff/events)                            */
+/* ------------------------------------------------------------------ */
+
+export type LiveStatus = 'idle' | 'connecting' | 'live' | 'reconnecting' | 'polling';
+
+export interface LiveGapEvent {
+  action: 'created' | 'updated' | 'resolved' | 'dismissed';
+  gap: KnowledgeGap;
+}
+
+export interface LiveConversationEvent {
+  action: 'message';
+  session_id: string;
+  title: string | null;
+  user_name: string | null;
+  user_role: string | null;
+  role: 'user' | 'assistant';
+  preview: string;
+  created_at: string;
+  /** Optional extras some servers include. */
+  message_id?: string | number;
+  gap_reason?: GapReason | null;
+}
+
+export interface LiveTrainingEvent {
+  action: 'status';
+  source: TrainingSource;
+}
+
+export interface LiveOverviewEvent {
+  questions_today: number;
+  unanswered_today: number;
+  open_gaps: number;
+}
+
+export interface LiveEventMap {
+  hello: { user_id: string | number; tenant_id: string; server_time: string };
+  notification: StaffNotification;
+  gap: LiveGapEvent;
+  conversation: LiveConversationEvent;
+  training: LiveTrainingEvent;
+  staff: { action: 'created' | 'updated' | 'deleted'; user: StaffUser };
+  keys: { action: 'created' | 'rolled' | 'revoked'; key: ApiKeyInfo };
+  overview: LiveOverviewEvent;
+  /** Client-side: polling fallback asks pages to refresh silently (every 30 s). */
+  poll: { at: number };
+  /** Client-side: stream (re)connected after a gap — refetch anything that may have missed events. */
+  resync: { at: number };
 }

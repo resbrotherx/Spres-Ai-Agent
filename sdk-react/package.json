@@ -1,9 +1,30 @@
 {
   "name": "spres-react",
-  "version": "1.1.0",
-  "description": "React SDK and customizable chat UI for Spres AI Backend",
+  "version": "1.2.0",
+  "description": "React SDK and Apple-style chat UI (streaming ChatWidget, ChatPanel, TrainingPanel, staff dashboard) for the Brainbox AI backend",
   "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "sideEffects": [
+    "./dist/ChatWidget.js",
+    "./dist/ChatPanel.js",
+    "./dist/TrainingPanel.js",
+    "./dist/MessageContent.js",
+    "./dist/chatUi.js",
+    "./dist/co/*.js",
+    "./dist/design/sounds.js",
+    "./dist/staff/*.js",
+    "./dist/staff/**/*.js"
+  ],
   "files": [
     "dist"
   ],

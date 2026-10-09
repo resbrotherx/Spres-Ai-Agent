@@ -1,1032 +1,510 @@
-// @ts-nocheck
-import { Fragment, jsx, jsxs } from "react/jsx-runtime";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useBrainboxChat } from "./useBrainboxChat";
-import { MessageContent } from "./MessageContent";
-import { TypingIndicator } from "./co/TypingIndicator";
+'use client';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
+import { useBrainboxChat } from './useBrainboxChat';
+import { BrainboxLogo } from './design/Logo';
+import {
+  BotAvatar,
+  CHAT_CSS,
+  CHAT_STYLE_ID,
+  ChatIcon,
+  Composer,
+  MessageList,
+  SessionList,
+  ToastStack,
+  brandStyle,
+  copyText,
+  interpolate,
+  mergeData,
+  normalizeActions,
+  useAutoScroll,
+  useInjectedStyle,
+  useResolvedMode,
+  useSoundPreference,
+  useToasts,
+  useVoiceRecorder
+} from './chatUi';
+import type { ChatMessage, ChatUiData, ChatWidgetProps } from './types';
 
-const defaultChatWidgetData = {
-  brand: {
-    name: "Spres Ai",
-    subtitle: "We help companies provide instant",
-    logoUrl: ""
-  },
-  bot: {
-    name: "Spres Ai",
-    time: "12:31 Pm",
-    avatarUrl: ""
-  },
-  user: {
-    name: "King Mak",
-    time: "13:52 Pm",
-    avatarUrl: ""
-  },
-  introMessages: [
-    "Hi\u{1F44B} {{name}}! We help companies provide instant, accurate, and on-brand responses to their clients 24/7.",
-    "Here are a few ways I can assist you right now."
-  ],
+/** Default copy. Override any field with `data` / `manualData`. No demo content. */
+export const defaultChatWidgetData: ChatUiData = {
+  brand: { name: '', subtitle: '', logoUrl: '' },
+  bot: { name: 'Assistant', avatarUrl: '' },
+  user: { name: '' },
+  greeting: '',
+  introMessages: [],
   quickActions: [
-    "Learns your products & policies \u{1F449}",
-    "Chat with Spres Ai services \u{1F5E8}"
+    { label: 'What can you help me with?', icon: 'sparkles' },
+    { label: 'How do I get started?', icon: 'book' },
+    { label: 'I have a problem', icon: 'wrench' }
   ],
-  userReply: '"Yes, I am ready to chat with Spres Ai Service."',
-  modes: [
-    { icon: "chat", label: "Chat" },
-    { icon: "voice", label: "Voice" }
-  ],
-  composer: {
-    placeholder: "Type message...",
-    searchLabel: "History"
-  }
+  composer: { placeholder: 'Message…' }
 };
-const chatWidgetCss = `
-.bb-omago-root {
-  --bb-widget-purple: #b93fff;
-  --bb-widget-ink: #08080a;
-  --bb-widget-panel: #fff8ff;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: var(--bb-widget-ink);
-  letter-spacing: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 16px;
-}
-  .bb-msg-content p { margin: 0 0 8px; }
-.bb-msg-content p:last-child { margin-bottom: 0; }
-.bb-msg-list { margin: 6px 0; padding-left: 20px; }
-.bb-msg-list li { margin-bottom: 4px; }
-.bb-code-block {
-  margin: 10px 0;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #1e1e2e;
-  border: 1px solid #2e2e3e;
-}
-.bb-code-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 12px;
-  background: #14141e;
-  color: #9d9db3;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-.bb-code-copy {
-  border: 0;
-  background: transparent;
-  color: #b8b8d1;
-  font-size: 11px;
-  cursor: pointer;
-  padding: 2px 8px;
-  border-radius: 6px;
-}
-.bb-code-copy:hover { background: rgba(255,255,255,.08); }
-.bb-code-block pre {
-  margin: 0;
-  padding: 12px;
-  overflow-x: auto;
-  font-family: "Fira Code", Menlo, Consolas, monospace;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: #e4e4f0;
-}
-.bb-msg-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12.5px; }
-.bb-msg-table th, .bb-msg-table td { border: 1px solid rgba(0,0,0,.1); padding: 6px 8px; text-align: left; }
-.bb-msg-table th { background: rgba(0,0,0,.04); font-weight: 700; }
-.bb-omago-panel {
-  width: 100%;
-  height: min(var(--bb-widget-height), calc(100vh - 82px));
-  max-height: calc(100vh - 82px);
-  min-height: 0;
-  border-radius: var(--bb-widget-radius);
-  overflow: hidden;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  border: var(--bb-widget-border);
-  background: var(--bb-widget-panel);
-  box-shadow:
-    0 34px 90px rgba(82, 35, 108, .24),
-    inset 0 0 0 1px rgba(255,255,255,.7);
-  box-sizing: border-box;
-}
-.bb-omago-header {
-  min-height: 68px;
-  padding: 12px;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, .88);
-  background: rgba(255,255,255,.36);
-  backdrop-filter: blur(14px);
-}
-.bb-omago-header-copy {
-  min-width: 0;
-  flex: 1;
-}
-.bb-omago-title {
-  margin: 0;
-  font-size: clamp(15px, 2.2vw, 18px);
-  line-height: 1.15;
-  font-weight: 820;
-  color: #0a0a0d;
-  overflow-wrap: anywhere;
-}
-.bb-omago-subtitle {
-  margin-top: 6px;
-  color: rgba(9, 9, 12, .54);
-  font-size: 11px;
-  line-height: 1.25;
-  font-weight: 650;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.bb-omago-logo,
-.bb-omago-avatar-logo {
-  position: relative;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border-radius: 999px;
- // background: var(--bb-widget-purple);
-  background:
-    radial-gradient(circle at 36% 28%, rgba(255,255,255,.95) 0 12%, transparent 13%),
-    radial-gradient(circle at 50% 50%, #d987ff 0 14%, #b334ff 42%, #8e31dc 66%, rgba(142,49,220,.05) 71%);
-  //box-shadow: 0 0 31px rgba(181, 56, 255, .88), inset 0 0 18px rgba(255,255,255,.25);
-}
-.bb-omago-logo img,
-.bb-omago-avatar-logo img {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  object-fit: cover;
-  display: block;
-}
-.bb-omago-logo {
-  width: 38px;
-  height: 38px;
-}
-.bb-omago-avatar-logo {
-  width: 34px;
-  height: 34px;
-}
-.bb-omago-logo::before,
-.bb-omago-avatar-logo::before {
-  content: "";
-  width: 17px;
-  height: 17px;
-  border-radius: 999px;
-  background: #fff;
-  clip-path: polygon(0 50%, 53% 15%, 100% 0, 100% 100%, 53% 85%);
-}
-.bb-omago-logo.has-image::before,
-.bb-omago-avatar-logo.has-image::before {
-  display: none;
-}
-.bb-omago-close,
-.bb-omago-floating-close,
-.bb-omago-launcher {
-  display: grid;
-  place-items: center;
-  border: 0;
-  color: #fff;
-  background: #050506;
-  cursor: pointer;
-  // box-shadow: 0 18px 40px rgba(0,0,0,.22);
-}
-.bb-omago-root button {
-  -webkit-tap-highlight-color: transparent;
-  transform: translateY(0) scale(1);
-  transition:
-    transform 120ms ease,
-    box-shadow 160ms ease,
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    filter 160ms ease;
-}
-.bb-omago-root button:hover {
-  filter: brightness(0.98);
-}
-.bb-omago-root button:active {
-  transform: translateY(1px) scale(0.96);
-  filter: brightness(0.94);
-}
-.bb-omago-root button:focus-visible {
-  outline: 2px solid var(--bb-widget-purple);
-  outline-offset: 2px;
-}
-.bb-omago-close {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  flex: 0 0 auto;
-}
-.bb-omago-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 12px;
-  box-sizing: border-box;
-  background:
-    radial-gradient(circle at 86% 42%, rgba(255,255,255,.7), transparent 30%),
-    linear-gradient(180deg, rgba(255,250,255,.7), rgba(249,230,255,.72));
-}
-.bb-omago-transcript {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-.bb-omago-transcript::-webkit-scrollbar {
-  width: 7px;
-}
-.bb-omago-transcript::-webkit-scrollbar-thumb {
-  background: rgba(163, 89, 220, .18);
-  border-radius: 999px;
-}
-.bb-omago-assistant {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  gap: 9px;
-  align-items: start;
-}
-.bb-omago-author {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 8px 0 8px;
-  font-weight: 820;
-  font-size: 15px;
-  color: #0b0b0f;
-}
-  .bb-omago-emoji-pop {
-  position: absolute;
-  bottom: 42px;
-  left: 0;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
-  padding: 8px;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,.08);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.12);
-  z-index: 10;
-}
-.bb-omago-emoji-pop button {
-  border: 0;
-  background: transparent;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-}
-.bb-omago-emoji-pop button:hover {
-  background: rgba(0,0,0,.05);
-}
-.bb-omago-author span {
-  color: rgba(12, 12, 16, .45);
-  font-size: 11px;
-  font-weight: 760;
-}
-.bb-omago-bubble {
-  width: fit-content;
-  max-width: min(100%, 230px);
-  padding: 9px 11px;
-  border-radius: 0 14px 14px 14px;
-  background: rgba(255,255,255,.92);
-  color: rgba(12, 12, 16, .64);
-  font-size: 12.5px;
-  line-height: 1.45;
-  font-weight: 590;
-  box-shadow: 0 12px 28px rgba(142, 64, 202, .06);
-}
-.bb-omago-bubble + .bb-omago-bubble {
-  margin-top: 10px;
-  border-radius: 14px;
-}
-.bb-omago-actions {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-}
-.bb-omago-action-pill {
-  width: fit-content;
-  max-width: 100%;
-  min-height: 32px;
-  padding: 0 11px;
-  border: 1px solid rgba(184, 64, 255, .18);
-  border-radius: 999px;
-  background: rgba(255,255,255,.23);
-  color: var(--bb-widget-purple);
-  font-size: 12.5px;
-  font-weight: 780;
-  cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.34);
-}
-.bb-omago-action-pill:hover,
-.bb-omago-mode:hover,
-.bb-omago-tool:hover,
-.bb-omago-search:hover {
-  background: rgba(255,255,255,.42);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.55), 0 8px 20px rgba(156,71,216,.08);
-}
-.bb-omago-user {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
-  gap: 8px;
-  align-items: start;
-  margin: 14px 0 12px auto;
-  width: min(100%, 244px);
-}
-.bb-omago-user .bb-omago-author {
-  justify-content: flex-end;
-  margin-top: 12px;
-  margin-bottom: 12px;
-}
-.bb-omago-user .bb-omago-bubble {
-  margin-left: auto;
-  border-radius: 22px 0 22px 22px;
-}
-.bb-omago-person-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 820;
-  background:
-    radial-gradient(circle at 50% 24%, #f7ded0 0 20%, transparent 21%),
-    linear-gradient(145deg, #c9b8ad, #9e6f59);
-}
-.bb-omago-person-avatar img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-}
-.bb-omago-mode-switch {
-  align-self: center;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  min-width: 172px;
-  min-height: 38px;
-  margin: 0 auto 12px;
-  padding: 4px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.72);
-  background: rgba(255,255,255,.19);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.42);
-}
-.bb-omago-mode {
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: #0b0b0e;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 760;
-  cursor: pointer;
-}
-.bb-omago-mode.is-active {
-  background: rgba(255,255,255,.42);
-  box-shadow: 0 10px 30px rgba(156, 71, 216, .08);
-}
-.bb-omago-live-list {
-  display: grid;
-  gap: 12px;
-}
-.bb-omago-live-message {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
-}
-.bb-omago-live-message.is-user {
-  grid-template-columns: minmax(0, 1fr) 34px;
-}
-.bb-omago-live-copy {
-  min-width: 0;
-}
-.bb-omago-live-meta {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  margin: 0 0 4px;
-  color: rgba(12,12,16,.72);
-  font-size: 12px;
-  font-weight: 800;
-}
-.bb-omago-live-meta time {
-  color: rgba(12,12,16,.42);
-  font-size: 10.5px;
-  font-weight: 720;
-}
-.bb-omago-live-message.is-user .bb-omago-live-meta {
-  justify-content: flex-end;
-}
-.bb-omago-live-bubble {
-  display: block;
-  max-width: min(76%, 230px);
-  padding: 8px 10px;
-  border-radius: 14px 14px 14px 6px;
-  background: rgba(255,255,255,.94);
-  color: rgba(12,12,16,.68);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-.bb-omago-live-message.is-user .bb-omago-live-bubble {
-  margin-left: auto;
-  border-radius: 14px 14px 6px 14px;
-  color: #fff;
-  background: var(--bb-widget-purple);
-}
-.bb-omago-file-input {
-  display: none;
-}
-.bb-omago-recording {
-  color: #dc2626;
-  font-size: 12px;
-  font-weight: 760;
-  margin-top: 8px;
-}
-.bb-omago-composer {
-  min-height: 88px;
-  padding: 10px;
-  border-radius: 17px;
-  border: 1px solid rgba(255,255,255,.86);
-  background: rgba(255,255,255,.18);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.34), 0 14px 35px rgba(128, 54, 180, .05);
-  box-sizing: border-box;
-}
-.bb-omago-composer textarea {
-  width: 100%;
-  height: 30px;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  resize: none;
-  color: #0d0d10;
-  background: transparent;
-  font: inherit;
-  font-size: 12.5px;
-  line-height: 1.3;
-  box-sizing: border-box;
-}
-.bb-omago-composer textarea::placeholder {
-  color: rgba(10, 10, 14, .52);
-}
-.bb-omago-composer-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.bb-omago-tool,
-.bb-omago-search,
-.bb-omago-send {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  cursor: pointer;
-  color: #07070a;
-  //background: var(--bb-widget-purple);
-   background: rgba(255,255,255,.25);
-  // box-shadow: inset 0 0 0 1px rgba(255,255,255,.38);
-}
-.bb-omago-tool {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-}
-.bb-omago-search {
-  height: 34px;
-  gap: 5px;
-  border-radius: 999px;
-  padding: 0 10px;
-  font-size: 12.5px;
-  font-weight: 780;
-  white-space: nowrap;
-}
-.bb-omago-send {
-  margin-left: auto;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  color: #fff;
-  background: radial-gradient(circle at 36% 28%, #c3d9ff, var(--bb-widget-purple) 53%, #8120d2 100%);
- // box-shadow: 0 0 30px rgba(181, 57, 255, .78), inset 0 0 13px rgba(255,255,255,.35);
-}
-.bb-omago-launcher:hover,
-.bb-omago-send:hover {
-  box-shadow: 0 0 36px rgba(57, 74, 255, 0.82), 0 16px 38px rgba(92, 28, 135, .24);
-}
-.bb-omago-error {
-  color: #dc2626;
-  font-size: 13px;
-  margin-top: 10px;
-}
-.bb-omago-floating-close {
-  display: none;
-  width: 52px;
-  height: 52px;
-  border-radius: 999px;
-}
-.bb-omago-launcher {
-  min-width: 104px;
-  height: 46px;
-  border-radius: 999px;
-  padding: 0 15px;
-  display: inline-flex;
-  gap: 10px;
-  font-weight: 760;
-  background: radial-gradient(circle at 20% 20%, #efc3ff, var(--bb-widget-purple) 50%, #8120d2 100%);
- // box-shadow: 0 0 30px rgba(181, 57, 255, .7), 0 18px 40px rgba(92, 28, 135, .22);
-}
-  .bb-omago-launcher-gif {
-  width: 64px;
-  height: 64px;
-  border-radius: 999px;
-  border: 0;
-  padding: 0;
-  overflow: hidden;
-  cursor: pointer;
-}
-.bb-omago-launcher-gif img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.bb-omago-launcher-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 999px;
-  border: 0;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background: var(--bb-widget-purple);
-  cursor: pointer;
-}
-@media (max-width: 560px) {
-  .bb-omago-root {
-    width: calc(100vw - 24px) !important;
-  }
-  .bb-omago-panel {
-    max-height: calc(100vh - 82px);
-    border-radius: 20px;
-  }
-  .bb-omago-header {
-    padding: 12px;
-    min-height: 64px;
-    gap: 9px;
-  }
-  .bb-omago-logo {
-    width: 36px;
-    height: 36px;
-  }
-  .bb-omago-close {
-    width: 32px;
-    height: 32px;
-  }
-  .bb-omago-body {
-    padding: 10px;
-  }
-  .bb-omago-assistant {
-    grid-template-columns: 36px minmax(0, 1fr);
-    gap: 8px;
-  }
-  .bb-omago-avatar-logo {
-    width: 32px;
-    height: 32px;
-  }
-  .bb-omago-author {
-    font-size: 14px;
-  }
-  .bb-omago-bubble,
-  .bb-omago-action-pill {
-    font-size: 12px;
-  }
-  .bb-omago-mode-switch {
-    min-width: 166px;
-  }
-  .bb-omago-mode {
-    font-size: 12.5px;
-  }
-  .bb-omago-tool {
-    width: 32px;
-    height: 32px;
-  }
-  .bb-omago-search {
-    height: 32px;
-    padding: 0 9px;
-    font-size: 12px;
-  }
-  .bb-omago-send {
-    width: 34px;
-    height: 34px;
-  }
-}
-`;
-function mergeData(base, overrides) {
-  if (!overrides) return base;
-  const output = { ...base };
-  Object.entries(overrides).forEach(([key, value]) => {
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      output[key] = mergeData(base[key] || {}, value);
-    } else if (value !== void 0) {
-      output[key] = value;
+
+type View = 'chat' | 'history';
+
+export function ChatWidget({
+  sdk,
+  position = 'bottom-right',
+  primaryColor,
+  accentColor,
+  backgroundColor,
+  border,
+  borderRadius,
+  launcherType = 'icon',
+  launcherGifUrl,
+  buttonText = 'Chat',
+  placeholder,
+  width = '380px',
+  height = '600px',
+  defaultOpen = false,
+  onOpenChange,
+  zIndex = 9999,
+  mode = 'light',
+  sounds = true,
+  logoUrl,
+  logoText,
+  companyName,
+  companyDescription,
+  headerText,
+  avatarGifUrl,
+  user,
+  bot,
+  data,
+  manualData,
+  showExportButton = false,
+  showVoiceInput = false,
+  showFileUpload = false,
+  showImageUpload = false,
+  showFeedback = true,
+  initialSessionId,
+  persistSession = true
+}: ChatWidgetProps) {
+  useInjectedStyle(CHAT_STYLE_ID, CHAT_CSS);
+  const theme = useResolvedMode(mode);
+  const [open, setOpenState] = useState(defaultOpen);
+  const [view, setView] = useState<View>('chat');
+  const [inputMode, setInputMode] = useState<'chat' | 'voice'>('chat');
+  const [input, setInput] = useState('');
+  const [query, setQuery] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
+  const { soundOn, toggleSound, play } = useSoundPreference(sounds);
+  const { toasts, push, dismiss, pause, resume } = useToasts();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+  const windowRef = useRef<HTMLElement>(null);
+  const titleId = useId();
+
+  const sdkUser = useMemo(() => {
+    try {
+      return sdk.getUserProfile?.() || null;
+    } catch {
+      return null;
+    }
+  }, [sdk]);
+
+  const ui = useMemo(() => {
+    const merged = mergeData(defaultChatWidgetData, (manualData || data) as Record<string, any> | undefined);
+    const person = { ...(merged.user || {}), ...(sdkUser || {}), ...(user || {}) };
+    const botInfo = { ...(merged.bot || {}), ...(bot || {}) };
+    const title = headerText || companyName || logoText || merged.brand?.name || botInfo.name || 'Assistant';
+    const first = (person.firstName || person.name || '').split(/\s+/)[0] || '';
+    const vars = { name: first, botName: botInfo.name || title };
+    const greeting = merged.greeting ? interpolate(merged.greeting, vars) : first ? `Hi ${first}` : 'Hi there';
+    return {
+      title,
+      subtitle: companyDescription || merged.brand?.subtitle || 'Typically replies in seconds',
+      logo: logoUrl || merged.brand?.logoUrl || '',
+      botName: botInfo.name || title,
+      botAvatar: avatarGifUrl || botInfo.avatarUrl || logoUrl || merged.brand?.logoUrl || '',
+      person,
+      greeting,
+      welcomeSub: `Ask me anything — I’m here to help.`,
+      intro: (merged.introMessages || []).map((m: string) => interpolate(m, vars)).filter(Boolean),
+      actions: normalizeActions(merged.quickActions),
+      placeholder: placeholder || merged.composer?.placeholder || 'Message…'
+    };
+  }, [avatarGifUrl, bot, companyDescription, companyName, data, headerText, logoText, logoUrl, manualData, placeholder, sdkUser, user]);
+
+  const chat = useBrainboxChat(sdk, initialSessionId, {
+    persistSession,
+    open,
+    userKey: ui.person.email || ui.person.username || undefined,
+    onReply: (m) => {
+      if (open) play('receive');
+      else play('notify');
+      setAnnouncement(`${ui.botName}: ${m.text.slice(0, 280)}`);
+    },
+    onError: (msg) => {
+      play('error');
+      push({ tone: 'error', title: 'Message not sent', body: msg, action: { label: 'Retry', onClick: () => void chat.retry() } });
     }
   });
-  return output;
-}
-function Icon({ name, size = 24, strokeWidth = 2 }) {
-  const paths = {
-    x: /* @__PURE__ */ jsxs(Fragment, { children: [
-      /* @__PURE__ */ jsx("path", { d: "M18 6 6 18" }),
-      /* @__PURE__ */ jsx("path", { d: "m6 6 12 12" })
-    ] }),
-    paperclip: /* @__PURE__ */ jsx("path", { d: "m21.4 11.6-8.8 8.8a6 6 0 0 1-8.5-8.5l8.8-8.8a4 4 0 0 1 5.7 5.7l-8.9 8.8a2 2 0 1 1-2.8-2.8l8.1-8.1" }),
-    smile: /* @__PURE__ */ jsxs(Fragment, { children: [
-      /* @__PURE__ */ jsx("circle", { cx: "12", cy: "12", r: "9" }),
-      /* @__PURE__ */ jsx("path", { d: "M8 14s1.5 2 4 2 4-2 4-2" }),
-      /* @__PURE__ */ jsx("path", { d: "M9 9h.01" }),
-      /* @__PURE__ */ jsx("path", { d: "M15 9h.01" })
-    ] }),
-    search: /* @__PURE__ */ jsx("path", { d: "m21 21-4.3-4.3M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z" }),
-    send: /* @__PURE__ */ jsxs(Fragment, { children: [
-      /* @__PURE__ */ jsx("path", { d: "m22 2-7 20-4-9-9-4Z" }),
-      /* @__PURE__ */ jsx("path", { d: "M22 2 11 13" })
-    ] }),
-    chat: /* @__PURE__ */ jsxs(Fragment, { children: [
-      /* @__PURE__ */ jsx("path", { d: "M21 12a8 8 0 0 1-8 8H7l-4 3 1.3-5.1A8 8 0 1 1 21 12Z" }),
-      /* @__PURE__ */ jsx("path", { d: "m14.5 7.5.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7Z" })
-    ] }),
-    voice: /* @__PURE__ */ jsxs(Fragment, { children: [
-      /* @__PURE__ */ jsx("rect", { x: "4", y: "9", width: "4", height: "6", rx: "2" }),
-      /* @__PURE__ */ jsx("rect", { x: "10", y: "5", width: "4", height: "14", rx: "2" }),
-      /* @__PURE__ */ jsx("rect", { x: "16", y: "11", width: "4", height: "4", rx: "2" }),
-      /* @__PURE__ */ jsx("path", { d: "m18.5 4 .7 1.7 1.8.8-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.8Z" })
-    ] })
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      setOpenState(next);
+      onOpenChange?.(next);
+    },
+    [onOpenChange]
+  );
+
+  // Focus management: input on open, launcher on close.
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    if (open && !wasOpen.current) setTimeout(() => inputRef.current?.focus(), 60);
+    if (!open && wasOpen.current) launcherRef.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
+
+  // Load sessions only when history is opened.
+  useEffect(() => {
+    if (open && view === 'history' && !chat.sessionsLoaded && !chat.sessionsLoading) void chat.refreshSessions();
+  }, [open, view, chat.sessionsLoaded, chat.sessionsLoading, chat.refreshSessions]);
+
+  const scroll = useAutoScroll([chat.messages, open, view]);
+
+  const send = (text?: string) => {
+    const value = (text ?? input).trim();
+    if (!value || chat.loading) return;
+    setInput('');
+    play('send');
+    setView('chat');
+    void chat.sendMessage(value);
+    scroll.scrollToBottom(false);
   };
-  return /* @__PURE__ */ jsx(
-    "svg",
-    {
-      width: size,
-      height: size,
-      viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth,
-      strokeLinecap: "round",
-      strokeLinejoin: "round",
-      "aria-hidden": "true",
-      children: paths[name] || paths.chat
+
+  const onCopy = async (m: ChatMessage) => {
+    const ok = await copyText(m.text);
+    push(ok ? { tone: 'success', title: 'Copied to clipboard' } : { tone: 'error', title: 'Couldn’t copy' });
+  };
+
+  const onFeedback = async (m: ChatMessage, rating: 'up' | 'down') => {
+    try {
+      await chat.sendFeedback(m.id, rating);
+      push({ tone: 'success', title: 'Thanks for the feedback', body: rating === 'down' ? 'We’ll use it to improve this answer.' : undefined });
+    } catch (err: any) {
+      play('error');
+      push({ tone: 'error', title: 'Feedback not sent', body: err?.message });
+    }
+  };
+
+  const voice = useVoiceRecorder(
+    (blob) => void chat.sendVoiceNote(blob),
+    (msg) => {
+      play('error');
+      push({ tone: 'error', title: 'Microphone unavailable', body: msg });
     }
   );
-}
-function PersonAvatar({ person }) {
-  const initials = ((person == null ? void 0 : person.name) || "KM").split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-  return /* @__PURE__ */ jsx("span", { className: "bb-omago-person-avatar", children: (person == null ? void 0 : person.avatarUrl) ? /* @__PURE__ */ jsx("img", { src: person.avatarUrl, alt: "" }) : initials });
-}
-function formatTime(timestamp) {
-  try {
-    return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  } catch {
-    return '';
+
+  const newChat = () => {
+    void chat.createSession();
+    setView('chat');
+    setInput('');
+    setTimeout(() => inputRef.current?.focus(), 30);
+  };
+
+  const onKeyDownWindow = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    if (view === 'history') {
+      setView('chat');
+      setTimeout(() => inputRef.current?.focus(), 30);
+    } else setOpen(false);
+  };
+
+  const isLeft = position.includes('left');
+  const isTop = position.includes('top');
+  const layerStyle: CSSProperties = { zIndex };
+  if (position === 'center') {
+    layerStyle.left = '50%';
+    layerStyle.transform = 'translateX(-50%)';
+    layerStyle.bottom = 24;
+  } else {
+    if (isTop) layerStyle.top = 24;
+    else layerStyle.bottom = 24;
+    if (isLeft) layerStyle.left = 24;
+    else layerStyle.right = 24;
   }
-}
-function ManualTranscript({ ui, onQuickAction }) {
-  return /* @__PURE__ */ jsxs(Fragment, { children: [
-    /* @__PURE__ */ jsxs("div", { className: "bb-omago-assistant", children: [
-      /* @__PURE__ */ jsx("span", { className: "bb-omago-avatar-logo", "aria-hidden": "true" }),
-      /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsxs("div", { className: "bb-omago-author", children: [
-          ui.bot.name,
-          /* @__PURE__ */ jsx("span", { children: ui.bot.time })
-        ] }),
-        ui.introMessages.map((message) => /* @__PURE__ */ jsx("div", { className: "bb-omago-bubble", children: message }, message)),
-        /* @__PURE__ */ jsx("div", { className: "bb-omago-actions", children: ui.quickActions.map((action) => /* @__PURE__ */ jsx("button", { className: "bb-omago-action-pill", type: "button", onClick: () => onQuickAction(action), children: action }, action)) })
-      ] })
-    ] }),
-    /* @__PURE__ */ jsxs("div", { className: "bb-omago-user", children: [
-      /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsxs("div", { className: "bb-omago-author", children: [
-          ui.user.name,
-          /* @__PURE__ */ jsx("span", { children: ui.user.time })
-        ] }),
-        /* @__PURE__ */ jsx("div", { className: "bb-omago-bubble", children: ui.userReply })
-      ] }),
-      /* @__PURE__ */ jsx(PersonAvatar, { person: ui.user })
-    ] })
-  ] });
-}
-// function LiveTranscript({ messages, ui }) {
-//   return /* @__PURE__ */ jsx("div", { className: "bb-omago-live-list", children: messages.map((message) => {
-//     const isUser = message.role === "user";
-//     const person = isUser ? ui.user : ui.bot;
-//     const avatar = /* @__PURE__ */ jsx(PersonAvatar, { person });
-//     const copy = /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-copy", children: [
-//       /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-meta", children: [
-//         isUser ? (ui.user.name || "You") : (ui.bot.name || "AI Agent"),
-//         /* @__PURE__ */ jsx("time", { children: formatTime(message.timestamp) })
-//       ] }),
-//       // /* @__PURE__ */ jsx("span", { className: "bb-omago-live-bubble", children: message.text })
-//       <span className="bb-omago-live-bubble"><MessageContent text={message.text} /></span>
-//     ] });
-//     return /* @__PURE__ */ jsxs("div", { className: `bb-omago-live-message ${isUser ? "is-user" : ""}`, children: isUser ? [copy, avatar] : [avatar, copy] }, message.id);
-//   }) });
-// }
-const EMOJI_SET = ["😀","😂","😍","👍","🙏","🎉","🔥","❤️","😢","🤔","👏","✅"];
-function EmojiPicker({ onSelect }) {
+  const rootStyle = {
+    ...layerStyle,
+    ...brandStyle({ primaryColor, accentColor, backgroundColor }),
+    '--bb-w-width': width,
+    '--bb-w-height': height,
+    ...(borderRadius ? { '--bb-w-radius': borderRadius } : {}),
+    ...(border ? { '--bb-w-border': border } : {})
+  } as CSSProperties;
+
+  const unread = chat.unreadCount;
+  const hasMessages = chat.messages.length > 0;
+  const canRate = !!chat.sessionId;
+
+  const launcherLabel = open ? 'Close chat' : unread ? `Open chat, ${unread} unread ${unread === 1 ? 'reply' : 'replies'}` : 'Open chat';
+
+  const launcher =
+    !open && launcherType === 'gif' && launcherGifUrl ? (
+      <button ref={launcherRef} type="button" className="bb-w-launcher is-gif" onClick={() => setOpen(true)} aria-label={launcherLabel}>
+        <img src={launcherGifUrl} alt="" />
+        {unread ? <span className="bb-w-badge" aria-hidden="true">{unread > 9 ? '9+' : unread}</span> : null}
+      </button>
+    ) : !open && launcherType === 'button' ? (
+      <button ref={launcherRef} type="button" className="bb-w-launcher is-pill" onClick={() => setOpen(true)} aria-label={launcherLabel}>
+        <ChatIcon name="chat" size={20} />
+        <span>{buttonText}</span>
+        {unread ? <span className="bb-w-badge" aria-hidden="true">{unread > 9 ? '9+' : unread}</span> : null}
+      </button>
+    ) : (
+      <button
+        ref={launcherRef}
+        type="button"
+        className="bb-w-launcher"
+        onClick={() => setOpen(!open)}
+        aria-label={launcherLabel}
+        aria-expanded={open}
+      >
+        <span className="bb-w-launcher-icon" key={open ? 'open' : 'closed'}>
+          <ChatIcon name={open ? 'chevronDown' : 'chat'} size={26} strokeWidth={open ? 2 : 1.75} />
+        </span>
+        {!open && unread ? <span className="bb-w-badge" aria-hidden="true">{unread > 9 ? '9+' : unread}</span> : null}
+      </button>
+    );
+
   return (
-    <div className="bb-omago-emoji-pop">
-      {EMOJI_SET.map(e => (
-        <button key={e} type="button" onClick={() => onSelect(e)}>{e}</button>
-      ))}
+    <div
+      className={`bb-c bb-w${isLeft ? ' is-left' : ''}${isTop ? ' is-top' : ''}${position === 'center' ? ' is-center' : ''}${open ? ' is-open' : ''}`}
+      data-theme={theme}
+      style={rootStyle}
+    >
+      <div className="bb-c-sr" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+      {open ? <div className="bb-w-scrim" onClick={() => setOpen(false)} aria-hidden="true" /> : null}
+      {open ? (
+        <section
+          ref={windowRef}
+          className={`bb-w-window${expanded ? ' is-expanded' : ''}`}
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby={titleId}
+          onKeyDown={onKeyDownWindow}
+        >
+          <header className="bb-c-header">
+            {view === 'history' ? (
+              <button
+                type="button"
+                className="bb-c-iconbtn"
+                onClick={() => {
+                  setView('chat');
+                  setTimeout(() => inputRef.current?.focus(), 30);
+                }}
+                aria-label="Back to chat"
+              >
+                <ChatIcon name="chevronLeft" size={20} />
+              </button>
+            ) : ui.logo ? (
+              <BotAvatar src={ui.logo} name={ui.title} />
+            ) : (
+              <span className="bb-c-avatar is-logo">
+                <BrainboxLogo size={32} title={ui.title} />
+              </span>
+            )}
+            <div className="bb-c-header-copy">
+              <h2 className="bb-c-title" id={titleId}>
+                {view === 'history' ? 'Conversations' : ui.title}
+              </h2>
+              {view === 'history' ? null : (
+                <div className="bb-c-subtitle">
+                  <span className="bb-c-dot" aria-hidden="true" />
+                  <span>{chat.streaming ? 'Typing…' : ui.subtitle}</span>
+                </div>
+              )}
+            </div>
+            <div className="bb-c-header-actions">
+              {view === 'chat' ? (
+                <>
+                  <button type="button" className="bb-c-iconbtn" onClick={newChat} aria-label="New conversation" title="New conversation">
+                    <ChatIcon name="compose" size={18} />
+                  </button>
+                  <button type="button" className="bb-c-iconbtn" onClick={() => setView('history')} aria-label="Conversation history" title="History">
+                    <ChatIcon name="history" size={18} />
+                  </button>
+                </>
+              ) : null}
+              {showExportButton && hasMessages && view === 'chat' ? (
+                <button type="button" className="bb-c-iconbtn" onClick={() => void chat.exportChat('json')} aria-label="Export conversation" title="Export">
+                  <ChatIcon name="download" size={18} />
+                </button>
+              ) : null}
+              {sounds ? (
+                <button
+                  type="button"
+                  className="bb-c-iconbtn"
+                  onClick={toggleSound}
+                  aria-label={soundOn ? 'Mute sounds' : 'Unmute sounds'}
+                  aria-pressed={!soundOn}
+                  title={soundOn ? 'Sounds on' : 'Sounds off'}
+                >
+                  <ChatIcon name={soundOn ? 'volume' : 'volumeOff'} size={18} />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="bb-c-iconbtn bb-w-expand"
+                onClick={() => setExpanded((x) => !x)}
+                aria-label={expanded ? 'Shrink window' : 'Expand window'}
+                aria-pressed={expanded}
+                title={expanded ? 'Shrink' : 'Expand'}
+              >
+                <ChatIcon name={expanded ? 'shrink' : 'expand'} size={16} />
+              </button>
+              <button type="button" className="bb-c-iconbtn" onClick={() => setOpen(false)} aria-label="Close chat" title="Close">
+                <ChatIcon name="x" size={18} />
+              </button>
+            </div>
+          </header>
+
+          <div className="bb-w-body">
+            {view === 'history' ? (
+              <div className="bb-w-history">
+                <label className="bb-c-search">
+                  <span className="bb-c-sr">Search conversations</span>
+                  <ChatIcon name="search" size={15} />
+                  <input type="search" placeholder="Search" value={query} autoFocus onChange={(e) => setQuery(e.target.value)} />
+                </label>
+                <SessionList
+                  sessions={chat.sessions || []}
+                  activeId={chat.sessionId}
+                  loading={chat.sessionsLoading}
+                  query={query}
+                  onSelect={(id) => {
+                    setView('chat');
+                    void chat.loadSession(id);
+                  }}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="bb-c-scroll" ref={scroll.ref} onScroll={scroll.onScroll}>
+                  {!hasMessages && !chat.loading ? (
+                    <div className="bb-c-welcome">
+                      <div className="bb-c-welcome-logo">{ui.logo ? <img src={ui.logo} alt="" /> : <BrainboxLogo size={48} />}</div>
+                      <h3 className="bb-c-greeting">{ui.greeting}</h3>
+                      <p className="bb-c-welcome-sub">{ui.welcomeSub}</p>
+                      {ui.intro.length ? (
+                        <div className="bb-c-intro">
+                          {ui.intro.map((m: string, i: number) => (
+                            <div key={i} className="bb-c-bubble">
+                              {m}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      {ui.actions.length ? (
+                        <div className="bb-c-chips">
+                          {ui.actions.map((a) => (
+                            <button key={a.label} type="button" className="bb-c-chip" onClick={() => send(a.prompt || a.label)}>
+                              <ChatIcon name={a.icon || 'sparkles'} size={15} />
+                              {a.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <MessageList
+                      messages={chat.messages}
+                      botName={ui.botName}
+                      botAvatar={ui.botAvatar}
+                      showFeedback={showFeedback}
+                      canRate={canRate}
+                      onCopy={onCopy}
+                      onFeedback={onFeedback}
+                    />
+                  )}
+                  {scroll.showJump ? (
+                    <button type="button" className="bb-c-jump" onClick={() => scroll.scrollToBottom()} aria-label="Scroll to latest message">
+                      <ChatIcon name="arrowDown" size={16} />
+                    </button>
+                  ) : null}
+                </div>
+                {chat.error && !chat.loading ? (
+                  <div className="bb-c-alert" role="alert">
+                    <ChatIcon name="alert" size={16} />
+                    <span className="bb-c-alert-msg">{chat.error}</span>
+                    <button type="button" className="bb-c-btn" onClick={() => void chat.retry()}>
+                      Retry
+                    </button>
+                    <button type="button" className="bb-c-iconbtn is-sm" onClick={chat.clearError} aria-label="Dismiss error">
+                      <ChatIcon name="x" size={14} />
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            )}
+            <ToastStack toasts={toasts} dismiss={dismiss} pause={pause} resume={resume} />
+            {view === 'chat' && showVoiceInput ? (
+              <div className="bb-c-seg" role="tablist" aria-label="Input mode">
+                {(['chat', 'voice'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={inputMode === m}
+                    tabIndex={inputMode === m ? 0 : -1}
+                    onClick={() => setInputMode(m)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        setInputMode(inputMode === 'chat' ? 'voice' : 'chat');
+                      }
+                    }}
+                  >
+                    <ChatIcon name={m === 'chat' ? 'chat' : 'mic'} size={14} />
+                    {m === 'chat' ? 'Chat' : 'Voice'}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {view === 'chat' && showVoiceInput && inputMode === 'voice' ? (
+              <div className="bb-c-composer">
+                <div className="bb-c-voice">
+                  <button
+                    type="button"
+                    className={`bb-c-send${voice.recording ? ' is-recording' : ''}`}
+                    onClick={() => void voice.toggle()}
+                    aria-label={voice.recording ? 'Stop recording and send' : 'Start recording'}
+                    aria-pressed={voice.recording}
+                  >
+                    <ChatIcon name={voice.recording ? 'stop' : 'mic'} size={22} />
+                  </button>
+                  <span className="bb-c-voice-label" role="status">
+                    {voice.recording ? 'Recording… tap to send' : 'Tap to record a voice note'}
+                  </span>
+                </div>
+              </div>
+            ) : view === 'chat' ? (
+              <Composer
+                value={input}
+                onChange={setInput}
+                onSend={() => send()}
+                onStop={chat.stop}
+                streaming={chat.loading}
+                busy={chat.loading}
+                placeholder={ui.placeholder}
+                showFileUpload={showFileUpload}
+                showImageUpload={showImageUpload}
+                onFile={(f) => void chat.uploadFile(f)}
+                onImage={(f) => void chat.uploadImage(f)}
+                inputRef={inputRef}
+                onEscape={() => setOpen(false)}
+              />
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+      {launcher}
     </div>
   );
 }
-function LiveTranscript({ messages, ui, loading }) {
-  return /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-list", children: [
-    messages.map((message) => {
-      const isUser = message.role === "user";
-      const person = isUser ? ui.user : ui.bot;
-      const avatar = /* @__PURE__ */ jsx(PersonAvatar, { person });
-      const copy = /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-copy", children: [
-        /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-meta", children: [
-          isUser ? (ui.user.name || "You") : (ui.bot.name || "AI Agent"),
-          /* @__PURE__ */ jsx("time", { children: formatTime(message.timestamp) })
-        ] }),
-        /* @__PURE__ */ jsx("span", { className: "bb-omago-live-bubble", children: /* @__PURE__ */ jsx(MessageContent, { text: message.text }) })
-      ] });
-      return /* @__PURE__ */ jsxs("div", { className: `bb-omago-live-message ${isUser ? "is-user" : ""}`, children: isUser ? [copy, avatar] : [avatar, copy] }, message.id);
-    }),
-    loading && /* @__PURE__ */ jsxs("div", { className: "bb-omago-live-message", children: [
-      /* @__PURE__ */ jsx(PersonAvatar, { person: ui.bot }),
-      /* @__PURE__ */ jsx("div", { className: "bb-omago-live-copy", children: /* @__PURE__ */ jsx(TypingIndicator, { label: "Searching knowledge base..." }) })
-    ] })
-  ] });
-}
-function ChatWidget({
-  sdk,
-  position = "bottom-right",
-  primaryColor = "#b93fff",
-  accentColor = "#08080a",
-  launcherType = "button", // "button" | "icon" | "gif"
-  launcherGifUrl = void 0,
-  backgroundColor = "#fbf1ff",
-  companyDescription = void 0,
-  buttonText = "Chat",
-  placeholder = void 0,
-  width = "320px",
-  height = "480px",
-  borderRadius = "22px",
-  border = "2px solid rgba(255, 255, 255, .82)",
-  defaultOpen = false,
-  design = "omago",
-  logoUrl = void 0,
-  logoText = void 0,
-  companyName = void 0,
-  user = void 0,
-  bot = void 0,
-  data = void 0,
-  manualData = void 0
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [input, setInput] = useState("");
-  const [mode, setMode] = useState("chat");
-  const [recording, setRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [voiceError, setVoiceError] = useState("");
-  const { messages, loading, error, sendMessage, sendVoiceNote, uploadFile, sessions, loadSession } = useBrainboxChat(sdk);
-  const endRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const sdkUser = useMemo(() => sdk.getUserProfile?.(), [sdk]);
-  const [historyMode, setHistoryMode] = useState(false);
-  const [showEmoji, setShowEmoji] = useState(false);
-  
-  const ui = useMemo(() => {
-    const merged = mergeData(defaultChatWidgetData, manualData || data);
-    const resolvedName = user?.name || sdkUser?.name || merged.user.name;
-    const resolvedBotName = bot?.name || merged.bot.name;
-    const interpolate = (str) =>
-      str.replaceAll("{{name}}", resolvedName).replaceAll("{{botName}}", resolvedBotName);
 
-    return {
-      ...merged,
-      brand: {
-        ...merged.brand,
-        name: companyName || logoText || merged.brand.name,
-        subtitle: companyDescription || merged.brand.subtitle,
-        logoUrl: logoUrl || merged.brand.logoUrl
-      },
-      bot: { ...merged.bot, ...(bot || {}) },
-      user: { ...merged.user, ...(sdkUser || {}), ...(user || {}) },
-      introMessages: merged.introMessages.map(interpolate),
-      userReply: interpolate(merged.userReply)
-    };
-  }, [bot, companyDescription, companyName, data, logoText, logoUrl, manualData, sdkUser, user]);
-  const positionStyle = useMemo(() => {
-    const base = {
-      position: "fixed",
-      zIndex: 9999,
-      width,
-      maxWidth: `min(${width}, calc(100vw - 28px))`
-    };
-    if (position.includes("bottom")) base.bottom = "24px";
-    if (position.includes("top")) base.top = "24px";
-    if (position.includes("right")) base.right = "24px";
-    if (position.includes("left")) base.left = "24px";
-    if (position === "center") {
-      base.left = "50%";
-      base.transform = "translateX(-50%)";
-      base.bottom = "24px";
-    }
-    return base;
-  }, [position, width]);
-  useEffect(() => {
-    var _a;
-    if (messages.length > 0) {
-      (_a = endRef.current) == null ? void 0 : _a.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, open]);
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    setVoiceError("");
-    await sendMessage(input.trim());
-    setInput("");
-  };
-  const handleFileSelect = async (event) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      await uploadFile(file);
-      event.target.value = "";
-    }
-  };
-  const handleVoice = async () => {
-    setVoiceError("");
-    if (recording) {
-      mediaRecorder?.stop();
-      return;
-    }
-    try {
-      const canUseMicrophone = typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia;
-      if (!canUseMicrophone) {
-        const secureHint = typeof window !== "undefined" && !window.isSecureContext ? " Microphone recording requires HTTPS or localhost." : "";
-        throw new Error(`Microphone recording is not available in this browser context.${secureHint}`);
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks = [];
-      recorder.onstart = () => setRecording(true);
-      recorder.ondataavailable = (event) => chunks.push(event.data);
-      recorder.onstop = async () => {
-        setRecording(false);
-        stream.getTracks().forEach(track => track.stop());
-        await sendVoiceNote(new Blob(chunks, { type: 'audio/webm' }));
-      };
-      setMediaRecorder(recorder);
-      recorder.start();
-    } catch (err) {
-      setRecording(false);
-      setVoiceError(err?.message || "Microphone access was denied.");
-    }
-  };
-  const fillComposer = (value) => {
-    setInput(value.replace(/\\u\\{[0-9A-Fa-f]+\\}/g, "").trim());
-  };
-  const composerPlaceholder = placeholder || ui.composer.placeholder;
-  return /* @__PURE__ */ jsxs(
-    "div",
-    {
-      className: "bb-omago-root",
-      "data-design": design,
-      style: {
-        ...positionStyle,
-        "--bb-widget-purple": primaryColor,
-        "--bb-widget-ink": accentColor,
-        "--bb-widget-panel": backgroundColor,
-        "--bb-widget-radius": borderRadius,
-        "--bb-widget-border": border,
-        "--bb-widget-height": height
-      },
-      children: [
-        /* @__PURE__ */ jsx("style", { children: chatWidgetCss }),
-        open ? /* @__PURE__ */ jsxs(Fragment, { children: [
-          /* @__PURE__ */ jsxs("section", { className: "bb-omago-panel", "aria-label": ui.brand.name, children: [
-            /* @__PURE__ */ jsxs("header", { className: "bb-omago-header", children: [
-              /* @__PURE__ */ jsx("span", { className: `bb-omago-logo ${ui.brand.logoUrl ? "has-image" : ""}`, "aria-hidden": "true", children: ui.brand.logoUrl ? /* @__PURE__ */ jsx("img", { src: ui.brand.logoUrl, alt: "" }) : null }),
-              /* @__PURE__ */ jsxs("div", { className: "bb-omago-header-copy", children: [
-                /* @__PURE__ */ jsx("h2", { className: "bb-omago-title", children: ui.brand.name }),
-                /* @__PURE__ */ jsx("div", { className: "bb-omago-subtitle", children: ui.brand.subtitle })
-              ] }),
-              /* @__PURE__ */ jsx("button", { className: "bb-omago-close", type: "button", onClick: () => setOpen(false), "aria-label": "Close chat", children: /* @__PURE__ */ jsx(Icon, { name: "x", size: 22, strokeWidth: 1.8 }) })
-            ] }),
-            /* @__PURE__ */ jsxs("div", { className: "bb-omago-body", children: [
-              // /* @__PURE__ */ jsxs("div", { className: "bb-omago-transcript", children: [
-                //  messages.length > 0 ? /* @__PURE__ */ jsx(LiveTranscript, { messages, ui, loading }) : /* @__PURE__ */ jsx(ManualTranscript, { ui, onQuickAction: fillComposer }),
-              //   /* @__PURE__ */ jsx("div", { ref: endRef })
-              // ] }),
-              <div className="bb-omago-transcript">
-                  {historyMode ? (
-                    <div className="bb-omago-history-list">
-                      {(sessions || []).length === 0 && <p style={{ fontSize: 12, opacity: .6 }}>No previous sessions yet.</p>}
-                      {(sessions || []).map(s => (
-                        <button
-                          key={s.session_id}
-                          className="bb-omago-action-pill"
-                          type="button"
-                          style={{ width: "100%", textAlign: "left" }}
-                          onClick={() => { loadSession(s.session_id); setHistoryMode(false); }}
-                        >
-                          {s.title}
-                        </button>
-                      ))}
-                    </div>
-                  ) : messages.length > 0 ? (
-                    <LiveTranscript messages={messages} ui={ui} loading={loading } />
-                  ) : (
-                    <ManualTranscript ui={ui} onQuickAction={fillComposer} />
-                  )}
-                  <div ref={endRef} />
-                </div>,
-              /* @__PURE__ */ jsx("div", { className: "bb-omago-mode-switch", role: "tablist", "aria-label": "Conversation mode", children: ui.modes.map((item) => /* @__PURE__ */ jsxs("button", { className: `bb-omago-mode ${mode === item.icon ? "is-active" : ""}`, type: "button", onClick: () => setMode(item.icon), children: [
-                /* @__PURE__ */ jsx(Icon, { name: item.icon, size: 20, strokeWidth: 1.9 }),
-                item.label
-              ] }, item.label)) }),
-              /* @__PURE__ */ jsxs("div", { className: "bb-omago-composer", children: [
-                /* @__PURE__ */ jsx(
-                  "textarea",
-                  {
-                    value: input,
-                    onChange: (event) => setInput(event.target.value),
-                    onKeyDown: (event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        handleSend();
-                      }
-                    },
-                    placeholder: mode === "voice" ? "Voice mode ready..." : composerPlaceholder
-                  }
-                ),
-                /* @__PURE__ */ jsxs("div", { className: "bb-omago-composer-bar", children: [
-                  /* @__PURE__ */ jsxs("button", { className: "bb-omago-tool", type: "button", onClick: () => fileInputRef.current?.click(), "aria-label": "Attach file", children: [
-                    /* @__PURE__ */ jsx(Icon, { name: "paperclip", size: 22, strokeWidth: 1.8 }),
-                    /* @__PURE__ */ jsx("input", { ref: fileInputRef, className: "bb-omago-file-input", type: "file", onChange: handleFileSelect })
-                  ] }),
-                  /* @__PURE__ */ jsxs("div", { style: { position: "relative" }, children: [
-                  /* @__PURE__ */ jsx("button", { className: "bb-omago-tool", type: "button", onClick: () => setShowEmoji(s => !s), "aria-label": "Emoji", children: /* @__PURE__ */ jsx(Icon, { name: "smile", size: 22, strokeWidth: 1.8 }) }),
-                    showEmoji && /* @__PURE__ */ jsx(EmojiPicker, { onSelect: (e) => { setInput(current => current + e); setShowEmoji(false); } })
-                   ] }),
-                  // /* @__PURE__ */ jsxs("button", { className: "bb-omago-search", type: "button", children: [
-                  //   /* @__PURE__ */ jsx(Icon, { name: "search", size: 21, strokeWidth: 2.2 }),
-                  //   ui.composer.searchLabel
-                  // ] }),
-                  <button className="bb-omago-search" type="button" onClick={() => setHistoryMode(h => !h)}>
-                  <Icon name="search" size={21} strokeWidth={2.2} />
-                  {historyMode ? "Back to chat" : ui.composer.searchLabel}
-                </button>,
-                  /* @__PURE__ */ jsx("button", { className: "bb-omago-send", type: "button", onClick: mode === "voice" ? handleVoice : handleSend, "aria-label": mode === "voice" ? recording ? "Stop recording" : "Record voice note" : "Send message", children: /* @__PURE__ */ jsx(Icon, { name: mode === "voice" ? "voice" : "send", size: 22, strokeWidth: 2.1 }) })
-                ] }),
-                recording && /* @__PURE__ */ jsx("div", { className: "bb-omago-recording", children: "Recording..." }),
-                (error || voiceError) && /* @__PURE__ */ jsx("div", { className: "bb-omago-error", children: error || voiceError }),
-                loading && /* @__PURE__ */ jsx("span", { style: { display: "none" }, children: "Sending..." })
-              ] })
-            ] })
-          ] }),
-          /* @__PURE__ */ jsx("button", { className: "bb-omago-floating-close", type: "button", onClick: () => setOpen(false), "aria-label": "Close chat", children: /* @__PURE__ */ jsx(Icon, { name: "x", size: 28, strokeWidth: 1.7 }) })
-        ] }) : (
-  launcherType === "gif" && launcherGifUrl ? (
-    /* @__PURE__ */ jsx("button", { className: "bb-omago-launcher-gif", type: "button", onClick: () => setOpen(true), "aria-label": "Open chat", children: /* @__PURE__ */ jsx("img", { src: launcherGifUrl, alt: "Open chat" }) })
-  ) : launcherType === "icon" ? (
-    /* @__PURE__ */ jsx("button", { className: "bb-omago-launcher-icon", type: "button", onClick: () => setOpen(true), "aria-label": "Open chat", children: /* @__PURE__ */ jsx(Icon, { name: "chat", size: 26 }) })
-  ) : (
-    /* @__PURE__ */ jsxs("button", { className: "bb-omago-launcher", type: "button", onClick: () => setOpen(true), "aria-label": "Open chat", children: [
-      /* @__PURE__ */ jsx(Icon, { name: "chat", size: 22 }),
-      buttonText
-    ] })
-  )
-)
-      ]
-    }
-  );
-}
-export {
-  ChatWidget,
-  defaultChatWidgetData
-};
+export default ChatWidget;

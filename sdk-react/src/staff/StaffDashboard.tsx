@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { Icon } from './icons';
+import { BrainboxLogo } from '../design/Logo';
+import { playSound } from '../design/sounds';
+import type { BrainboxSound } from '../design/sounds';
+import { LiveHub } from './live';
 import { useHashRouter } from './router';
-import { NavItem, Shell } from './Shell';
+import { NavItem, openNotificationLink, Shell } from './Shell';
+import { CommandPalette } from './palette';
 import { BrainboxStaffClient } from './staffClient';
 import { useStaffStyles } from './styles';
-import type { StaffDashboardProps, StaffDashboardTheme, StaffUser } from './types';
-import { makeCan, StaffContext, ToastViewport, useToastState } from './ui';
-import type { StaffContextValue } from './ui';
+import type { LiveStatus, StaffDashboardProps, StaffDashboardTheme, StaffNotification, StaffUser } from './types';
+import { makeCan, StaffContext, StaffErrorBoundary, ToastViewport, useToastState } from './ui';
+import type { NotificationStore, StaffContextValue, ThemeMode } from './ui';
 import { AcceptInvitePage, ForcePasswordChangePage, LoginPage, ResetPasswordPage } from './pages/Auth';
 import { AllKeysPage, AllUsersPage, CompaniesPage, CompanyDetailPage } from './pages/Platform';
 import { OverviewPage } from './pages/Overview';
@@ -32,33 +36,61 @@ const TITLES: Record<string, string> = {
 };
 
 const PLATFORM_TITLES: Record<string, string> = { companies: 'Companies', users: 'All users', keys: 'All API keys' };
+const THEME_KEY = 'bb-staff-theme';
+const SOUND_KEY = 'bb-staff-sounds';
+
+function readLS(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeLS(key: string, v: string) {
+  try {
+    localStorage.setItem(key, v);
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 function themeVars(theme: StaffDashboardTheme | undefined, offsetTop: number): CSSProperties {
   const v: Record<string, string> = { '--bbs-top': `${offsetTop}px` };
   if (!theme) return v as CSSProperties;
   const map: [keyof StaffDashboardTheme, string][] = [
-    ['primary', '--bbs-primary'],
-    ['primaryHover', '--bbs-primary-hover'],
-    ['accent', '--bbs-accent'],
-    ['sidebarFrom', '--bbs-side-from'],
-    ['sidebarTo', '--bbs-side-to'],
-    ['surface', '--bbs-surface'],
-    ['text', '--bbs-text'],
-    ['muted', '--bbs-muted'],
-    ['border', '--bbs-border'],
+    ['primary', '--bbs-accent'],
+    ['primaryHover', '--bbs-accent-hover'],
+    ['surface', '--bbs-bg'],
+    ['text', '--bbs-label'],
+    ['muted', '--bbs-secondary'],
+    ['border', '--bbs-separator'],
     ['fontFamily', '--bbs-font']
   ];
   map.forEach(([k, cssVar]) => {
     const val = theme[k];
     if (val != null && val !== '') v[cssVar] = String(val);
   });
+  if (theme.primary && !theme.primaryHover) v['--bbs-accent-hover'] = theme.primary;
   if (theme.radius != null) v['--bbs-radius'] = `${theme.radius}px`;
   return v as CSSProperties;
+}
+
+function usePrefersDark(): boolean {
+  const q = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  const [dark, setDark] = useState(() => !!q?.matches);
+  useEffect(() => {
+    if (!q) return undefined;
+    const on = () => setDark(q.matches);
+    q.addEventListener?.('change', on);
+    return () => q.removeEventListener?.('change', on);
+  }, [q]);
+  return dark;
 }
 
 /**
  * Brainbox staff dashboard: knowledge-gap inbox, analytics, conversations, training, staff management and
  * workspace settings — a self-contained app with hash routing (`#<routePrefix>/overview`, `/gaps/:id`, …).
+ * Updates live over `GET /api/staff/events` (SSE) with a silent polling fallback.
  */
 export function StaffDashboard({
   apiUrl,
@@ -68,20 +100,50 @@ export function StaffDashboard({
   routePrefix = '',
   offsetTop = 0,
   client: clientProp,
-  className
+  className,
+  sounds: soundsProp = true,
+  live: liveProp = true
 }: StaffDashboardProps) {
   useStaffStyles();
   const client = useMemo(() => clientProp || new BrainboxStaffClient({ apiUrl }), [clientProp, apiUrl]);
   const { route, href, navigate } = useHashRouter(routePrefix);
   const [user, setUser] = useState<StaffUser | null>(null);
   const [booting, setBooting] = useState(() => client.isAuthenticated());
-  const { toasts, push, dismiss } = useToastState();
   const [openGaps, setOpenGaps] = useState<number | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const expiredRef = useRef(false);
   // Password typed at sign-in, kept in memory only to prefill a forced password change.
   const loginPasswordRef = useRef<string | undefined>(undefined);
 
-  // Restore the session from the stored token.
+  /* ---------------- appearance & sound ---------------- */
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
+    const s = readLS(THEME_KEY);
+    return s === 'light' || s === 'dark' || s === 'auto' ? s : theme?.mode || 'light';
+  });
+  const setThemeMode = useCallback((m: ThemeMode) => {
+    setThemeModeState(m);
+    writeLS(THEME_KEY, m);
+  }, []);
+  const prefersDark = usePrefersDark();
+  const isDark = themeMode === 'dark' || (themeMode === 'auto' && prefersDark);
+
+  const [sounds, setSoundsState] = useState<boolean>(() => {
+    const s = readLS(SOUND_KEY);
+    return s === '1' ? true : s === '0' ? false : soundsProp;
+  });
+  const soundsRef = useRef(sounds);
+  soundsRef.current = sounds;
+  const play = useCallback((name: BrainboxSound) => playSound(name, soundsRef.current), []);
+  const setSounds = useCallback((on: boolean) => {
+    setSoundsState(on);
+    soundsRef.current = on;
+    writeLS(SOUND_KEY, on ? '1' : '0');
+    if (on) playSound('success', true);
+  }, []);
+
+  const { toasts, push, dismiss } = useToastState(play);
+
+  /* ---------------- session ---------------- */
   useEffect(() => {
     let alive = true;
     if (!client.isAuthenticated()) {
@@ -102,12 +164,11 @@ export function StaffDashboard({
   const userRef = useRef<StaffUser | null>(null);
   userRef.current = user;
 
-  // Session ended (logout or 401) → back to the login screen.
   useEffect(
     () =>
       client.onTokenChange((token) => {
         if (token) return;
-        if (userRef.current && !expiredRef.current) push('Your session expired. Please sign in again.', 'info');
+        if (userRef.current && !expiredRef.current) push('Your session expired', 'info', { body: 'Please sign in again.' });
         expiredRef.current = false;
         loginPasswordRef.current = undefined;
         setUser(null);
@@ -115,25 +176,195 @@ export function StaffDashboard({
     [client, push]
   );
 
+  /* ---------------- live hub ---------------- */
+  const hub = useMemo(() => new LiveHub(client), [client]);
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>('idle');
+  const ready = !!user && !user.must_change_password;
+  useEffect(() => hub.onStatus(setLiveStatus), [hub]);
+  useEffect(() => {
+    if (!ready || !liveProp) return undefined;
+    hub.start();
+    return () => hub.stop();
+  }, [hub, ready, liveProp]);
+  const pollingMode = liveStatus === 'polling' || (!liveProp && ready);
+
+  /* ---------------- counts ---------------- */
+  const countTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshCounts = useCallback(() => {
-    if (!client.isAuthenticated()) return;
-    client
-      .listGaps({ status: 'open', page: 1, page_size: 1 })
-      .then((r) => setOpenGaps(r.counts?.open ?? r.total))
-      .catch(() => undefined);
+    if (countTimer.current) clearTimeout(countTimer.current);
+    countTimer.current = setTimeout(() => {
+      if (!client.isAuthenticated()) return;
+      client
+        .listGaps({ status: 'open', page: 1, page_size: 1 })
+        .then((r) => setOpenGaps(r.counts?.open ?? r.total))
+        .catch(() => undefined);
+    }, 150);
   }, [client]);
 
   useEffect(() => {
-    if (!user) return undefined;
+    if (!ready) return undefined;
     refreshCounts();
-    const id = setInterval(refreshCounts, 60000);
+    const id = setInterval(refreshCounts, pollingMode ? 15000 : 120000);
     return () => clearInterval(id);
-  }, [user, refreshCounts]);
+  }, [ready, refreshCounts, pollingMode]);
 
+  /* ---------------- notifications store ---------------- */
+  const [notifItems, setNotifItems] = useState<StaffNotification[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [notifLoaded, setNotifLoaded] = useState(false);
+  const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  const knownIds = useRef<Set<string> | null>(null);
+
+  const markFresh = useCallback((ids: string[]) => {
+    if (!ids.length) return;
+    setFresh((f) => new Set([...Array.from(f), ...ids]));
+    setTimeout(() => setFresh((f) => new Set(Array.from(f).filter((x) => !ids.includes(x)))), 2400);
+  }, []);
+
+  const announceNotification = useCallback(
+    (n: StaffNotification, allTypes: boolean) => {
+      if (!allTypes && n.type === 'gap') return; // the `gap` event already toasted it
+      const tone = n.type === 'training_failed' ? 'error' : n.type === 'feedback' ? 'warning' : 'info';
+      push(n.title, tone, {
+        body: n.body,
+        sound: 'notify',
+        action: n.link ? { label: 'Open', onClick: () => openNotificationLink(routePrefix, n) } : undefined
+      });
+    },
+    [push, routePrefix]
+  );
+
+  const loadNotifications = useCallback(
+    async (announce = false) => {
+      if (!client.isAuthenticated()) return;
+      try {
+        const res = await client.listNotifications({ limit: 30 });
+        const items = res.items || [];
+        const prev = knownIds.current;
+        const ids = new Set(items.map((n) => String(n.id)));
+        if (prev && announce) {
+          const added = items.filter((n) => !prev.has(String(n.id)) && !n.read);
+          markFresh(added.map((n) => String(n.id)));
+          added.slice(0, 2).forEach((n) => announceNotification(n, true));
+          if (added.some((n) => n.type === 'gap' || n.type === 'feedback')) refreshCounts();
+        }
+        knownIds.current = ids;
+        setNotifItems(items);
+        setUnread(res.unread_count || 0);
+        setNotifLoaded(true);
+      } catch {
+        /* the bell is best-effort */
+      }
+    },
+    [client, markFresh, announceNotification, refreshCounts]
+  );
+
+  useEffect(() => {
+    if (!ready) {
+      knownIds.current = null;
+      setNotifItems([]);
+      setUnread(0);
+      setNotifLoaded(false);
+      return undefined;
+    }
+    void loadNotifications();
+    if (!pollingMode) return undefined;
+    const id = setInterval(() => {
+      if (!document.hidden) void loadNotifications(true);
+    }, 15000);
+    return () => clearInterval(id);
+  }, [ready, pollingMode, loadNotifications]);
+
+  const markRead = useCallback(
+    (n: StaffNotification) => {
+      if (n.read) return;
+      setNotifItems((list) => list.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+      setUnread((u) => Math.max(0, u - 1));
+      client.markNotificationRead(n.id).catch(() => {
+        setNotifItems((list) => list.map((x) => (x.id === n.id ? { ...x, read: false } : x)));
+        setUnread((u) => u + 1);
+      });
+    },
+    [client]
+  );
+
+  const markAllRead = useCallback(async () => {
+    const before = notifItems;
+    const beforeUnread = unread;
+    setNotifItems((list) => list.map((x) => ({ ...x, read: true })));
+    setUnread(0);
+    try {
+      await client.markAllNotificationsRead();
+    } catch (err: any) {
+      setNotifItems(before);
+      setUnread(beforeUnread);
+      push('Couldn’t mark notifications as read', 'error', { body: err?.message });
+    }
+  }, [client, notifItems, unread, push]);
+
+  const notifications = useMemo<NotificationStore>(
+    () => ({ items: notifItems, unread, loaded: notifLoaded, fresh, reload: () => loadNotifications(), markRead, markAllRead }),
+    [notifItems, unread, notifLoaded, fresh, loadNotifications, markRead, markAllRead]
+  );
+
+  /* ---------------- global live reactions ---------------- */
+  const can = useMemo(() => makeCan(user), [user]);
+  useEffect(() => {
+    if (!ready) return undefined;
+    const offs = [
+      hub.on('notification', (n) => {
+        const id = String(n.id);
+        if (knownIds.current?.has(id)) return;
+        knownIds.current?.add(id);
+        setNotifItems((list) => (list.some((x) => String(x.id) === id) ? list : [n, ...list].slice(0, 50)));
+        if (!n.read) setUnread((u) => u + 1);
+        markFresh([id]);
+        announceNotification(n, false);
+      }),
+      hub.on('gap', (e) => {
+        if (e.action === 'created' && e.gap.status === 'open') {
+          setOpenGaps((c) => (c == null ? c : c + 1));
+          if (e.gap.reason !== 'negative_feedback') {
+            push('New unanswered question', 'warning', {
+              body: `“${e.gap.question}”${e.gap.user_name ? ` — ${e.gap.user_name}` : ''}`,
+              sound: 'notify',
+              action: { label: can('trainer') ? 'Answer' : 'View', onClick: () => navigate(`/gaps/${e.gap.id}`, can('trainer') ? { answer: 1 } : undefined) }
+            });
+          }
+        }
+        refreshCounts();
+      }),
+      hub.on('overview', (o) => {
+        if (typeof o.open_gaps === 'number') setOpenGaps(o.open_gaps);
+      }),
+      hub.on('resync', () => {
+        void loadNotifications(true);
+        refreshCounts();
+      })
+    ];
+    return () => offs.forEach((off) => off());
+  }, [hub, ready, push, navigate, can, refreshCounts, markFresh, announceNotification, loadNotifications]);
+
+  /* ---------------- ⌘K ---------------- */
+  useEffect(() => {
+    if (!ready) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      } else if (e.key === '/' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement) && !(e.target as HTMLElement)?.isContentEditable) {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [ready]);
+
+  /* ---------------- routing ---------------- */
   const section = route.segments[0] || '';
   const isPublic = PUBLIC_ROUTES.includes(section);
 
-  // Redirects: root → overview; signed-in on /login → next/overview.
   useEffect(() => {
     if (route.outside || booting) return;
     if (user && (section === 'login' || section === '')) {
@@ -145,11 +376,13 @@ export function StaffDashboard({
     }
   }, [user, booting, section, isPublic, route.path, route.query.next, route.outside, navigate]);
 
+  useEffect(() => setPaletteOpen(false), [route.path]);
+
   const signOut = useCallback(() => {
     expiredRef.current = true;
     client.logout();
     setUser(null);
-    push('You’ve been signed out.', 'info');
+    push('You’ve been signed out', 'info');
     navigate('/login');
   }, [client, navigate, push]);
 
@@ -157,7 +390,7 @@ export function StaffDashboard({
     (u: StaffUser, meta?: { password?: string }) => {
       loginPasswordRef.current = u.must_change_password ? meta?.password : undefined;
       setUser(u);
-      push(`Welcome${u.full_name ? `, ${u.full_name.split(' ')[0]}` : ''}!`);
+      push(`Welcome${u.full_name ? `, ${u.full_name.split(' ')[0]}` : ''}`, 'success');
       const next = route.query.next;
       navigate(next && next.startsWith('/') && !next.startsWith('/login') ? next : '/overview', undefined, { replace: true });
     },
@@ -169,6 +402,8 @@ export function StaffDashboard({
     [navigate, route.path, route.query]
   );
 
+  const openPalette = useCallback(() => setPaletteOpen(true), []);
+
   const ctx = useMemo<StaffContextValue | null>(
     () =>
       user
@@ -176,7 +411,7 @@ export function StaffDashboard({
             client,
             user,
             setUser,
-            can: makeCan(user),
+            can,
             toast: push,
             href,
             navigate,
@@ -185,13 +420,22 @@ export function StaffDashboard({
             routePrefix,
             openGaps,
             refreshCounts,
-            signOut
+            signOut,
+            live: hub,
+            liveStatus,
+            sounds,
+            setSounds,
+            play,
+            themeMode,
+            setThemeMode,
+            notifications,
+            openPalette
           }
         : null,
-    [client, user, push, href, navigate, route.query, brandName, routePrefix, openGaps, refreshCounts, signOut]
+    [client, user, can, push, href, navigate, route.query, brandName, routePrefix, openGaps, refreshCounts, signOut, hub, liveStatus, sounds, setSounds, play, themeMode, setThemeMode, notifications, openPalette]
   );
 
-  const rootClass = `bb-staff${className ? ` ${className}` : ''}`;
+  const rootClass = `bb-staff${isDark ? ' is-dark' : ''}${className ? ` ${className}` : ''}`;
   const rootStyle = themeVars(theme, offsetTop);
   const toastsEl = <ToastViewport toasts={toasts} dismiss={dismiss} />;
 
@@ -200,7 +444,7 @@ export function StaffDashboard({
       <div className={rootClass} style={rootStyle}>
         <div className="bb-staff-center-screen" aria-busy="true" aria-label="Loading">
           <span className="bb-staff-loader">
-            <Icon name="brain" size={22} />
+            <BrainboxLogo size={44} title="" />
           </span>
         </div>
       </div>
@@ -222,7 +466,7 @@ export function StaffDashboard({
           onDone={(u) => {
             loginPasswordRef.current = undefined;
             setUser(u);
-            push('Password updated. Welcome!');
+            push('Password updated', 'success', { body: 'Welcome to the staff console.' });
           }}
         />
         {toastsEl}
@@ -248,6 +492,7 @@ export function StaffDashboard({
     { key: 'gaps', label: 'Knowledge gaps', icon: 'gaps', badge: openGaps, alert: !!openGaps },
     { key: 'conversations', label: 'Conversations', icon: 'chat' },
     { key: 'training', label: 'Training', icon: 'training' },
+    { key: 'notifications', label: 'Notifications', icon: 'bell', badge: unread || null },
     { key: 'staff', label: 'Staff', icon: 'staff' },
     { key: 'settings', label: 'Settings', icon: 'settings' }
   ];
@@ -267,7 +512,6 @@ export function StaffDashboard({
   switch (section) {
     case 'gaps':
       page = <GapsPage gapId={seg1} />;
-      search = { placeholder: 'Search knowledge gaps…', value: route.query.q || '', onChange: setQuerySearch };
       break;
     case 'conversations':
       if (seg1) {
@@ -276,7 +520,6 @@ export function StaffDashboard({
         title = 'Transcript';
       } else {
         page = <ConversationsPage />;
-        search = { placeholder: 'Search conversations…', value: route.query.q || '', onChange: setQuerySearch };
       }
       break;
     case 'training':
@@ -284,7 +527,7 @@ export function StaffDashboard({
       break;
     case 'staff':
       page = <StaffPage />;
-      search = { placeholder: 'Search staff…', value: route.query.q || '', onChange: setQuerySearch };
+      search = { placeholder: 'Filter staff…', value: route.query.q || '', onChange: setQuerySearch };
       break;
     case 'settings':
       page = <SettingsPage tab={seg1} />;
@@ -303,19 +546,20 @@ export function StaffDashboard({
         break;
       }
       title = PLATFORM_TITLES[sub];
+      crumbs = [{ label: 'Platform' }];
       if (sub === 'companies' && route.segments[2]) {
         page = <CompanyDetailPage tenantId={route.segments[2]} tab={route.segments[3]} />;
-        crumbs = [{ label: 'Companies', to: '/platform/companies' }];
+        crumbs = [{ label: 'Platform' }, { label: 'Companies', to: '/platform/companies' }];
         title = 'Company';
       } else if (sub === 'users') {
         page = <AllUsersPage />;
-        search = { placeholder: 'Search name, email or company…', value: route.query.q || '', onChange: setQuerySearch };
+        search = { placeholder: 'Filter name, email or company…', value: route.query.q || '', onChange: setQuerySearch };
       } else if (sub === 'keys') {
         page = <AllKeysPage />;
-        search = { placeholder: 'Search keys or companies…', value: route.query.q || '', onChange: setQuerySearch };
+        search = { placeholder: 'Filter keys or companies…', value: route.query.q || '', onChange: setQuerySearch };
       } else {
         page = <CompaniesPage />;
-        search = { placeholder: 'Search companies or owners…', value: route.query.q || '', onChange: setQuerySearch };
+        search = { placeholder: 'Filter companies or owners…', value: route.query.q || '', onChange: setQuerySearch };
       }
       break;
     }
@@ -325,7 +569,7 @@ export function StaffDashboard({
   }
 
   const navSection = section === 'platform' ? `platform/${seg1 && PLATFORM_TITLES[seg1] ? seg1 : 'companies'}` : section;
-  const activeKey = nav.some((n) => n.key === navSection) ? navSection : section === 'account' || section === 'notifications' ? '' : 'overview';
+  const activeKey = nav.some((n) => n.key === navSection) ? navSection : section === 'account' ? '' : 'overview';
 
   return (
     <StaffContext.Provider value={ctx}>
@@ -338,9 +582,18 @@ export function StaffDashboard({
         logoUrl={logoUrl}
         rootClassName={rootClass}
         rootStyle={rootStyle}
-        overlay={toastsEl}
+        overlay={
+          <>
+            {paletteOpen ? <CommandPalette nav={nav} onClose={() => setPaletteOpen(false)} /> : null}
+            {toastsEl}
+          </>
+        }
       >
-        {page}
+        <StaffErrorBoundary resetKey={route.path} onHome={() => navigate('/overview')}>
+          <div className="bb-staff-page" key={section}>
+            {page}
+          </div>
+        </StaffErrorBoundary>
       </Shell>
     </StaffContext.Provider>
   );
