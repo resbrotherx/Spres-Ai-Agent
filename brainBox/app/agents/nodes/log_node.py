@@ -60,8 +60,21 @@ def response_node(state: AgentState) -> AgentState:
     for i, chunk in enumerate(state["context"][:MAX_CHUNKS]):
         label = sources[i] if i < len(sources) and sources[i] else "document"
         blocks.append(f"[{i + 1}] (source: {label})\n{chunk[:MAX_CHUNK_CHARS]}")
-    context = "\n\n".join(blocks) if blocks else "No context found"
     question = state["question"]
+
+    # Nothing in the knowledge base this user may see: don't let the model guess (small local
+    # models invent answers from thin air). Reply at once; chat.py records it as a no_context gap.
+    if not blocks:
+        return {
+            **state,
+            "response": (
+                f"{UNKNOWN_ANSWER_PREFIX}. I've passed your question to our team so they can add "
+                "the answer — please contact support if you need help right away."
+            ),
+            "reasoning": "No matching knowledge-base context; answered without calling the LLM",
+        }
+
+    context = "\n\n".join(blocks)
 
     prompt = f"""You are a helpful customer-support and knowledge assistant.
 Answer the user's question using the knowledge base context below. The context may contain
