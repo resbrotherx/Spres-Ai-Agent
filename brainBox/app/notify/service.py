@@ -64,6 +64,18 @@ def send_transactional(db: Session, tenant_id: Optional[str], to: str, kind: str
     return ok
 
 
+def _publish_notifications(tenant_id: str, items: List[Notification]) -> None:
+    """Live "notification" events, each only to its addressee. Never raises."""
+    try:
+        from app import realtime
+        if not items or not realtime.broker.has_subscribers(tenant_id):
+            return
+        for n in items:
+            realtime.publish(tenant_id, "notification", notification_to_dict(n), user_id=n.user_id)
+    except Exception as e:
+        logger.warning(f"Publishing notifications failed: {e}")
+
+
 def notify_staff(
     db: Session,
     tenant_id: str,
@@ -86,12 +98,16 @@ def notify_staff(
                 User.is_active.is_(True), User.invite_token_hash.is_(None)).all()
             if staff_mod.rank(u.role) >= staff_mod.rank(min_role) and u.id != exclude_user_id
         ]
+        created: List[Notification] = []
         for user in recipients:
             if user.notify_in_app is not False:
-                db.add(Notification(tenant_id=tenant_id, user_id=user.id, type=type, title=title[:250],
-                                    body=body, link=link, read=False, created_at=staff_mod.utcnow()))
+                n = Notification(tenant_id=tenant_id, user_id=user.id, type=type, title=title[:250],
+                                 body=body, link=link, read=False, created_at=staff_mod.utcnow())
+                db.add(n)
+                created.append(n)
                 result["in_app"] += 1
         db.commit()
+        _publish_notifications(tenant_id, created)
 
         if not (email and smtp_configured()):
             return result

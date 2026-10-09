@@ -12,6 +12,7 @@ from app.db.models import APIKey, Notification
 from app.db.session import get_db
 from app.dependencies import AuthContext, require_api_key, require_staff
 from app.notify.service import notification_to_dict
+from app.realtime import publish_key
 from app.utils.logging import logger
 
 router = APIRouter()
@@ -115,6 +116,7 @@ def create_key(payload: KeyCreatePayload, auth: AuthContext = Depends(require_st
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     logger.info(f"API key created from dashboard: id={record.id} tenant={record.tenant_id} "
                 f"type={record.key_type} by={auth.staff_user_id}")
+    publish_key(record, "created")
     return {"key": _key_out(record), "raw_key": raw}
 
 
@@ -123,7 +125,9 @@ def revoke_key(key_id: int, auth: AuthContext = Depends(require_staff("admin")),
     owned = db.query(APIKey.id).filter(APIKey.id == key_id, APIKey.tenant_id == auth.tenant_id).first()
     if owned is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")
-    apikeys.revoke_key(db, key_id)
+    revoked = apikeys.revoke_key(db, key_id)
+    if revoked is not None:
+        publish_key(revoked, "revoked")
     logger.info(f"API key revoked from dashboard: id={key_id} tenant={auth.tenant_id} by={auth.staff_user_id}")
     return {"revoked": True}
 
@@ -139,6 +143,8 @@ def roll_key(key_id: int, auth: AuthContext = Depends(require_staff("admin")), d
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")
     record, raw, old = result
+    publish_key(record, "rolled")
+    publish_key(old, "revoked")
     logger.info(f"API key rolled from dashboard: old={old.id} new={record.id} tenant={auth.tenant_id} "
                 f"by={auth.staff_user_id}")
     return {"key": _key_out(record), "raw_key": raw, "revoked_id": old.id}

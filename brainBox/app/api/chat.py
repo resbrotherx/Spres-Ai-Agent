@@ -1,12 +1,18 @@
 import hashlib
-from typing import Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 from uuid import uuid4
 from datetime import datetime, timedelta
 
-from app.db.session import get_db
+from app import realtime
+from app.agents.nodes import log_node as nodes
+from app.config import settings as app_settings
+from app.db.session import SessionLocal, get_db
 from app.db.models import ChatFeedback, ChatSession, ChatMessage as ChatMessageModel
 from app.schemas.chat import (
     ChatPayload, ChatResponse, ChatSessionCreate, ChatSessionResponse,
@@ -99,164 +105,219 @@ def is_invalid_cached_response(response: str) -> bool:
         or "ai model service is currently unavailable" in value
     )
 
+# ---------------------------------------------------------------------------
+# chat turn: shared by POST /api/chat and POST /api/chat/stream
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ChatTurn:
+    """Everything resolved before answering (plain values: usable from any thread/DB session)."""
+    question: str
+    tenant_id: Optional[str]
+    session_id: str
+    title: Optional[str]
+    user_id: Optional[str]
+    user_name: Optional[str]
+    session_role: Optional[str]
+    # Role that drives retrieval permissions (and the cache key).
+    retrieval_role: Optional[str]
+    cache_k: str
+    user_message_id: Optional[int] = None
+
+
+def _publish_message(db: Session, turn: ChatTurn, role: str, message: ChatMessageModel) -> None:
+    """Live "conversation" event for staff dashboards (cheap no-op without listeners)."""
+    try:
+        created_at = message.created_at if realtime.broker.has_subscribers(turn.tenant_id) else None
+        realtime.publish_message(turn.tenant_id, turn.session_id, turn.title, turn.user_name,
+                                 turn.session_role or turn.retrieval_role, role, message.content,
+                                 message.id, created_at)
+    except Exception as e:  # realtime must never break chat
+        db.rollback()
+        logger.warning(f"Publishing chat message event failed: {e}")
+
+
+def prepare_turn(db: Session, payload: ChatPayload, auth: AuthContext) -> ChatTurn:
+    """Auth/tenant/role, session resolution and the stored user message. Raises HTTPException."""
+    question = payload.question
+    tenant_id = auth.resolve_tenant(payload.tenant_id)
+    user_id = _clean(payload.user_id)
+    # Publishable key -> "public" whatever the client says; secret key -> trusted role.
+    user_role = auth.effective_role(payload.user_role)
+
+    # Unknown session_id -> create it (no orphan messages); foreign session -> 404.
+    session = resolve_session(
+        db,
+        payload.session_id or str(uuid4()),
+        tenant_id,
+        user_id=user_id,
+        user_name=payload.user_name,
+        user_role=user_role,
+        create=True,
+        title=question[:60] or None,
+    )
+
+    # Role that drives retrieval permissions. With keys enforced it comes only from the key
+    # (+ trusted secret-key role), never from what a session was stamped with earlier.
+    retrieval_role = user_role if auth.enforced else (user_role or session.user_role)
+
+    # Cache is per tenant + effective role + question: answers never cross tenants, and a
+    # public user can never get an answer built from internal documents. The question part
+    # is a SHA-256 of the whole normalized question - integrations prepend long shared
+    # prefixes ("Context: Odoo record ... Question: ..."), so a prefix would collide.
+    cache_k = cache_key(tenant_id, "chat", f"role={normalize_role(retrieval_role)}:{question_cache_id(question)}")
+
+    turn = ChatTurn(
+        question=question,
+        tenant_id=tenant_id,
+        session_id=session.session_id,
+        title=session.title,
+        user_id=user_id,
+        user_name=_clean(payload.user_name) or session.user_name,
+        session_role=session.user_role,
+        retrieval_role=retrieval_role,
+        cache_k=cache_k,
+    )
+    user_message = ChatMessageModel(session_id=turn.session_id, tenant_id=tenant_id, role="user", content=question)
+    db.add(user_message)
+    db.commit()
+    turn.user_message_id = user_message.id
+    _publish_message(db, turn, "user", user_message)
+    return turn
+
+
+def lookup_cache(turn: ChatTurn) -> Optional[Dict[str, Any]]:
+    """A valid cached answer for this turn (invalid ones are deleted), else None."""
+    cached_response = get_cache(turn.cache_k)
+    if not cached_response:
+        return None
+    if not isinstance(cached_response, dict):
+        cached_response = {"response": str(cached_response)}
+    if is_invalid_cached_response(cached_response.get("response", "")):
+        logger.warning(f"Ignoring invalid cached chat response for question: {turn.question[:50]}")
+        delete_cache(turn.cache_k)
+        return None
+    return cached_response
+
+
+def graph_state(turn: ChatTurn) -> Dict[str, Any]:
+    return {
+        "question": turn.question,
+        "tenant_id": turn.tenant_id,
+        "context": [],
+        "response": None,
+        "search_results": [],
+        "reasoning": None,
+        # log_node filters retrieval by the audiences this role may read.
+        "user_id": turn.user_id,
+        "user_role": turn.retrieval_role,
+    }
+
+
+def _finish_turn(db: Session, turn: ChatTurn, background_tasks: BackgroundTasks, *, response: str,
+                 reasoning: Optional[str], search_results, context: str, cached: bool,
+                 gap_reason: Optional[str], best: Optional[float], stored: Optional[str] = None) -> Dict[str, Any]:
+    """Persist the assistant message, schedule chat_event + gap recording, publish the event."""
+    assistant_message = ChatMessageModel(
+        session_id=turn.session_id,
+        tenant_id=turn.tenant_id,
+        role="assistant",
+        content=response if stored is None else stored,
+        context=context,
+    )
+    db.add(assistant_message)
+    db.commit()
+
+    # A cached answer that was itself a gap answer still counts as unanswered (the existing
+    # gap's occurrences go up; no new notification). Older cache entries without "gap_reason"
+    # count as answered.
+    background_tasks.add_task(
+        gaps.record_chat_outcome, turn.tenant_id, turn.question, response, gap_reason, best,
+        session_id=turn.session_id, message_id=assistant_message.id, user_id=turn.user_id,
+        user_name=turn.user_name, user_role=turn.retrieval_role, cached=cached,
+    )
+    _publish_message(db, turn, "assistant", assistant_message)
+    return {
+        "response": response,
+        "reasoning": reasoning,
+        "search_results": search_results,
+        "session_id": turn.session_id,
+        "message_id": assistant_message.id,
+        "user_message_id": turn.user_message_id,
+    }
+
+
+def finish_cached(db: Session, turn: ChatTurn, cached_response: Dict[str, Any],
+                  background_tasks: BackgroundTasks) -> Dict[str, Any]:
+    return _finish_turn(
+        db, turn, background_tasks,
+        response=cached_response.get("response", ""),
+        reasoning="Retrieved from cache",
+        search_results=cached_response.get("search_results"),
+        context="",
+        cached=True,
+        gap_reason=cached_response.get("gap_reason"),
+        best=cached_response.get("best_distance"),
+    )
+
+
+def finish_fresh(db: Session, turn: ChatTurn, background_tasks: BackgroundTasks, *, response: str,
+                 reasoning: Optional[str], search_results, context: Optional[List[str]],
+                 stored: Optional[str] = None) -> Dict[str, Any]:
+    """Gap detection, answer cache, then ``_finish_turn``."""
+    try:
+        threshold = get_tenant_settings(db, turn.tenant_id)["gap_distance_threshold"]
+    except Exception as e:  # settings lookup must never break chat
+        logger.warning(f"Tenant settings unavailable, using default gap threshold: {e}")
+        db.rollback()
+        threshold = app_settings.GAP_DISTANCE_THRESHOLD
+    gap_reason, best = gaps.detect_gap(response, search_results, reasoning, threshold)
+
+    cache_data = {
+        "response": response,
+        "search_results": search_results,
+        "reasoning": reasoning,
+        "gap_reason": gap_reason,
+        "best_distance": best,
+    }
+    if not is_invalid_cached_response(cache_data["response"]):
+        set_cache(turn.cache_k, cache_data, ttl=3600)
+
+    return _finish_turn(
+        db, turn, background_tasks,
+        response=response, reasoning=reasoning, search_results=search_results,
+        context="\n".join(context or []), cached=False, gap_reason=gap_reason, best=best, stored=stored,
+    )
+
+
 @router.post("/chat", response_model=ChatResponse)
-async def chat(
+def chat(
     payload: ChatPayload,
     background_tasks: BackgroundTasks,
     auth: AuthContext = Depends(require_api_key),
     db: Session = Depends(get_db)
 ):
+    # Sync handler: FastAPI runs it in the threadpool, so a slow LLM never blocks the event loop
+    # (live SSE streams keep flowing).
     try:
-        question = payload.question
-        tenant_id = auth.resolve_tenant(payload.tenant_id)
-        session_id = payload.session_id
-        user_id = _clean(payload.user_id)
-        # Publishable key -> "public" whatever the client says; secret key -> trusted role.
-        user_role = auth.effective_role(payload.user_role)
+        turn = prepare_turn(db, payload, auth)
 
-        # Unknown session_id -> create it (no orphan messages); foreign session -> 404.
-        session = resolve_session(
-            db,
-            session_id or str(uuid4()),
-            tenant_id,
-            user_id=user_id,
-            user_name=payload.user_name,
-            user_role=user_role,
-            create=True,
-            title=question[:60] or None,
-        )
-        session_id = session.session_id
-
-        # Role that drives retrieval permissions. With keys enforced it comes only from the key
-        # (+ trusted secret-key role), never from what a session was stamped with earlier.
-        retrieval_role = user_role if auth.enforced else (user_role or session.user_role)
-
-        # Cache is per tenant + effective role + question: answers never cross tenants, and a
-        # public user can never get an answer built from internal documents. The question part
-        # is a SHA-256 of the whole normalized question - integrations prepend long shared
-        # prefixes ("Context: Odoo record ... Question: ..."), so a prefix would collide.
-        cache_k = cache_key(tenant_id, "chat", f"role={normalize_role(retrieval_role)}:{question_cache_id(question)}")
-        cached_response = get_cache(cache_k)
-
+        cached_response = lookup_cache(turn)
         if cached_response:
-            cached_text = (
-                cached_response.get("response", "")
-                if isinstance(cached_response, dict)
-                else str(cached_response)
-            )
-            if is_invalid_cached_response(cached_text):
-                logger.warning(f"Ignoring invalid cached chat response for question: {question[:50]}")
-                delete_cache(cache_k)
-                cached_response = None
+            logger.info(f"Cache hit for question: {turn.question[:50]}")
+            return ChatResponse(**finish_cached(db, turn, cached_response, background_tasks))
 
-        if cached_response:
-            logger.info(f"Cache hit for question: {question[:50]}")
-            user_message = ChatMessageModel(
-                session_id=session_id,
-                tenant_id=tenant_id,
-                role="user",
-                content=question
-            )
-            assistant_message = ChatMessageModel(
-                session_id=session_id,
-                tenant_id=tenant_id,
-                role="assistant",
-                content=cached_response.get("response", ""),
-                context=""
-            )
-            db.add(user_message)
-            db.add(assistant_message)
-            db.commit()
+        logger.info(f"Processing chat question: {turn.question}")
+        result = graph.invoke(graph_state(turn))
 
-            # A cached answer that was itself a gap answer still counts as unanswered (the
-            # existing gap's occurrences go up; no new notification). Older cache entries
-            # without "gap_reason" count as answered.
-            background_tasks.add_task(
-                gaps.record_chat_outcome, tenant_id, question, cached_response.get("response", ""),
-                cached_response.get("gap_reason"), cached_response.get("best_distance"),
-                session_id=session_id, message_id=assistant_message.id, user_id=user_id,
-                user_name=_clean(payload.user_name) or session.user_name,
-                user_role=retrieval_role, cached=True,
-            )
-
-            return ChatResponse(
-                response=cached_response.get("response", ""),
-                reasoning="Retrieved from cache",
-                search_results=cached_response.get("search_results"),
-                session_id=session_id,
-                message_id=assistant_message.id,
-                user_message_id=user_message.id,
-            )
-
-        logger.info(f"Processing chat question: {question}")
-
-        result = graph.invoke({
-            "question": question,
-            "tenant_id": tenant_id,
-            "context": [],
-            "response": None,
-            "search_results": [],
-            "reasoning": None,
-            # log_node filters retrieval by the audiences this role may read.
-            "user_id": user_id,
-            "user_role": retrieval_role,
-        })
-
-        try:
-            threshold = get_tenant_settings(db, tenant_id)["gap_distance_threshold"]
-        except Exception as e:  # settings lookup must never break chat
-            logger.warning(f"Tenant settings unavailable, using default gap threshold: {e}")
-            db.rollback()
-            from app.config import settings as app_settings
-            threshold = app_settings.GAP_DISTANCE_THRESHOLD
-        gap_reason, best = gaps.detect_gap(
-            result.get("response"), result.get("search_results"), result.get("reasoning"), threshold)
-
-        cache_data = {
-            "response": result.get("response", "No response generated"),
-            "search_results": result.get("search_results", []),
-            "reasoning": result.get("reasoning"),
-            "gap_reason": gap_reason,
-            "best_distance": best,
-        }
-        response_data = {
-            "response": cache_data["response"],
-            "search_results": cache_data["search_results"],
-            "reasoning": cache_data["reasoning"],
-            "session_id": session_id
-        }
-
-        if not is_invalid_cached_response(cache_data["response"]):
-            set_cache(cache_k, cache_data, ttl=3600)
-
-        if session_id:
-            user_message = ChatMessageModel(
-                session_id=session_id,
-                tenant_id=tenant_id,
-                role="user",
-                content=question
-            )
-            assistant_message = ChatMessageModel(
-                session_id=session_id,
-                tenant_id=tenant_id,
-                role="assistant",
-                content=result.get("response", ""),
-                context="\n".join(result.get("context", []))
-            )
-            db.add(user_message)
-            db.add(assistant_message)
-            db.commit()
-            response_data["message_id"] = assistant_message.id
-            response_data["user_message_id"] = user_message.id
-
-        background_tasks.add_task(
-            gaps.record_chat_outcome, tenant_id, question, cache_data["response"], gap_reason, best,
-            session_id=session_id, message_id=response_data.get("message_id"), user_id=user_id,
-            user_name=_clean(payload.user_name) or session.user_name,
-            user_role=retrieval_role, cached=False,
-        )
-
-        return ChatResponse(**response_data)
+        return ChatResponse(**finish_fresh(
+            db, turn, background_tasks,
+            response=result.get("response", "No response generated"),
+            reasoning=result.get("reasoning"),
+            search_results=result.get("search_results", []),
+            context=result.get("context", []),
+            stored=result.get("response", ""),
+        ))
 
     except HTTPException:
         db.rollback()
@@ -268,6 +329,116 @@ async def chat(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+# ---------------------------------------------------------------------------
+# streaming chat (Server-Sent Events)
+# ---------------------------------------------------------------------------
+
+SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
+
+
+def _with_db(fn, *args, **kwargs):
+    """Run ``fn(db, ...)`` with a fresh DB session (streams outlive the request's session)."""
+    db = SessionLocal()
+    try:
+        return fn(db, *args, **kwargs)
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _answer_events(turn: ChatTurn):
+    """Blocking generator (runs in a worker thread): retrieval, then the streamed answer.
+    Yields ("state", state), then ("token", t)... and one ("end"|"fallback"|"instant", text,
+    reasoning); raises LLMStreamError when the LLM breaks off mid-answer."""
+    state = nodes.router_node(graph_state(turn))
+    state = nodes.log_node(state)  # audience-filtered retrieval, same as the graph
+    yield ("state", state)
+    prompt = nodes.build_prompt(state)
+    if prompt is None:
+        yield ("instant", nodes.no_context_response(), nodes.NO_CONTEXT_REASONING)
+        return
+    yield from nodes.stream_answer(prompt)
+
+
+async def _stream_turn(turn: ChatTurn, background_tasks: BackgroundTasks):
+    yield realtime.sse("meta", {"session_id": turn.session_id, "user_message_id": turn.user_message_id})
+    try:
+        cached_response = await run_in_threadpool(lookup_cache, turn)
+        if cached_response:
+            logger.info(f"Cache hit for question (stream): {turn.question[:50]}")
+            data = await run_in_threadpool(_with_db, finish_cached, turn, cached_response, background_tasks)
+            yield realtime.sse("token", {"t": data["response"]})
+            yield realtime.sse("done", {**data, "cached": True})
+            return
+
+        logger.info(f"Processing chat question (stream): {turn.question}")
+        state: Dict[str, Any] = {}
+        outcome = None
+        try:
+            async for item in realtime.iterate_in_thread(lambda: _answer_events(turn),
+                                                         heartbeat=app_settings.SSE_PING_SECONDS):
+                if item is realtime.HEARTBEAT:
+                    yield realtime.PING
+                elif item[0] == "state":
+                    state = item[1]
+                elif item[0] == "token":
+                    yield realtime.sse("token", {"t": item[1]})
+                else:
+                    outcome = item
+        except nodes.LLMStreamError:
+            # Same as /api/chat when the LLM is unavailable: the fallback text is stored (and
+            # recorded as an llm_unavailable gap), but the stream reports an error.
+            data = await run_in_threadpool(
+                _with_db, finish_fresh, turn, background_tasks,
+                response=nodes.LLM_FALLBACK_RESPONSE, reasoning=nodes.LLM_FALLBACK_REASONING,
+                search_results=state.get("search_results", []), context=state.get("context", []))
+            yield realtime.sse("error", {
+                "detail": data["response"], "status": status.HTTP_503_SERVICE_UNAVAILABLE,
+                # additive: the stored fallback message
+                "session_id": data["session_id"], "message_id": data["message_id"],
+                "user_message_id": data["user_message_id"],
+            })
+            return
+
+        if outcome is None:
+            raise RuntimeError("The answer stream ended without a result")
+        kind, text, reasoning = outcome
+        if kind != "end":  # no-context answer / LLM fallback: the whole text at once
+            yield realtime.sse("token", {"t": text})
+        data = await run_in_threadpool(
+            _with_db, finish_fresh, turn, background_tasks,
+            response=text, reasoning=reasoning,
+            search_results=state.get("search_results", []), context=state.get("context", []))
+        yield realtime.sse("done", {**data, "cached": False})
+    except Exception as e:
+        logger.error(f"Error in chat stream: {e}", exc_info=True)
+        yield realtime.sse("error", {"detail": str(e), "status": status.HTTP_500_INTERNAL_SERVER_ERROR})
+
+
+@router.post("/chat/stream", responses={200: {"content": {"text/event-stream": {}}}})
+async def chat_stream(
+    payload: ChatPayload,
+    auth: AuthContext = Depends(require_api_key),
+    db: Session = Depends(get_db),
+):
+    """Like POST /api/chat, streamed as Server-Sent Events: ``meta`` -> ``token``* -> ``done``
+    (or ``error``). Auth/validation/session errors are plain HTTP errors before the stream."""
+    try:
+        turn = await run_in_threadpool(prepare_turn, db, payload, auth)
+    except HTTPException:
+        await run_in_threadpool(db.rollback)
+        raise
+    except Exception as e:
+        await run_in_threadpool(db.rollback)
+        logger.error(f"Error in chat stream endpoint: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    background_tasks = BackgroundTasks()  # gap recording etc. run after the stream ends
+    return StreamingResponse(_stream_turn(turn, background_tasks), media_type="text/event-stream",
+                             headers=SSE_HEADERS, background=background_tasks)
 
 @router.post("/chat/session", response_model=ChatSessionResponse)
 async def create_chat_session(

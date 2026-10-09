@@ -23,6 +23,7 @@ from app.db.models import (APIKey, ChatEvent, ChatSession, Document, KnowledgeGa
                            TenantSettings, TrainingSource, User)
 from app.db.session import get_db
 from app.dependencies import AuthContext, require_platform_admin
+from app.realtime import publish_key, publish_staff
 from app.utils.logging import logger
 
 router = APIRouter()
@@ -332,6 +333,7 @@ def create_tenant(payload: TenantCreate, request: Request, auth: AuthContext = D
             must_change_password=True, min_password=staff_mod.ADMIN_MIN_PASSWORD)
     except staff_mod.StaffError as e:
         _raise(e)
+    publish_staff(owner, "created")
     out: Dict[str, Any] = {"owner": staff_mod.to_dict(owner), "password_set": raw is None, "keys": []}
     if raw:
         url, sent = _invite(db, owner, raw, request, auth.staff_name)
@@ -340,6 +342,7 @@ def create_tenant(payload: TenantCreate, request: Request, auth: AuthContext = D
                                 ("secret", payload.create_keys.secret, "Server integration")):
         if wanted:
             record, raw_key = apikeys.create_key(db, tenant_id, ktype, name)
+            publish_key(record, "created")
             out["keys"].append({"key": apikeys.key_to_dict(record), "raw_key": raw_key})
     out["tenant"] = _summary_or_404(db, tenant_id)
     logger.info(f"Company created: tenant={tenant_id} owner={owner.id} keys={len(out['keys'])} by={_actor(auth)}")
@@ -429,6 +432,7 @@ def create_user(payload: UserCreate, request: Request, auth: AuthContext = Depen
             min_password=staff_mod.ADMIN_MIN_PASSWORD)
     except staff_mod.StaffError as e:
         _raise(e)
+    publish_staff(user, "created")
     names = _names(db, [tenant_id])
     out: Dict[str, Any] = {"user": _user_out(user, names), "password_set": raw is None}
     if raw:
@@ -460,6 +464,7 @@ def update_user(user_id: int, payload: UserPatch, auth: AuthContext = Depends(re
     loses_owner = _is_active_owner(user) and (new_role != "owner" or not new_active or new_tenant != user.tenant_id)
     if loses_owner and staff_mod.active_owner_count(db, user.tenant_id, exclude_id=user.id) == 0:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=LAST_OWNER)
+    old_tenant, old_dict = user.tenant_id, staff_mod.to_dict(user)
     if new_tenant != user.tenant_id:
         db.query(Notification).filter(Notification.user_id == user.id).delete(synchronize_session=False)
     user.role, user.is_active, user.tenant_id = new_role, new_active, new_tenant
@@ -469,6 +474,11 @@ def update_user(user_id: int, payload: UserPatch, auth: AuthContext = Depends(re
         user.is_platform_admin = payload.is_platform_admin
     db.commit()
     db.refresh(user)
+    if old_tenant != user.tenant_id:  # moved: gone from the old company, new in the other one
+        publish_staff(old_dict, "deleted", old_tenant)
+        publish_staff(user, "created")
+    else:
+        publish_staff(user, "updated")
     logger.info(f"Platform: user updated id={user.id} fields={sorted(payload.model_dump(exclude_none=True))} by={_actor(auth)}")
     return _user_out(user, _names(db, [user.tenant_id]))
 
@@ -481,6 +491,7 @@ def set_user_password(user_id: int, payload: PasswordSet, auth: AuthContext = De
         staff_mod.admin_set_password(db, user, payload.password, payload.must_change_password)
     except staff_mod.StaffError as e:
         _raise(e)
+    publish_staff(user, "updated")
     logger.info(f"Platform: password set for user={user.id} must_change={payload.must_change_password} by={_actor(auth)}")
     return {"ok": True, "user": _user_out(user, _names(db, [user.tenant_id]))}
 
@@ -503,9 +514,11 @@ def delete_user(user_id: int, auth: AuthContext = Depends(require_platform_admin
         raise HTTPException(status_code=400, detail="You can't remove your own account")
     if _is_active_owner(user) and staff_mod.active_owner_count(db, user.tenant_id, exclude_id=user.id) == 0:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=LAST_OWNER)
+    gone, gone_tenant = staff_mod.to_dict(user), user.tenant_id
     db.query(Notification).filter(Notification.user_id == user.id).delete(synchronize_session=False)
     db.delete(user)
     db.commit()
+    publish_staff(gone, "deleted", gone_tenant)
     logger.info(f"Platform: user removed id={user_id} by={_actor(auth)}")
     return {"deleted": True}
 
@@ -529,6 +542,7 @@ def create_key(payload: KeyCreate, auth: AuthContext = Depends(require_platform_
         record, raw = apikeys.create_key(db, tenant_id, payload.key_type, payload.name, payload.expires_at)
     except apikeys.KeyRequestError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    publish_key(record, "created")
     logger.info(f"Platform: key created id={record.id} tenant={tenant_id} type={record.key_type} by={_actor(auth)}")
     return {"key": _key_out(record, _names(db, [tenant_id])), "raw_key": raw}
 
@@ -542,6 +556,8 @@ def roll_key(key_id: int, auth: AuthContext = Depends(require_platform_admin), d
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=NOT_FOUND_KEY)
     record, raw, old = result
+    publish_key(record, "rolled")
+    publish_key(old, "revoked")
     logger.info(f"Platform: key rolled old={old.id} new={record.id} tenant={record.tenant_id} by={_actor(auth)}")
     return {"key": _key_out(record, _names(db, [record.tenant_id])), "raw_key": raw, "revoked_id": old.id}
 
@@ -551,5 +567,6 @@ def revoke_key(key_id: int, auth: AuthContext = Depends(require_platform_admin),
     record = apikeys.revoke_key(db, key_id)
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=NOT_FOUND_KEY)
+    publish_key(record, "revoked")
     logger.info(f"Platform: key revoked id={record.id} tenant={record.tenant_id} by={_actor(auth)}")
     return {"revoked": True, "key": _key_out(record, _names(db, [record.tenant_id]))}

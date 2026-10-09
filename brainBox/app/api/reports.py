@@ -116,14 +116,17 @@ def update_gap(gap_id: int, payload: GapPatch, auth: AuthContext = Depends(requi
     gap = _get_gap(db, auth, gap_id)
     if payload.resolution_note is not None:
         gap.resolution_note = payload.resolution_note.strip() or None
+    action = "updated"
     if payload.status is not None and payload.status != gap.status:
         if payload.status not in gaps_mod.GAP_STATUSES:
             raise HTTPException(status_code=422, detail="status must be open, resolved or dismissed")
         if payload.status == "resolved":
             _resolve(gap, auth)
+            action = "resolved"
         else:
             gap.status = payload.status
             if payload.status == "dismissed":
+                action = "dismissed"
                 gap.resolved_at = staff_mod.utcnow()
                 gap.resolved_by_id = auth.staff_user_id
                 gap.resolved_by_name = auth.staff_name
@@ -133,6 +136,7 @@ def update_gap(gap_id: int, payload: GapPatch, auth: AuthContext = Depends(requi
                 gap.resolved_by_name = None
     db.commit()
     db.refresh(gap)
+    gaps_mod._publish_gap(gap, action)
     return gaps_mod.gap_to_dict(gap)
 
 
@@ -175,6 +179,10 @@ def answer_gap(gap_id: int, payload: GapAnswer, background_tasks: BackgroundTask
         raise HTTPException(status_code=500, detail="Database error")
     db.refresh(gap)
     db.refresh(source)
+    gaps_mod._publish_gap(gap, "resolved")
+    for other in similar:
+        gaps_mod._publish_gap(other, "resolved")
+    training_service.publish_status(source)
     background_tasks.add_task(training_service.run_text_training, source.source_id, task_id, content)
     return {
         "gap": gaps_mod.gap_to_dict(gap),

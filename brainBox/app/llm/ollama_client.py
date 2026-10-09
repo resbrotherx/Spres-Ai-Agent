@@ -1,5 +1,6 @@
+import json
 import time
-from typing import Optional
+from typing import Iterator, Optional
 
 import httpx
 
@@ -84,6 +85,32 @@ def ask_ollama_sync(prompt: str, model: str = None) -> Optional[str]:
     except Exception as e:
         logger.error(f"Error calling Ollama: {str(e)}")
         return None
+
+
+def stream_ollama_sync(prompt: str, model: str = None) -> Iterator[str]:
+    """Yield answer text deltas (Ollama ``stream: true`` NDJSON). Same options as the
+    non-streaming call, so the loaded model is reused. Raises on any failure (the caller decides
+    between falling back to another provider and reporting a mid-stream error). Closing the
+    generator closes the HTTP stream, which makes Ollama stop generating."""
+    model = model or settings.OLLAMA_MODEL
+    payload = _payload(prompt, model)
+    payload["stream"] = True
+    started = time.time()
+    with httpx.stream("POST", f"{settings.OLLAMA_BASE_URL}/api/generate", json=payload,
+                      timeout=OLLAMA_TIMEOUT) as response:
+        response.raise_for_status()
+        for line in response.iter_lines():
+            if not line.strip():
+                continue
+            chunk = json.loads(line)
+            if chunk.get("error"):
+                raise RuntimeError(f"Ollama error: {chunk['error']}")
+            piece = chunk.get("response")
+            if piece:
+                yield piece
+            if chunk.get("done"):
+                _log_timing(chunk, started)
+                return
 
 
 def warm_up_ollama() -> None:

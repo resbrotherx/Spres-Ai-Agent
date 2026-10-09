@@ -1,4 +1,5 @@
 node_modules/
+lib/
 .expo/
 .expo-shared/
 android/
@@ -7,3 +8,4 @@ npm-debug.log*
 yarn-error.log*
 .DS_Store
 .env
+*.tgz

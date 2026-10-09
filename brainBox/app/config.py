@@ -121,4 +121,14 @@ class Settings:
     SMTP_TLS = (os.getenv("SMTP_TLS") or "starttls").strip().lower()  # starttls | ssl | none
     SMTP_TIMEOUT = int(os.getenv("SMTP_TIMEOUT", "15") or 15)
 
+    # --- Realtime (SSE: /api/chat/stream, /api/staff/events) --------------------------------
+    # Comment heartbeat interval (keeps proxies from closing idle streams).
+    SSE_PING_SECONDS = float(os.getenv("SSE_PING_SECONDS", "15") or 15)
+    # Minimum interval between "overview" count pushes per tenant.
+    REALTIME_OVERVIEW_SECONDS = float(os.getenv("REALTIME_OVERVIEW_SECONDS", "10") or 10)
+    # Events buffered per connected dashboard before new ones are dropped (slow consumers).
+    REALTIME_QUEUE_SIZE = int(os.getenv("REALTIME_QUEUE_SIZE", "256") or 256)
+    # How often a live staff stream re-checks that its user/JWT is still valid.
+    REALTIME_REAUTH_SECONDS = float(os.getenv("REALTIME_REAUTH_SECONDS", "300") or 300)
+
 settings = Settings()

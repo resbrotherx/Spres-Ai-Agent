@@ -135,6 +135,15 @@ def gap_to_dict(g: KnowledgeGap) -> Dict[str, Any]:
     }
 
 
+def _publish_gap(gap: KnowledgeGap, action: str) -> None:
+    """Live "gap" event for the tenant's dashboards. Never raises."""
+    try:
+        from app import realtime
+        realtime.publish_gap(gap, action)
+    except Exception as e:
+        logger.warning(f"Publishing gap event failed: {e}")
+
+
 def upsert_gap(
     db: Session,
     tenant_id: str,
@@ -174,6 +183,7 @@ def upsert_gap(
                 gap.status = "open"
                 gap.resolved_at = None
             db.commit()
+            _publish_gap(gap, "updated")
             return gap, False
         gap = KnowledgeGap(
             tenant_id=tenant_id, question=question.strip()[:4000], question_norm=norm, question_hash=digest,
@@ -185,6 +195,7 @@ def upsert_gap(
         try:
             db.commit()
             db.refresh(gap)
+            _publish_gap(gap, "created")
             return gap, True
         except IntegrityError:  # concurrent insert of the same question: bump it instead
             db.rollback()
@@ -275,6 +286,11 @@ def record_chat_outcome(
             answered=reason is None, gap_reason=reason, cached=cached, created_at=utcnow(),
         ))
         db.commit()
+        try:
+            from app import realtime
+            realtime.broker.touch_overview(tenant_id)  # questions/unanswered counts changed
+        except Exception:
+            pass
         if reason is None:
             return
         gap, created = upsert_gap(

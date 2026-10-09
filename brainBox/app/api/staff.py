@@ -16,6 +16,7 @@ from app.db.session import SessionLocal, get_db
 from app.dependencies import AuthContext, require_staff, role_forbidden
 from app.notify.email import render, smtp_configured
 from app.notify.service import notify_staff, send_transactional
+from app.realtime import publish_staff
 from app.utils.logging import logger
 
 router = APIRouter()
@@ -211,7 +212,9 @@ def accept_invite(payload: AcceptInvite, background_tasks: BackgroundTasks, db: 
     user.invite_expires_at = None
     staff_mod.set_password(db, user, payload.password)
     background_tasks.add_task(_notify_joined_bg, user.tenant_id, user.id)
-    return staff_mod.login_response(db, user)
+    out = staff_mod.login_response(db, user)
+    publish_staff(out["user"], "updated", user.tenant_id)
+    return out
 
 
 @router.post("/staff/forgot-password")
@@ -264,6 +267,7 @@ def update_me(payload: MePatch, auth: AuthContext = Depends(require_staff("viewe
         user.notify_in_app = payload.notify_in_app
     db.commit()
     db.refresh(user)
+    publish_staff(user, "updated")
     return staff_mod.to_dict(user)
 
 
@@ -305,6 +309,7 @@ def invite_staff(payload: InvitePayload, request: Request, auth: AuthContext = D
             user, raw = staff_mod.create_staff(db, auth.tenant_id, payload.email, role, payload.full_name)
     except staff_mod.StaffError as e:
         _raise(e)
+    publish_staff(user, "created")
     if payload.password:
         logger.info(f"Staff created with a temporary password: user={user.id} tenant={auth.tenant_id} "
                     f"role={role} by={auth.staff_user_id}")
@@ -342,6 +347,7 @@ def update_staff(user_id: int, payload: StaffPatch, auth: AuthContext = Depends(
         user.notify_email = payload.notify_email
     db.commit()
     db.refresh(user)
+    publish_staff(user, "updated")
     return staff_mod.to_dict(user)
 
 
@@ -354,9 +360,11 @@ def delete_staff(user_id: int, auth: AuthContext = Depends(require_staff("admin"
     is_active_owner = user.role == "owner" and user.is_active and user.invite_token_hash is None
     if is_active_owner and staff_mod.active_owner_count(db, auth.tenant_id, exclude_id=user.id) == 0:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=LAST_OWNER)
+    gone = staff_mod.to_dict(user)
     db.query(Notification).filter(Notification.user_id == user.id).delete(synchronize_session=False)
     db.delete(user)
     db.commit()
+    publish_staff(gone, "deleted", auth.tenant_id)
     logger.info(f"Staff removed: user={user_id} tenant={auth.tenant_id} by={auth.staff_user_id}")
     return {"deleted": True}
 
@@ -392,4 +400,5 @@ def set_staff_password(user_id: int, payload: AdminSetPassword, auth: AuthContex
     except staff_mod.StaffError as e:
         _raise(e)
     logger.info(f"Staff password set by admin: user={user.id} tenant={auth.tenant_id} by={auth.staff_user_id}")
+    publish_staff(user, "updated")
     return {"ok": True, "user": staff_mod.to_dict(user)}

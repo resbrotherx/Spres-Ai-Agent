@@ -1,17 +1,48 @@
 {
-  "name": "brainbox-react-native-sdk",
-  "version": "1.0.0",
-  "description": "React Native SDK for Brainbox chat and support UI",
-  "main": "index.js",
+  "name": "spres-react-native",
+  "version": "2.0.0",
+  "description": "Brainbox AI chat for React Native: headless client with streaming, a useBrainboxChat hook and ready-made chat, launcher and widget components.",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "files": [
-    "index.js",
-    "ChatScreen.js",
+    "lib",
+    "src",
     "README.md"
   ],
-  "keywords": ["brainbox", "react-native", "sdk", "chat", "ai"],
-  "peerDependencies": {
-    "react": ">=18.0.0",
-    "react-native": ">=0.70.0"
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node __tests__/run.js",
+    "prepare": "npm run build"
   },
-  "license": "MIT"
+  "keywords": [
+    "brainbox",
+    "react-native",
+    "expo",
+    "sdk",
+    "chat",
+    "ai",
+    "assistant",
+    "streaming"
+  ],
+  "peerDependencies": {
+    "@react-native-async-storage/async-storage": ">=1.17.0",
+    "react": ">=18.0.0",
+    "react-native": ">=0.72.0",
+    "react-native-svg": ">=13.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@react-native-async-storage/async-storage": {
+      "optional": true
+    }
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "react": "^18.2.0",
+    "react-native": "^0.74.5",
+    "react-native-svg": "^15.15.5",
+    "react-test-renderer": "^18.2.0",
+    "typescript": "^5.9.3"
+  }
 }

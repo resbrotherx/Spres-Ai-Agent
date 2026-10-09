@@ -13,6 +13,7 @@ from app.api.staff import router as staff_router
 from app.api.reports import router as reports_router
 from app.api.dashboard import router as dashboard_router
 from app.api.platform import router as platform_router
+from app.api.events import router as events_router
 from app.config import settings
 from app.db.session import init_db
 from app.permissions import AUDIENCES
@@ -53,7 +54,13 @@ async def lifespan(app: FastAPI):
     import threading
     from app.llm.ollama_client import warm_up_ollama
     threading.Thread(target=warm_up_ollama, name="ollama-warmup", daemon=True).start()
-    yield
+    # Live staff events: capture the loop so publish() works from threads/BackgroundTasks.
+    from app.realtime import broker
+    broker.start()
+    try:
+        yield
+    finally:
+        await broker.stop()
 
 app = FastAPI(
     title="Brainbox AI Backend",
@@ -91,6 +98,7 @@ app.include_router(chat_router, prefix="/api", tags=["chat"])
 app.include_router(upload_router, prefix="/api", tags=["upload"])
 app.include_router(train_router, prefix="/api", tags=["train"])
 app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
+app.include_router(events_router, prefix="/api", tags=["realtime"])
 app.include_router(staff_router, prefix="/api", tags=["staff"])
 app.include_router(reports_router, prefix="/api", tags=["reports"])
 app.include_router(dashboard_router, prefix="/api", tags=["dashboard"])

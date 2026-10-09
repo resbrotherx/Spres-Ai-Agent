@@ -191,6 +191,7 @@ document of the source at once and clears the tenant's cached answers.
 
 ### Chat
 - `POST /api/chat` - Send chat question (response includes `message_id` / `user_message_id`)
+- `POST /api/chat/stream` - Same, streamed as Server-Sent Events (see [Streaming chat](#streaming-chat))
 - `POST /api/chat/feedback` - Thumbs up/down on an answer `{session_id, message_id?, rating, comment?}`
 - `GET /api/widget-config` - Widget appearance configured in the staff dashboard (publishable key OK)
 - `POST /api/chat/session` - Create chat session
@@ -359,6 +360,74 @@ skipped silently (logged at INFO).
 
 SMTP: `SMTP_HOST`, `SMTP_PORT` (default 587/465/25 by mode), `SMTP_USER`, `SMTP_PASSWORD`,
 `SMTP_FROM`, `SMTP_TLS` = `starttls` | `ssl` | `none`, `SMTP_TIMEOUT`.
+
+### Streaming chat
+
+`POST /api/chat/stream` takes the same body, auth (publishable/secret key or staff JWT) and scope
+rules as `POST /api/chat` and answers with Server-Sent Events (`text/event-stream`,
+`Cache-Control: no-cache`, `X-Accel-Buffering: no`). Each event is `event: <name>` + one-line
+JSON `data:`; `: ping` comments are sent every `SSE_PING_SECONDS` (15 s) while waiting.
+
+| event | data |
+|---|---|
+| `meta` | `{session_id, user_message_id}` - right after the session + user message are stored |
+| `token` | `{t}` - text delta (0..n; the whole answer at once for cache hits / no-context answers) |
+| `done` | `{response, reasoning, session_id, message_id, user_message_id, search_results, cached}` - replace the streamed text with `response` |
+| `error` | `{detail, status}` - then the stream ends (LLM failed mid-answer: `status` 503, `detail` = the stored fallback text, plus `session_id` / `message_id` / `user_message_id`) |
+
+Auth, validation and session errors (401/403/404/422) are normal JSON responses before any
+streaming. Behaviour matches `/api/chat`: answer cache, audience filtering, no-context instant
+answer, stored messages, `chat_events`, gap detection + notifications (after `done`). Ollama is
+called with `stream: true` (same options/keep-alive as the non-streaming call, so the model is
+not reloaded); OpenAI-compatible providers with `stream=True`; same provider order/fallback. If
+every provider fails before producing text you get the fallback answer + `done`, exactly like
+`/api/chat`. Browsers must use `fetch()` + `ReadableStream` (EventSource can't send headers).
+
+```bash
+curl -N -H "X-API-Key: pk_..." -H "Content-Type: application/json" \
+  -d '{"question":"hi"}' https://your-host/api/chat/stream
+# event: meta
+# data: {"session_id":"…","user_message_id":41}
+#
+# event: token
+# data: {"t":"Hello"}
+# …
+# event: done
+# data: {"response":"Hello! …","reasoning":"…","session_id":"…","message_id":42,"user_message_id":41,"search_results":[…],"cached":false}
+```
+
+### Live staff events
+
+`GET /api/staff/events` is a long-lived SSE stream for the dashboard. Staff JWT only, in
+`Authorization: Bearer <jwt>` or `?token=<jwt>` (API keys -> 403, no/invalid JWT -> 401). Events
+are scoped to the user's tenant; the stream re-checks the user every `REALTIME_REAUTH_SECONDS`
+(300) and ends with an `error` event if the account was disabled.
+
+| event | data | who |
+|---|---|---|
+| `hello` | `{user_id, tenant_id, server_time}` | on connect |
+| `overview` | `{questions_today, unanswered_today, open_gaps}` | on connect, then at most every `REALTIME_OVERVIEW_SECONDS` (10) when counts change |
+| `notification` | notification (same shape as `GET /api/notifications` items) | only its addressee |
+| `gap` | `{action: created\|updated\|resolved\|dismissed, gap}` | all staff of the tenant |
+| `conversation` | `{action: "message", session_id, title, user_name, user_role, role, preview, created_at, message_id}` | all staff |
+| `training` | `{action: "status", source}` (queued / processing / completed / failed) | all staff |
+| `staff` | `{action: created\|updated\|deleted, user}` | admins+ (and platform admins of any tenant) |
+| `keys` | `{action: created\|rolled\|revoked, key}` (never raw keys; a roll also sends `revoked` for the old key) | admins+ (and platform admins) |
+
+```bash
+curl -N -H "Authorization: Bearer $STAFF_JWT" https://your-host/api/staff/events
+```
+
+Implementation: `app/realtime.py` is an in-process pub/sub broker (bounded queue per connection,
+`REALTIME_QUEUE_SIZE`; a slow client loses events instead of blocking anyone; publishing is
+thread-safe via `loop.call_soon_threadsafe`). **Single-worker limitation:** events only reach
+dashboards connected to the same process that produced them. That is the case with today's single
+uvicorn worker; with several workers (or Celery workers doing training) add a Redis pub/sub
+fan-out to `Broker.publish` before scaling out.
+
+**nginx:** the backend sends `X-Accel-Buffering: no`, which nginx honours, so no config change is
+needed for `/api/`. If you terminate through another proxy, disable response buffering for
+`/api/chat/stream` and `/api/staff/events` and keep its read timeout above the 15 s ping interval.
 
 ### Upgrade notes
 

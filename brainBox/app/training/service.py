@@ -83,6 +83,15 @@ def source_to_dict(source: TrainingSource) -> Dict[str, Any]:
 # job helpers
 # ---------------------------------------------------------------------------
 
+def publish_status(source: TrainingSource) -> None:
+    """Live "training" status event (queued/processing/completed/failed). Never raises."""
+    try:
+        from app import realtime
+        realtime.publish_training(source)
+    except Exception as e:
+        logger.warning(f"Publishing training status failed: {e}")
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -105,6 +114,7 @@ def _start(db, source_id: str, task_id: str) -> Optional[TrainingSource]:
     source.error_message = None
     _set_task(db, task_id, "processing")
     db.commit()
+    publish_status(source)
     return source
 
 
@@ -133,6 +143,7 @@ def _finish(db, source_id: str, task_id: str, status: str, error: Optional[str],
     _set_task(db, task_id, status, error)
     db.commit()
     if source is not None:
+        publish_status(source)
         try:
             from app.redis_cache.cache import clear_tenant_cache
             clear_tenant_cache(source.tenant_id)  # cached chat answers may now be stale

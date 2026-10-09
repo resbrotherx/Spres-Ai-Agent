@@ -138,6 +138,7 @@ def train_file(
     task_id = _queue(db, source)
     _commit(db)
     db.refresh(source)
+    service.publish_status(source)
 
     background_tasks.add_task(service.run_file_training, source.source_id, task_id, data, filename, ext)
     logger.info(f"Training file queued: {filename} ({len(data)} bytes) source={source.source_id} task={task_id}")
@@ -168,6 +169,7 @@ def train_text(
     task_id = _queue(db, source)
     _commit(db)
     db.refresh(source)
+    service.publish_status(source)
     background_tasks.add_task(service.run_text_training, source.source_id, task_id, payload.content)
     return TrainResponse(source=_out(source), task_id=task_id)
 
@@ -248,6 +250,7 @@ def create_api_source(
     task_id = _queue(db, source)
     _commit(db)
     db.refresh(source)
+    service.publish_status(source)
     background_tasks.add_task(service.run_api_sync, source.source_id, task_id)
     return TrainResponse(source=_out(source), task_id=task_id)
 
@@ -273,6 +276,7 @@ def sync_source(
     task_id = _queue(db, source)
     _commit(db)
     db.refresh(source)
+    service.publish_status(source)
     background_tasks.add_task(service.run_api_sync, source.source_id, task_id)
     return TrainResponse(source=_out(source), task_id=task_id)
 
