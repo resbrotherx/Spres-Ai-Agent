@@ -46,6 +46,25 @@ class Settings:
 
     USE_OPENAI = os.getenv("USE_OPENAI", "false").lower() == "true"
 
+    # --- Answer speed / LLM tuning -------------------------------------------------------
+    # LLM_PROVIDER: "ollama" (local, default) or "openai" (any OpenAI-compatible API — OpenAI,
+    # Groq, Together… — set OPENAI_API_KEY, OPENAI_BASE_URL and OPENAI_MODEL). The other
+    # provider is still tried as a fallback when configured.
+    LLM_PROVIDER = (os.getenv("LLM_PROVIDER") or "ollama").strip().lower()
+    OPENAI_BASE_URL = (os.getenv("OPENAI_BASE_URL") or "").strip() or None
+    OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()
+    # Ollama: keep these constant — changing num_ctx between requests forces a slow model reload.
+    OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "2048") or 2048)
+    OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "220") or 220)  # max answer tokens
+    OLLAMA_NUM_THREAD = int(os.getenv("OLLAMA_NUM_THREAD", "0") or 0)  # 0 = let Ollama decide
+    OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "-1")  # -1 = keep the model in memory
+    OLLAMA_WARMUP = os.getenv("OLLAMA_WARMUP", "true").lower() not in ("0", "false", "no", "off")
+    LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2") or 0.2)
+    LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "120") or 120)
+    # How much knowledge-base text goes into each prompt (prompt size dominates CPU latency).
+    RAG_MAX_CHUNKS = int(os.getenv("RAG_MAX_CHUNKS", "3") or 3)
+    RAG_MAX_CHUNK_CHARS = int(os.getenv("RAG_MAX_CHUNK_CHARS", "700") or 700)
+
     VECTOR_DIM = 768
 
     JWT_SECRET_KEY = os.getenv(

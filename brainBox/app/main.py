@@ -48,6 +48,10 @@ def _startup_checks() -> None:
 async def lifespan(app: FastAPI):
     init_db()
     _startup_checks()
+    # Load the LLM into memory in the background so the first question isn't a cold start.
+    import threading
+    from app.llm.ollama_client import warm_up_ollama
+    threading.Thread(target=warm_up_ollama, name="ollama-warmup", daemon=True).start()
     yield
 
 app = FastAPI(

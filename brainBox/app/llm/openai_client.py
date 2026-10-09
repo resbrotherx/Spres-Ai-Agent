@@ -1,45 +1,56 @@
+"""OpenAI-compatible chat client (OpenAI, Groq, Together, … via OPENAI_BASE_URL)."""
+import time
 from typing import Optional
+
 from app.config import settings
 from app.utils.logging import logger
 
-async def ask_openai(prompt: str) -> Optional[str]:
-    if not settings.USE_OPENAI or not settings.OPENAI_API_KEY:
-        logger.warning("OpenAI not configured")
-        return None
 
+def openai_enabled() -> bool:
+    return bool(settings.OPENAI_API_KEY) and (settings.LLM_PROVIDER == "openai" or settings.USE_OPENAI)
+
+
+def _client_kwargs() -> dict:
+    kwargs = {"api_key": settings.OPENAI_API_KEY, "timeout": settings.LLM_TIMEOUT}
+    if settings.OPENAI_BASE_URL:
+        kwargs["base_url"] = settings.OPENAI_BASE_URL
+    return kwargs
+
+
+def _request(prompt: str) -> dict:
+    return {
+        "model": settings.OPENAI_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": settings.LLM_TEMPERATURE,
+        "max_tokens": settings.OLLAMA_NUM_PREDICT,
+    }
+
+
+async def ask_openai(prompt: str) -> Optional[str]:
+    if not openai_enabled():
+        return None
     try:
         from openai import AsyncOpenAI
 
-        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-
-        response = await client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
+        started = time.time()
+        response = await AsyncOpenAI(**_client_kwargs()).chat.completions.create(**_request(prompt))
+        logger.info(f"{settings.OPENAI_MODEL} answered in {time.time() - started:.1f}s")
         return response.choices[0].message.content
     except Exception as e:
-        logger.error(f"Error calling OpenAI: {str(e)}")
+        logger.error(f"Error calling OpenAI-compatible API: {str(e)}")
         return None
+
 
 def ask_openai_sync(prompt: str) -> Optional[str]:
-    if not settings.USE_OPENAI or not settings.OPENAI_API_KEY:
-        logger.warning("OpenAI not configured")
+    if not openai_enabled():
         return None
-
     try:
         from openai import OpenAI
 
-        client = OpenAI(api_key=settings.OPENAI_API_KEY)
-
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
+        started = time.time()
+        response = OpenAI(**_client_kwargs()).chat.completions.create(**_request(prompt))
+        logger.info(f"{settings.OPENAI_MODEL} answered in {time.time() - started:.1f}s")
         return response.choices[0].message.content
     except Exception as e:
-        logger.error(f"Error calling OpenAI: {str(e)}")
+        logger.error(f"Error calling OpenAI-compatible API: {str(e)}")
         return None
