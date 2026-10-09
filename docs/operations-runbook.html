@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brainbox Operations Runbook</title>
+<meta name="description" content="How to run Brainbox day to day: onboarding companies, keys, staff, training, the Odoo add-on, deployments, backups, SDK releases, moving servers, security and troubleshooting.">
+<style>
+:root{
+  --primary:#1d4ed8; --primary-dark:#1e3a8a; --accent:#0ea5e9; --navy:#0b1f44;
+  --callout:#eff6ff; --ink:#1e293b; --muted:#64748b; --line:#dbe3ef; --soft:#f8fafc;
+  --amber:#b45309; --amber-bg:#fffbeb; --green:#047857; --green-bg:#ecfdf5; --red:#b91c1c; --red-bg:#fef2f2;
+}
+@page{ size:A4; margin:17mm 16mm 19mm 16mm; }
+@page cover{ margin:0; }
+*{ box-sizing:border-box; }
+html,body{ background:#fff; }
+body{ margin:0; font-family:"Inter","Segoe UI",system-ui,-apple-system,Arial,sans-serif; color:var(--ink);
+  font-size:10pt; line-height:1.52; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+@media screen{ body{ max-width:210mm; margin:0 auto; padding:0 16px; } }
+
+/* ---------- cover ---------- */
+.cover{ page:cover; width:210mm; height:297mm; position:relative; overflow:hidden; color:#fff;
+  background:linear-gradient(155deg,#0b1f44 0%,#12306e 52%,#1d4ed8 100%); break-after:page; }
+@media screen{ .cover{ width:100%; height:auto; min-height:900px; } }
+.cover .inner{ position:absolute; inset:0; padding:30mm 22mm 24mm; display:flex; flex-direction:column; }
+.cover .brand{ display:flex; align-items:center; gap:12px; font-weight:600; letter-spacing:.14em; font-size:9.5pt;
+  text-transform:uppercase; color:#bae6fd; }
+.cover .brand .dot{ width:30px; height:30px; border-radius:50%; background:radial-gradient(circle at 35% 35%,#7dd3fc,#0ea5e9 55%,#1d4ed8); box-shadow:0 0 0 6px rgba(14,165,233,.18); }
+.cover h1{ font-size:38pt; line-height:1.08; margin:34mm 0 6mm; font-weight:800; letter-spacing:-.02em; }
+.cover h1 span{ color:#7dd3fc; }
+.cover .sub{ font-size:14pt; color:#dbeafe; max-width:150mm; line-height:1.45; margin:0; }
+.cover .meta{ margin-top:auto; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.cover .meta div{ border:1px solid rgba(186,230,253,.35); border-radius:10px; padding:10px 12px; background:rgba(255,255,255,.06); }
+.cover .meta b{ display:block; font-size:7.5pt; letter-spacing:.12em; text-transform:uppercase; color:#93c5fd; font-weight:600; }
+.cover .meta span{ font-size:11.5pt; font-weight:600; }
+.cover .fine{ margin-top:8mm; font-size:8.5pt; color:#93c5fd; }
+.cover svg.orb{ position:absolute; right:-40mm; top:60mm; width:150mm; opacity:.22; }
+
+/* ---------- headings ---------- */
+h2{ break-before:page; font-size:20pt; color:var(--navy); margin:0 0 4mm; line-height:1.15; letter-spacing:-.01em;
+  padding-bottom:3mm; border-bottom:3px solid var(--primary); }
+h2 .num{ color:var(--accent); margin-right:8px; }
+h3{ font-size:13pt; color:var(--navy); margin:6mm 0 2mm; break-after:avoid; }
+h4{ font-size:10.5pt; color:var(--primary-dark); margin:4mm 0 1.5mm; break-after:avoid; }
+p{ margin:0 0 2.6mm; }
+.lead{ font-size:11pt; color:#334155; }
+ul,ol{ margin:0 0 3mm; padding-left:6mm; }
+li{ margin:0 0 1mm; }
+code,.mono{ font-family:"Cascadia Code","Consolas","Courier New",monospace; font-size:8.6pt; }
+code{ background:#eef2f7; border-radius:4px; padding:0 3px; color:#0f2a5c; }
+pre{ font-family:"Cascadia Code","Consolas",monospace; font-size:8.3pt; line-height:1.45; background:#0b1f44; color:#e0f2fe;
+  border-radius:8px; padding:3.2mm 4mm; margin:0 0 3.5mm; white-space:pre-wrap; word-break:break-word; break-inside:avoid; }
+pre .c{ color:#7dd3fc; } pre .k{ color:#fcd34d; } pre .s{ color:#a7f3d0; }
+a{ color:var(--primary); text-decoration:none; }
+strong{ color:#0f172a; }
+
+/* ---------- callouts ---------- */
+.callout{ border-radius:8px; padding:3mm 4mm 2.2mm; margin:0 0 3.5mm; break-inside:avoid; border-left:4px solid var(--primary); background:var(--callout); }
+.callout .t{ display:block; font-weight:700; font-size:8.2pt; letter-spacing:.09em; text-transform:uppercase; margin-bottom:1mm; color:var(--primary); }
+.callout.dev{ background:#f1f5f9; border-left-color:#475569; } .callout.dev .t{ color:#334155; }
+.callout.imp{ background:var(--amber-bg); border-left-color:#f59e0b; } .callout.imp .t{ color:var(--amber); }
+.callout.ok{ background:var(--green-bg); border-left-color:#10b981; } .callout.ok .t{ color:var(--green); }
+.callout p:last-child,.callout ul:last-child{ margin-bottom:1mm; }
+
+/* ---------- tables ---------- */
+table{ width:100%; border-collapse:separate; border-spacing:0; margin:0 0 4mm; font-size:8.9pt; break-inside:auto; border:1px solid var(--line); }
+table.keep{ break-inside:avoid; border-radius:8px; overflow:hidden; }
+table.compact{ font-size:8.5pt; } table.compact tbody td{ padding:1.3mm 2.4mm; }
+thead th{ background:var(--navy); color:#fff; text-align:left; font-weight:600; padding:2mm 2.6mm; font-size:8.4pt; letter-spacing:.02em; }
+tbody td{ padding:1.8mm 2.6mm; border-top:1px solid var(--line); vertical-align:top; }
+tbody tr:nth-child(even) td{ background:#f8fafc; }
+tr{ break-inside:avoid; }
+td.k{ font-weight:600; color:var(--navy); white-space:nowrap; }
+td .mono, td code{ font-size:8pt; }
+tbody tr.group td{ background:#dbeafe !important; color:var(--primary-dark); font-weight:700; font-size:8.2pt; letter-spacing:.06em; text-transform:uppercase; padding:1.4mm 2.6mm; }
+
+/* ---------- figures ---------- */
+figure{ margin:0 0 4mm; break-inside:avoid; border:1px solid var(--line); border-radius:10px; padding:3mm 3mm 2mm; background:#fff; }
+figure svg{ width:100%; height:auto; display:block; }
+figcaption{ font-size:8.4pt; color:var(--muted); margin-top:1.5mm; text-align:center; }
+figcaption b{ color:var(--navy); }
+
+/* ---------- misc blocks ---------- */
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:4mm; margin-bottom:3.5mm; }
+.grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:3.5mm; margin-bottom:3.5mm; }
+.card{ border:1px solid var(--line); border-radius:10px; padding:3mm 3.5mm 2mm; break-inside:avoid; background:#fff; }
+.card h4{ margin-top:0; }
+.card.blue{ background:var(--callout); border-color:#bfdbfe; }
+.card .tag{ display:inline-block; font-size:7.5pt; font-weight:700; letter-spacing:.08em; text-transform:uppercase; border-radius:99px; padding:.4mm 2.4mm; margin-bottom:1.5mm; }
+.tag.pk{ background:#e0f2fe; color:#075985; } .tag.sk{ background:#dbeafe; color:#1e3a8a; } .tag.adm{ background:#fef3c7; color:#92400e; }
+.big3 .card{ text-align:left; }
+.big3 .ico{ width:34px; height:34px; border-radius:9px; display:grid; place-items:center; color:#fff; font-weight:800; font-size:13pt; margin-bottom:2mm; }
+.steps{ counter-reset:s; list-style:none; padding:0; margin:0 0 3mm; }
+.steps > li{ counter-increment:s; position:relative; padding:2.2mm 3mm 2.2mm 12mm; margin:0 0 2mm; border:1px solid var(--line); border-radius:8px; break-inside:avoid; background:#fff; }
+.steps > li::before{ content:counter(s); position:absolute; left:3mm; top:2.2mm; width:6.5mm; height:6.5mm; border-radius:50%; background:var(--primary); color:#fff; font-weight:700; font-size:9pt; display:grid; place-items:center; }
+.steps > li b.h{ color:var(--navy); }
+.steps .tech{ display:block; color:var(--muted); font-size:8.4pt; margin-top:.6mm; }
+.check{ list-style:none; padding:0; }
+.check li{ position:relative; padding-left:7mm; margin-bottom:1.6mm; break-inside:avoid; }
+.check li::before{ content:""; position:absolute; left:0; top:1mm; width:3.6mm; height:3.6mm; border:1.6px solid var(--primary); border-radius:3px; }
+.pill{ display:inline-block; font-size:8pt; border-radius:99px; padding:0 2.2mm; font-weight:600; }
+.pill.y{ background:var(--green-bg); color:var(--green); } .pill.n{ background:var(--red-bg); color:var(--red); }
+.pill.m{ background:#e0f2fe; color:#075985; }
+.tree{ background:var(--soft); color:var(--ink); border:1px solid var(--line); }
+.tree .d{ color:var(--primary); font-weight:700; } .tree .c{ color:var(--muted); }
+.filecard{ border:1px solid var(--line); border-radius:9px; margin:0 0 3mm; break-inside:avoid; overflow:hidden; }
+.filecard .fh{ background:var(--callout); padding:1.8mm 3.5mm; display:flex; justify-content:space-between; align-items:baseline; gap:4mm; border-bottom:1px solid #dbeafe; }
+.filecard .fh .l{ display:flex; flex-wrap:wrap; gap:1mm 3mm; }
+.filecard .fh code{ background:none; padding:0; font-weight:700; font-size:9pt; color:var(--navy); }
+.filecard .fh span{ font-size:8pt; color:var(--muted); text-align:right; }
+.filecard .fb{ padding:2mm 3.5mm 1mm; }
+.filecard .fb p{ margin-bottom:1.5mm; }
+.filecard .fb ul{ margin-bottom:1.5mm; font-size:9pt; }
+.toc{ list-style:none; padding:0; margin:2mm 0 0; }
+.toc li{ display:flex; align-items:baseline; gap:2mm; padding:1.9mm 0; border-bottom:1px dotted #cbd5e1; margin:0; }
+.toc li .n{ width:9mm; font-weight:800; color:var(--accent); }
+.toc li a{ color:var(--navy); font-weight:600; }
+.toc li .d{ color:var(--muted); font-size:8.6pt; margin-left:2mm; flex:1; }
+.toc li .pg{ font-weight:700; color:var(--primary); min-width:8mm; text-align:right; }
+.toc-h{ break-before:auto; border:0; padding:0; margin-top:0; }
+.small{ font-size:8.6pt; color:var(--muted); }
+.nobreak{ break-inside:avoid; }
+hr.sep{ border:0; border-top:1px solid var(--line); margin:4mm 0; }
+.kv{ display:grid; grid-template-columns:32mm 1fr; gap:1mm 4mm; font-size:9.2pt; }
+.kv b{ color:var(--navy); }
+</style>
+<style>
+/* ---- additions for the Operations runbook (pre/lang shared with the Training & API reference) ---- */
+pre{ background:#f5f8fc; color:#0f2a5c; border:1px solid #dbe3ef; border-left:3px solid #0ea5e9; font-size:8pt;
+  line-height:1.42; padding:2.6mm 3.4mm; overflow-wrap:anywhere; }
+pre.long{ break-inside:auto; }
+pre .c{ color:#64748b; font-style:italic; }
+.lang{ font-size:7.4pt; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin:2.2mm 0 1mm; break-after:avoid; }
+.never{ border:1px solid #fecaca; background:var(--red-bg); border-radius:10px; padding:3mm 4mm 1.5mm; break-inside:avoid; margin-bottom:3.5mm; }
+.never .t{ display:block; font-weight:700; font-size:8.2pt; letter-spacing:.09em; text-transform:uppercase; color:var(--red); margin-bottom:1mm; }
+.send{ border:1px solid #a7f3d0; background:var(--green-bg); border-radius:10px; padding:3mm 4mm 1.5mm; break-inside:avoid; margin-bottom:3.5mm; }
+.send .t{ display:block; font-weight:700; font-size:8.2pt; letter-spacing:.09em; text-transform:uppercase; color:var(--green); margin-bottom:1mm; }
+.send ul, .never ul{ margin-bottom:1.5mm; }
+h2.nb{ break-before:auto; }
+.qr{ display:grid; grid-template-columns:1fr 1fr; gap:2.4mm 3.5mm; }
+.qr .box{ border:1px solid var(--line); border-radius:8px; padding:1.6mm 2.4mm .4mm; break-inside:avoid; background:#fff; }
+.qr .box h4{ margin:0 0 1mm; font-size:8.6pt; }
+.qr pre{ font-size:6.9pt; line-height:1.34; padding:1.4mm 2mm; margin:0 0 1.4mm; border-left-width:2px; }
+.qr p{ font-size:7.6pt; margin:0 0 1mm; color:#475569; }
+.qr .wide{ grid-column:1 / -1; }
+table.ts td:first-child{ font-weight:600; color:var(--navy); }
+table.ts td{ font-size:8.5pt; }
+.status{ display:inline-block; font-size:7.4pt; font-weight:700; letter-spacing:.05em; text-transform:uppercase; border-radius:99px; padding:.3mm 2.2mm; white-space:nowrap; }
+.status.live{ background:var(--green-bg); color:var(--green); } .status.pend{ background:var(--amber-bg); color:var(--amber); }
+.status.old{ background:var(--red-bg); color:var(--red); } .status.na{ background:#f1f5f9; color:#475569; }
+</style>
+</head>
+<body>
+
+<!-- =============================== COVER =============================== -->
+<section class="cover">
+  <svg class="orb" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="96" fill="none" stroke="#7dd3fc" stroke-width="1.2"/><circle cx="100" cy="100" r="70" fill="none" stroke="#7dd3fc" stroke-width="1"/><circle cx="100" cy="100" r="44" fill="none" stroke="#7dd3fc" stroke-width=".8"/><g fill="#bae6fd"><circle cx="100" cy="4" r="4"/><circle cx="170" cy="100" r="4"/><circle cx="56" cy="100" r="3"/><circle cx="31" cy="150" r="3"/><circle cx="150" cy="40" r="3"/></g><path d="M100 4 L170 100 L100 144 L56 100 Z M31 150 L56 100 M150 40 L170 100" fill="none" stroke="#bae6fd" stroke-width=".8"/></svg>
+  <div class="inner">
+    <div class="brand"><div class="dot"></div>Brainbox AI · Operations</div>
+    <h1>Operations Runbook<br><span>Brainbox, day to day</span></h1>
+    <p class="sub">What runs where, how to give a company its keys and staff accounts, how to share the Odoo add-on, how code reaches production, how to back up, publish the SDKs, move to a new server, and what to do when something breaks.</p>
+    <div class="meta">
+      <div><b>Server</b><span>165.227.77.33</span></div>
+      <div><b>Public URL</b><span>port.smartpowerbilling.com</span></div>
+      <div><b>Date</b><span>9 October 2026</span></div>
+    </div>
+    <p class="fine">Written for the project owner. Each section answers one question in plain language first, then gives the exact commands. Commands marked "on the server" are run over SSH on the brainBox server.</p>
+  </div>
+</section>
+
+<!-- =============================== TOC =============================== -->
+<h2 class="toc-h">Contents</h2>
+<ol class="toc">
+  <li><span class="n">1</span><a href="#s1">What runs where</a><span class="d">The server, the containers, GitHub, npm, Odoo, the dashboard</span><span class="pg" data-sec="s1">3</span></li>
+  <li><span class="n">2</span><a href="#s2">A company wants keys</a><span class="d">Onboarding, what to send, what never to send, revoking</span><span class="pg" data-sec="s2">4</span></li>
+  <li><span class="n">3</span><a href="#s3">Staff and the dashboard</a><span class="d">First owner, logging in, hosting, invites, unanswered questions</span><span class="pg" data-sec="s3">7</span></li>
+  <li><span class="n">4</span><a href="#s4">Training the AI</a><span class="d">Where and with which credentials</span><span class="pg" data-sec="s4">9</span></li>
+  <li><span class="n">5</span><a href="#s5">Sharing the Odoo add-on</a><span class="d">The zip, installation, settings, updating the SDK, local test</span><span class="pg" data-sec="s5">10</span></li>
+  <li><span class="n">6</span><a href="#s6">Deployments and backups</a><span class="d">push → GitHub Actions → deploy.sh; migrations; backup and restore</span><span class="pg" data-sec="s6">12</span></li>
+  <li><span class="n">7</span><a href="#s7">SDK releases</a><span class="d">What is published, what is pending, how to publish</span><span class="pg" data-sec="s7">14</span></li>
+  <li><span class="n">8</span><a href="#s8">Moving to a new server</a><span class="d">bootstrap-server.sh, restore, DNS, HTTPS, performance</span><span class="pg" data-sec="s8">16</span></li>
+  <li><span class="n">9</span><a href="#s9">Security checklist</a><span class="d">Firewall, ports, secrets, SSH, rotation</span><span class="pg" data-sec="s9">19</span></li>
+  <li><span class="n">10</span><a href="#s10">Troubleshooting</a><span class="d">Health checks, logs, slow answers, 401 / 403, missing model</span><span class="pg" data-sec="s10">20</span></li>
+  <li><span class="n">11</span><a href="#s11">Quick reference card</a><span class="d">The commands you use most, on one page</span><span class="pg" data-sec="s11">22</span></li>
+</ol>
+
+<div class="callout" style="margin-top:8mm">
+  <span class="t">The other two guides</span>
+  <p>This runbook is about <b>operating</b> the service. It does not repeat the two existing guides; it points to them by section:</p>
+  <ul>
+    <li><b>Odoo guide</b> = <i>Brainbox AI for Odoo — How it works</i> (<code>Brainbox-Odoo-Integration-Guide.pdf</code>): architecture, keys, roles and every Odoo setting.</li>
+    <li><b>Training &amp; API reference</b> = <i>Brainbox AI — Training Guide &amp; API Reference</i> (<code>Brainbox-Training-and-API-Reference.pdf</code>): training, knowledge gaps, staff roles and every endpoint.</li>
+  </ul>
+</div>
+<div class="callout imp">
+  <span class="t">About secrets in this document</span>
+  <p>No real key, password or token appears here. Keys are written as <code>pk_live_xxx</code> / <code>sk_live_xxx</code>, the admin token as <code>$ADMIN_TOKEN</code>, and the example company is <code>acme</code>. The real secrets live only in <code>/var/www/Spres-Ai-Agent/brainBox/.env</code> on the server and in your password manager.</p>
+</div>
+<div class="callout dev">
+  <span class="t">New files that come with this runbook</span>
+  <p><code>deploy/bootstrap-server.sh</code> (sets up a new server), <code>deploy/README.md</code> (deploy scripts, GitHub secrets, deploy key) and <code>docs/brainbox_ai-odoo17-v2.0.0.zip</code> (the Odoo add-on, ready to send to a company).</p>
+</div>
+
+<!-- =============================== 1 =============================== -->
+<h2 id="s1"><span class="num">1</span>What runs where</h2>
+<p class="lead">Everything that thinks lives on <b>one server</b> that you control. Everything else (websites, Odoo, the staff dashboard, scripts) is a client that talks to that server over HTTPS with a key or a staff login.</p>
+
+<figure>
+<svg viewBox="0 0 720 372" role="img" aria-label="Overview of the Brainbox system" font-family="Segoe UI, Inter, Arial, sans-serif">
+  <defs>
+    <marker id="o1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/></marker>
+    <marker id="o2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#64748b"/></marker>
+  </defs>
+  <!-- left column -->
+  <rect x="6" y="10" width="196" height="56" rx="11" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.3"/>
+  <text x="104" y="33" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0b1f44">You (owner)</text>
+  <text x="104" y="51" text-anchor="middle" font-size="10.5" fill="#475569">laptop: git push, SSH, CLI</text>
+  <rect x="6" y="96" width="196" height="56" rx="11" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.3"/>
+  <text x="104" y="119" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0b1f44">GitHub repository</text>
+  <text x="104" y="137" text-anchor="middle" font-size="10" fill="#475569">resbrotherx/Spres-Ai-Agent · main</text>
+  <rect x="6" y="182" width="196" height="56" rx="11" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.3"/>
+  <text x="104" y="205" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0b1f44">GitHub Actions</text>
+  <text x="104" y="223" text-anchor="middle" font-size="10.5" fill="#475569">check, then deploy over SSH</text>
+  <rect x="6" y="276" width="196" height="76" rx="11" fill="#fff" stroke="#94a3b8" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <text x="104" y="298" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0b1f44">Package registries</text>
+  <text x="104" y="316" text-anchor="middle" font-size="10" fill="#475569">npm: spres-react, spres-web,</text>
+  <text x="104" y="330" text-anchor="middle" font-size="10" fill="#475569">spres-ai (Node) · PyPI: spres-ai</text>
+  <text x="104" y="344" text-anchor="middle" font-size="9.5" fill="#64748b">published by hand</text>
+  <line x1="104" y1="66" x2="104" y2="92" stroke="#64748b" stroke-width="1.8" marker-end="url(#o2)"/>
+  <text x="112" y="84" font-size="9.5" fill="#475569">git push</text>
+  <line x1="104" y1="152" x2="104" y2="178" stroke="#64748b" stroke-width="1.8" marker-end="url(#o2)"/>
+  <text x="112" y="170" font-size="9.5" fill="#475569">triggers</text>
+  <line x1="104" y1="238" x2="104" y2="272" stroke="#64748b" stroke-width="1.4" stroke-dasharray="3 3" marker-end="url(#o2)"/>
+  <text x="112" y="260" font-size="9.5" fill="#64748b">npm publish (manual)</text>
+  <line x1="202" y1="210" x2="250" y2="210" stroke="#1d4ed8" stroke-width="2" marker-end="url(#o1)"/>
+  <text x="226" y="200" text-anchor="middle" font-size="9" fill="#1e3a8a" font-weight="600">SSH</text>
+  <text x="226" y="226" text-anchor="middle" font-size="8.5" fill="#1e3a8a">deploy.sh</text>
+  <!-- server -->
+  <rect x="254" y="10" width="252" height="342" rx="14" fill="#0b1f44"/>
+  <text x="380" y="34" text-anchor="middle" font-size="13.5" font-weight="700" fill="#fff">brainBox server</text>
+  <text x="380" y="50" text-anchor="middle" font-size="10" fill="#93c5fd">165.227.77.33 · Ubuntu · Docker</text>
+  <rect x="268" y="62" width="224" height="50" rx="9" fill="#1d4ed8"/>
+  <text x="380" y="82" text-anchor="middle" font-size="11.5" font-weight="700" fill="#fff">nginx · HTTPS (443)</text>
+  <text x="380" y="99" text-anchor="middle" font-size="9.5" fill="#dbeafe">/ → API :8000 · /sdk/ → sdk-web files</text>
+  <rect x="268" y="124" width="224" height="190" rx="10" fill="#122c5e" stroke="#2b4f8f"/>
+  <text x="380" y="142" text-anchor="middle" font-size="9.5" font-weight="700" fill="#93c5fd" letter-spacing="1">DOCKER COMPOSE · brainBox/</text>
+  <rect x="280" y="152" width="200" height="34" rx="7" fill="#0ea5e9"/>
+  <text x="380" y="166" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">brainbox-api</text>
+  <text x="380" y="180" text-anchor="middle" font-size="9" fill="#e0f2fe">FastAPI · keys, chat, training, staff</text>
+  <rect x="280" y="192" width="200" height="34" rx="7" fill="#163a7a"/>
+  <text x="380" y="206" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">brainbox-postgres</text>
+  <text x="380" y="220" text-anchor="middle" font-size="9" fill="#bae6fd">all data + vectors (pgvector)</text>
+  <rect x="280" y="232" width="200" height="34" rx="7" fill="#163a7a"/>
+  <text x="380" y="246" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">brainbox-redis</text>
+  <text x="380" y="260" text-anchor="middle" font-size="9" fill="#bae6fd">answer cache, task queue</text>
+  <rect x="280" y="272" width="200" height="34" rx="7" fill="#163a7a"/>
+  <text x="380" y="286" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">brainbox-ollama</text>
+  <text x="380" y="300" text-anchor="middle" font-size="9" fill="#bae6fd">the AI model (qwen2.5:1.5b)</text>
+  <text x="380" y="332" text-anchor="middle" font-size="9.5" fill="#bae6fd">code: /var/www/Spres-Ai-Agent</text>
+  <text x="380" y="346" text-anchor="middle" font-size="9.5" fill="#bae6fd">secrets: brainBox/.env</text>
+  <!-- right column -->
+  <rect x="552" y="10" width="162" height="70" rx="11" fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1.3"/>
+  <text x="633" y="31" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0b1f44">Company websites</text>
+  <text x="633" y="48" text-anchor="middle" font-size="9.8" fill="#334155">sdk-web, sdk-react</text>
+  <text x="633" y="66" text-anchor="middle" font-size="9.8" font-weight="700" fill="#075985">publishable key pk_</text>
+  <rect x="552" y="98" width="162" height="70" rx="11" fill="#eff6ff" stroke="#1d4ed8" stroke-width="1.3"/>
+  <text x="633" y="119" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0b1f44">Company Odoo</text>
+  <text x="633" y="136" text-anchor="middle" font-size="9.8" fill="#334155">brainbox_ai add-on</text>
+  <text x="633" y="154" text-anchor="middle" font-size="9.8" font-weight="700" fill="#1e3a8a">secret key sk_ (server)</text>
+  <rect x="552" y="186" width="162" height="70" rx="11" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.3"/>
+  <text x="633" y="207" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0b1f44">Staff dashboard</text>
+  <text x="633" y="224" text-anchor="middle" font-size="9.8" fill="#334155">StaffDashboard (sdk-react)</text>
+  <text x="633" y="242" text-anchor="middle" font-size="9.8" font-weight="700" fill="#5b21b6">email + password</text>
+  <rect x="552" y="274" width="162" height="70" rx="11" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.3"/>
+  <text x="633" y="295" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0b1f44">Company servers</text>
+  <text x="633" y="312" text-anchor="middle" font-size="9.8" fill="#334155">sdk-node, sdk-python, curl</text>
+  <text x="633" y="330" text-anchor="middle" font-size="9.8" font-weight="700" fill="#1e3a8a">secret key sk_</text>
+  <g stroke="#1d4ed8" stroke-width="1.8">
+    <line x1="550" y1="45" x2="510" y2="80" marker-end="url(#o1)"/>
+    <line x1="550" y1="133" x2="510" y2="96" marker-end="url(#o1)"/>
+    <line x1="550" y1="221" x2="510" y2="104" marker-end="url(#o1)"/>
+    <line x1="550" y1="309" x2="512" y2="110" marker-end="url(#o1)"/>
+  </g>
+  <text x="529" y="364" text-anchor="middle" font-size="9.5" fill="#475569">all over HTTPS</text>
+</svg>
+<figcaption><b>Figure 1.</b> One server holds the brain (API, database, cache, AI model). Code arrives from GitHub; every client reaches the server through nginx over HTTPS.</figcaption>
+</figure>
+
+<table class="keep compact">
+  <thead><tr><th style="width:21%">Piece</th><th style="width:31%">Where it lives</th><th>What it does · how it is updated</th></tr></thead>
+  <tbody>
+    <tr><td class="k">brainbox-api</td><td>Docker container, port 8000, code bind-mounted from <code>brainBox/</code></td><td>The backend: keys, chat, training, staff dashboard API. Updated by every deploy (restart).</td></tr>
+    <tr><td class="k">brainbox-postgres</td><td>Docker container, volume <code>brainbox_postgres_data</code>, only on 127.0.0.1:5432</td><td>Every company's documents, vectors, chats, keys, staff. <b>The one thing to back up.</b></td></tr>
+    <tr><td class="k">brainbox-redis</td><td>Docker container, internal only</td><td>Answer cache and task queue. Can be lost safely.</td></tr>
+    <tr><td class="k">brainbox-ollama</td><td>Docker container, internal only, volume <code>brainbox_ollama_data</code></td><td>Runs the AI model named in <code>OLLAMA_MODEL</code>. Model files are re-downloadable.</td></tr>
+    <tr><td class="k">nginx</td><td>On the server (site <code>resai</code> today)</td><td>HTTPS for <code>port.smartpowerbilling.com</code>, forwards to :8000, serves <code>/sdk/</code> from <code>sdk-web/</code>.</td></tr>
+    <tr><td class="k">GitHub + Actions</td><td><code>resbrotherx/Spres-Ai-Agent</code>, workflow <code>deploy.yml</code></td><td>Source of truth. A push to <code>main</code> deploys automatically (section 6).</td></tr>
+    <tr><td class="k">npm / PyPI packages</td><td>npmjs.com, pypi.org</td><td>SDKs other developers install. Published by hand (section 7).</td></tr>
+    <tr><td class="k">Odoo add-on</td><td>Each company's own Odoo server</td><td><code>brainbox_ai</code>, sent as a zip (section 5).</td></tr>
+    <tr><td class="k">Staff dashboard</td><td>A web page you host (section 3)</td><td>Where each company's staff train the AI, see unanswered questions and manage keys.</td></tr>
+  </tbody>
+</table>
+
+
+<!-- =============================== 2 =============================== -->
+<h2 id="s2"><span class="num">2</span>A company wants keys</h2>
+<p class="lead">Onboarding a company takes five minutes: pick a name for it, give it a first owner, and let that owner (or you) create its keys.</p>
+<div class="callout">
+  <span class="t">In plain words</span>
+  <p>Think of the server as the head office. Companies never get access to the head office itself: they get <b>keys</b> (for their websites and systems) and <b>staff accounts</b> (for their people). Each key and account belongs to exactly one company, called a <b>tenant</b>, and can only see that company's knowledge.</p>
+</div>
+
+<ol class="steps">
+  <li><b class="h">Choose the tenant id.</b> A short, lowercase name with no spaces, e.g. <code>acme</code>. Nothing needs to be "created": the tenant exists as soon as a key or staff account uses the name.
+    <span class="tech">Case-sensitive free text. A typo (<code>Acme</code> vs <code>acme</code>) silently makes a second, empty company, so write it down and copy-paste it. Check existing names with <code>keys list</code> / <code>staff list</code>.</span></li>
+  <li><b class="h">Create their first owner.</b> One person at the company who will manage everything else. Either from the server CLI or over HTTPS with the admin token (commands below). Without a password you get an <b>invite link</b> valid for 7 days.</li>
+  <li><b class="h">Send the owner the invite link and the dashboard address.</b> They set their password and log in to the staff dashboard (section 3).</li>
+  <li><b class="h">Keys: they create their own, or you do.</b> In the dashboard: <b>Settings → API keys</b> (admins and owners). Publishable key for websites and apps, secret key for servers and Odoo. Or you create them with the CLI / admin API.</li>
+  <li><b class="h">Send the connection details</b> (list below) and confirm the key works: <code>curl -H "X-API-Key: sk_live_xxx" https://port.smartpowerbilling.com/api/health</code> answers with the key's type and tenant.</li>
+</ol>
+
+<h3>Create the first owner</h3>
+<div class="lang">On the server (CLI inside the API container)</div>
+<pre><span class="c"># invite link (valid 7 days) — send it to the person</span>
+docker exec brainbox-api python -m app.cli staff create --tenant acme --email owner@acme.com --role owner --name "Ada Lovelace"
+
+<span class="c"># or set a password now (you are prompted twice, nothing is echoed)</span>
+docker exec -it brainbox-api python -m app.cli staff create --tenant acme --email owner@acme.com --role owner --password
+
+docker exec brainbox-api python -m app.cli staff list --tenant acme</pre>
+<div class="lang">From anywhere, with the admin token (BRAINBOX_ADMIN_TOKEN from the server's .env)</div>
+<pre>curl -X POST https://port.smartpowerbilling.com/api/admin/staff \
+  -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"tenant_id":"acme","email":"owner@acme.com","full_name":"Ada Lovelace","role":"owner"}'
+<span class="c"># -&gt; {"user": {...}, "invite_url": "https://.../#/accept-invite?token=..."}</span></pre>
+
+<h3>Create keys yourself (optional)</h3>
+<pre><span class="c"># the raw key is printed ONCE — copy it into your password manager straight away</span>
+docker exec brainbox-api python -m app.cli keys create --tenant acme --type publishable --name "Acme website"
+docker exec brainbox-api python -m app.cli keys create --tenant acme --type secret --name "Acme Odoo" --expires 2027-12-31
+docker exec brainbox-api python -m app.cli keys list --tenant acme      <span class="c"># never shows raw keys</span>
+
+<span class="c"># same over HTTPS</span>
+curl -X POST https://port.smartpowerbilling.com/api/admin/keys \
+  -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"tenant_id":"acme","key_type":"secret","name":"Acme Odoo"}'      <span class="c"># -&gt; {..., "api_key": "sk_live_..."}</span></pre>
+
+<h3>Which key goes where</h3>
+<table class="keep compact">
+  <thead><tr><th style="width:22%">Used in</th><th style="width:17%">Key</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td class="k">sdk-web on a website</td><td><span class="tag pk">publishable pk_</span></td><td>Pasted in the page; visible to visitors, which is fine: it can only chat, and only as <code>public</code>.</td></tr>
+    <tr><td class="k">sdk-react <code>ChatWidget</code> / <code>ChatPanel</code></td><td><span class="tag pk">publishable pk_</span></td><td>Same rules as sdk-web. Mobile apps (sdk-react-native) too.</td></tr>
+    <tr><td class="k">Odoo add-on settings</td><td><span class="tag sk">secret sk_</span></td><td>Stored on the Odoo server only; lets Odoo say which role each user has.</td></tr>
+    <tr><td class="k">sdk-node, sdk-python, curl, back-ends</td><td><span class="tag sk">secret sk_</span></td><td>Server-side code only. Never in a browser or app.</td></tr>
+    <tr><td class="k">Training by API, <code>TrainingPanel</code></td><td><span class="tag sk">secret sk_</span> or staff login</td><td><code>/api/train/*</code> and <code>/api/ingest</code> need a secret key or a trainer+ staff login.</td></tr>
+    <tr><td class="k">Staff dashboard</td><td>staff login</td><td>Email + password. No key at all.</td></tr>
+    <tr><td class="k">Admin API (<code>/api/admin/*</code>)</td><td><span class="tag adm">admin token</span></td><td>Yours alone. Works for every tenant. Never sent to a company.</td></tr>
+  </tbody>
+</table>
+<p class="small">The full explanation of key types, prefixes and what each can call is in the Training &amp; API reference, section 7 "Keys explained", and the Odoo guide, section 4.</p>
+
+<div class="grid2">
+  <div class="send">
+    <span class="t">Send the company</span>
+    <ul>
+      <li>Backend URL: <code>https://port.smartpowerbilling.com</code></li>
+      <li>Their tenant id, e.g. <code>acme</code></li>
+      <li>Dashboard link + the owner's invite link</li>
+      <li>Publishable key (websites, apps)</li>
+      <li>Secret key (Odoo, servers) — through a password manager share or another secure channel, not in a normal email or chat</li>
+      <li>Script tag: <code>https://port.smartpowerbilling.com/sdk/brainbox-web-sdk.js</code></li>
+      <li>The Odoo add-on zip (if they use Odoo)</li>
+    </ul>
+  </div>
+  <div class="never">
+    <span class="t">Never send</span>
+    <ul>
+      <li><code>BRAINBOX_ADMIN_TOKEN</code> (opens every company)</li>
+      <li><code>JWT_SECRET_KEY</code> (lets anyone forge staff logins)</li>
+      <li><code>POSTGRES_PASSWORD</code> or the <code>.env</code> file</li>
+      <li>The server's SSH password or keys</li>
+      <li>Another company's keys or tenant id</li>
+      <li>A secret key for use in a website or mobile app — give a publishable key instead</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Revoking and rotating keys</h3>
+<p>A revoked key stops working on the next request. To <b>rotate</b> (replace a key without downtime): create the new key, let the company install it, check it works, then revoke the old one. Each key shows <i>last used</i>, so you can see when the old one went quiet.</p>
+<pre>docker exec brainbox-api python -m app.cli keys list --tenant acme     <span class="c"># find the id (ID column)</span>
+docker exec brainbox-api python -m app.cli keys revoke 42
+curl -X DELETE https://port.smartpowerbilling.com/api/admin/keys/42 -H "X-Admin-Token: $ADMIN_TOKEN"</pre>
+<p>Company admins can do the same themselves in <b>Settings → API keys</b> (they only see their own tenant's keys). If a secret key leaks, revoke it first and ask questions later: the only effect is that their integration stops until the new key is installed.</p>
+
+<!-- =============================== 3 =============================== -->
+<h2 id="s3"><span class="num">3</span>Staff and the dashboard</h2>
+<p class="lead">Staff are the people at a company who look after their assistant: they train it, read what users asked, answer the questions it couldn't, and manage keys and colleagues. They all use one web page: the <b>staff dashboard</b>.</p>
+
+<h3>What you need</h3>
+<ul class="check">
+  <li>An <b>owner</b> (or admin) account for the company — created by you as in section 2. Everyone else is invited from the dashboard by that person.</li>
+  <li>A <b>hosted dashboard</b> (below), and <code>DASHBOARD_URL</code> in the server's <code>.env</code> pointing to it, so links in invite and password-reset emails open the right page.</li>
+  <li>For emails (invites, alerts): the <code>SMTP_*</code> settings in <code>.env</code>. Without them, everything still works but the invite link must be copied and sent by hand (the dashboard shows it).</li>
+</ul>
+
+<h3>Where staff log in</h3>
+<p>The dashboard is the <code>StaffDashboard</code> component of the React SDK (<code>spres-react</code>). Today it runs from the sdk-react <b>preview app</b> on your machine:</p>
+<pre>cd ai\sdk-react\preview
+npm install
+npm run dev                         <span class="c"># then open http://localhost:4173/#/staff</span></pre>
+<p>That is fine for you, but companies need a real address. Two ways to host it:</p>
+<div class="grid2">
+  <div class="card"><h4>A. Build the preview and serve it with nginx</h4>
+    <p>Quickest. Build with the server URL and serve the static files, e.g. at <code>https://port.smartpowerbilling.com/dashboard/</code>:</p>
+<pre><span class="c"># preview/.env.local:</span>
+VITE_BRAINBOX_API_URL=https://port.smartpowerbilling.com
+npx vite build --base=/dashboard/
+<span class="c"># nginx (same server block)</span>
+location /dashboard/ {
+    alias /var/www/brainbox-dashboard/;
+}</pre>
+    <p>Copy <code>preview/dist/</code> to <code>/var/www/brainbox-dashboard/</code>. Staff open <code>…/dashboard/#/staff</code>.</p></div>
+  <div class="card"><h4>B. A small app of your own</h4>
+    <p>Cleaner for customers (no chat demo pages). Any React app:</p>
+<pre>import { StaffDashboard } from 'spres-react';
+
+export default function App() {
+  return &lt;StaffDashboard
+    apiUrl="https://port.smart…"
+    brandName="Brainbox" /&gt;;
+}</pre>
+    <p>Build it and host the files anywhere (nginx, Netlify…). Needs <code>spres-react</code> 1.1.0, which is not on npm yet (section 7) — until then build it from the repo.</p></div>
+</div>
+<p>Then set <code>DASHBOARD_URL</code> and restart the API:</p>
+<pre><span class="c"># /var/www/Spres-Ai-Agent/brainBox/.env</span>
+<span class="c"># option A (the preview forwards #/accept-invite links to #/staff/...)</span>
+DASHBOARD_URL=https://port.smartpowerbilling.com/dashboard
+docker restart brainbox-api</pre>
+<div class="callout imp"><span class="t">Never build a secret key into the dashboard</span><p>Anything in a <code>VITE_…</code> variable ends up inside the JavaScript files that every visitor downloads. The dashboard does not need a key: staff log in with email and password.</p></div>
+
+<h3>Inviting staff and roles</h3>
+<p>In the dashboard: <b>Staff → Invite</b>, enter email, name and role. The person receives an email (or the admin copies the link shown) and sets a password within 7 days. Roles, from most to least powerful:</p>
+<table class="keep compact">
+  <thead><tr><th style="width:14%">Role</th><th>Can</th></tr></thead>
+  <tbody>
+    <tr><td class="k">owner</td><td>Everything, including managing admins and other owners. A company always keeps at least one active owner.</td></tr>
+    <tr><td class="k">admin</td><td>Invite / change / remove trainers and viewers, change settings, manage API keys.</td></tr>
+    <tr><td class="k">trainer</td><td>Train the AI, answer / dismiss / reopen knowledge gaps.</td></tr>
+    <tr><td class="k">viewer</td><td>Read everything: overview, gaps, conversations, training sources, staff list, settings.</td></tr>
+  </tbody>
+</table>
+<p class="small">Endpoints behind the dashboard: <code>POST /api/staff/login</code>, <code>POST /api/staff/invite</code> (admin+), <code>PATCH</code> / <code>DELETE /api/staff/{id}</code>, <code>POST /api/staff/{id}/resend-invite</code>, <code>POST /api/staff/accept-invite</code>, <code>/forgot-password</code>, <code>/reset-password</code>, <code>GET /api/staff</code>. Details: Training &amp; API reference section 6 "Staff roles" and section 10. One email address = one staff account in one company.</p>
+<pre><span class="c"># server-side helpers when someone is locked out</span>
+docker exec -it brainbox-api python -m app.cli staff set-password owner@acme.com
+docker exec brainbox-api python -m app.cli staff deactivate someone@acme.com   <span class="c"># immediate</span></pre>
+
+<h3>Unanswered questions (knowledge gaps)</h3>
+<ol class="steps">
+  <li><b class="h">The assistant can't answer.</b> No matching knowledge, a low-confidence match, the model said it doesn't know, the model was unavailable, or a user gave a thumbs-down.</li>
+  <li><b class="h">It appears in the dashboard</b> under <b>Knowledge gaps</b>, grouped by question with a counter of how often it was asked.</li>
+  <li><b class="h">Staff are notified.</b> An in-app notification (bell) for each active staff member, and an email if SMTP is configured on the server, the staff member has email alerts on, and the company allows it (<b>Settings → Alerts</b>). Emails are capped per hour (<code>EMAIL_MAX_PER_HOUR</code>, default 20).</li>
+  <li><b class="h">A trainer answers it</b> with <b>Answer &amp; train</b>: the answer becomes a training source, the gap is marked resolved, and the next user gets the new answer.
+    <span class="tech">Full flow: Training &amp; API reference, section 5. Email needs <code>SMTP_HOST</code> + <code>SMTP_FROM</code> (or <code>SMTP_USER</code>); also <code>SMTP_PORT</code>, <code>SMTP_PASSWORD</code>, <code>SMTP_TLS</code> = starttls / ssl / none.</span></li>
+</ol>
+
+<!-- =============================== 4 =============================== -->
+<h2 id="s4"><span class="num">4</span>Training the AI</h2>
+<p class="lead">Training means giving a company's assistant its knowledge: files, pasted text, or a connection to another system (for example a support desk). Each company trains its own assistant; you rarely need to do it for them.</p>
+
+<table class="keep compact">
+  <thead><tr><th style="width:24%">Where</th><th style="width:26%">Who / credentials</th><th>How</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Staff dashboard → Training</td><td>staff with role trainer, admin or owner</td><td>Upload files, paste text, connect an API, pick the audience, re-sync or delete sources. The easy way.</td></tr>
+    <tr><td class="k">Knowledge gaps → Answer &amp; train</td><td>trainer+</td><td>Answer one unanswered question; it becomes a training source.</td></tr>
+    <tr><td class="k">API <code>/api/train/*</code></td><td>secret key <code>sk_</code> or a trainer+ staff login</td><td><code>POST /api/train/file</code>, <code>/train/text</code>, <code>/train/api-source</code>, <code>GET /api/train/sources</code>, <code>PATCH</code> / <code>DELETE /api/train/sources/{id}</code>, <code>POST /api/train/sources/{id}/sync</code>.</td></tr>
+    <tr><td class="k"><code>TrainingPanel</code> (sdk-react)</td><td>secret key or staff token</td><td>The same training screen embedded in a company's own internal tool.</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <span class="t">The one rule to remember: audiences</span>
+  <p>Every source has an <b>audience</b> (public, customer, vendor, internal, admin) that decides who may get answers from it. New sources default to <b>internal</b>. Website visitors (publishable keys) only ever see <b>public</b> knowledge, so a company that wants its website bot to answer from a document must mark that document <b>public</b>.</p>
+</div>
+
+<p>Where to read more, in the <b>Training &amp; API reference</b>:</p>
+<table class="compact">
+  <thead><tr><th style="width:12%">Section</th><th>Topic</th></tr></thead>
+  <tbody>
+    <tr><td class="k">1</td><td>How Brainbox learns — from a PDF to an answer, in plain words</td></tr>
+    <tr><td class="k">2</td><td>Ways to train — dashboard, API, answering gaps; file types and limits</td></tr>
+    <tr><td class="k">3</td><td>Connecting a support system — tickets and responses, field mapping, re-sync</td></tr>
+    <tr><td class="k">4</td><td>Audiences — who sees what</td></tr>
+    <tr><td class="k">8</td><td>Best-practice checklist for good training data</td></tr>
+    <tr><td class="k">10, 11</td><td>Every training endpoint, with curl / JavaScript / Python recipes</td></tr>
+  </tbody>
+</table>
+<pre><span class="c"># smallest possible API example (secret key of the company)</span>
+curl -X POST https://port.smartpowerbilling.com/api/train/text \
+  -H "Authorization: Bearer sk_live_xxx" -H "Content-Type: application/json" \
+  -d '{"name":"Opening hours","content":"We are open Monday to Friday, 8:00-17:00.","audience":"public"}'</pre>
+
+<!-- =============================== 5 =============================== -->
+<h2 id="s5"><span class="num">5</span>Sharing the Odoo add-on</h2>
+<p class="lead">A company that uses Odoo 17 gets the assistant inside Odoo by installing one add-on, <b>Brainbox AI</b> (<code>brainbox_ai</code>, version 17.0.2.0.0). You send them a zip; they install it and paste in a secret key. They do not copy any chat code: the chat window <b>is</b> the web SDK, bundled inside the add-on.</p>
+
+<h3>What to send</h3>
+<ul>
+  <li><code>docs/brainbox_ai-odoo17-v2.0.0.zip</code> — the add-on folder (21 files, no caches). Or give them read access to a git repository containing only the <code>brainbox_ai</code> folder.</li>
+  <li>A <b>secret key</b> for their tenant (section 2) — the add-on does not work with a publishable key for logged-in users, because only a secret key lets Odoo say who each user is and what role they have.</li>
+  <li>The backend URL <code>https://port.smartpowerbilling.com</code> and their tenant id.</li>
+</ul>
+
+<h3>What the company does</h3>
+<ol class="steps">
+  <li><b class="h">Unzip into an addons folder.</b> The result must be <code>&lt;addons path&gt;/brainbox_ai/__manifest__.py</code>, in a folder listed in <code>addons_path</code> of their <code>odoo.conf</code> (Odoo.sh: commit the folder to their repository).</li>
+  <li><b class="h">Restart Odoo.</b></li>
+  <li><b class="h">Apps → Update Apps List</b> (developer mode), search <b>Brainbox AI</b>, click <b>Activate</b>.</li>
+  <li><b class="h">Settings → Brainbox AI:</b> fill in Backend URL, Tenant ID, Secret API key, click <b>Test connection</b>, choose a display mode, save.</li>
+</ol>
+
+<h3>The settings, briefly</h3>
+<table class="compact">
+  <thead><tr><th style="width:26%">Setting</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Backend URL</td><td><code>https://port.smartpowerbilling.com</code> (without <code>/api</code>).</td></tr>
+    <tr><td class="k">Tenant ID</td><td>Their tenant id. Optional with a secret key (the key already says which tenant).</td></tr>
+    <tr><td class="k">Secret API key (sk_...)</td><td>Kept on the Odoo server, never sent to browsers, never shown again. Empty = keep the stored key; "Remove it on save" deletes it.</td></tr>
+    <tr><td class="k">SDK script URL</td><td>Optional: load the SDK from a URL (e.g. <code>https://port.smartpowerbilling.com/sdk/brainbox-web-sdk.js</code>) instead of the bundled copy.</td></tr>
+    <tr><td class="k">Test connection</td><td>Button: the Odoo server calls <code>/api/health</code> with the stored key; it reports success, or a failure if the server cannot be reached or the key is rejected.</td></tr>
+    <tr><td class="k">Display mode, Position</td><td>Floating launcher (default), docked sidebar, systray icon only, or disabled; bottom-right / bottom-left.</td></tr>
+    <tr><td class="k">Allowed groups</td><td>Who gets the assistant. Empty = all internal users.</td></tr>
+    <tr><td class="k">Role mapping, role groups</td><td>Which role (internal, customer, vendor, public…) each kind of user gets; decides which knowledge they may read.</td></tr>
+    <tr><td class="k">Colors, names, logo, welcome message, quick actions</td><td>Appearance of the chat.</td></tr>
+  </tbody>
+</table>
+<p class="small">Every setting in detail, display modes, embedding the chat in a form and the role precedence: Odoo guide, section 7 "Installation and configuration" and section 5 "Who sees what". Onboarding checklist for a company: Odoo guide, section 6.</p>
+
+<h3>Updating the chat (SDK) inside the add-on</h3>
+<p>The add-on ships a copy of <code>sdk-web/brainbox-web-sdk.js</code> in <code>static/lib/brainbox-web-sdk/</code>. When the web SDK changes, copy it in, upgrade the module, and send a new zip:</p>
+<pre><span class="c"># in odoo\custom_addons\brainbox_ai (PowerShell)</span>
+.\tools\sync_sdk.ps1 -SdkPath C:\Users\USER\Documents\PERSONAL\ai\sdk-web
+<span class="c"># -Version 2 (download from npm via jsDelivr) only works once spres-web is published (section 7)</span></pre>
+<p>A company can also skip updates by setting <b>SDK script URL</b> to your server's copy, which every deploy keeps current. Bump the version in <code>__manifest__.py</code> and the zip name when you change the add-on, so companies can tell versions apart.</p>
+<pre><span class="c"># rebuild the zip, without Python caches (PowerShell or cmd, in odoo\custom_addons)</span>
+tar -a -cf brainbox_ai-odoo17-v2.0.1.zip --exclude=__pycache__ --exclude=*.pyc brainbox_ai</pre>
+
+<h3>The local Odoo test instance</h3>
+<pre>cd C:\Users\USER\Documents\PERSONAL\odoo
+<span class="c"># run Odoo: http://localhost:8069, database test_odoo_db (the only one with brainbox_ai installed)</span>
+.venv\Scripts\python.exe odoo-bin -c odoo.conf
+<span class="c"># upgrade the add-on after changing it (add --http-port 8075 if 8069 is busy)</span>
+.venv\Scripts\python.exe odoo-bin -c odoo.conf -d test_odoo_db -u brainbox_ai --stop-after-init</pre>
+
+<!-- =============================== 6 =============================== -->
+<h2 id="s6"><span class="num">6</span>Deployments and backups</h2>
+<p class="lead">You never copy files to the server by hand. You push to the <code>main</code> branch on GitHub; GitHub checks the code and tells the server to update itself. The whole thing takes about a minute.</p>
+
+<figure>
+<svg viewBox="0 0 720 128" role="img" aria-label="Deployment pipeline" font-family="Segoe UI, Inter, Arial, sans-serif">
+  <defs><marker id="d1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/></marker></defs>
+  <g font-size="10" fill="#334155" text-anchor="middle">
+    <rect x="4" y="14" width="124" height="86" rx="10" fill="#f8fafc" stroke="#94a3b8"/>
+    <text x="66" y="38" font-size="12" font-weight="700" fill="#0b1f44">git push</text>
+    <text x="66" y="56">to main</text><text x="66" y="72">brainBox/, sdk-web/,</text><text x="66" y="86">deploy/ changed</text>
+    <rect x="152" y="14" width="132" height="86" rx="10" fill="#eff6ff" stroke="#1d4ed8"/>
+    <text x="218" y="38" font-size="12" font-weight="700" fill="#0b1f44">Actions: check</text>
+    <text x="218" y="56">compile the backend</text><text x="218" y="72">node --check</text><text x="218" y="86">the web SDK</text>
+    <rect x="308" y="14" width="132" height="86" rx="10" fill="#eff6ff" stroke="#1d4ed8"/>
+    <text x="374" y="38" font-size="12" font-weight="700" fill="#0b1f44">Actions: deploy</text>
+    <text x="374" y="56">SSH with a key that</text><text x="374" y="72">can only run</text><text x="374" y="86">deploy.sh</text>
+    <rect x="464" y="14" width="132" height="86" rx="10" fill="#0b1f44"/>
+    <text x="530" y="38" font-size="12" font-weight="700" fill="#fff">deploy.sh</text>
+    <text x="530" y="56" fill="#bae6fd">fast-forward main</text><text x="530" y="72" fill="#bae6fd">rebuild only if needed</text><text x="530" y="86" fill="#bae6fd">restart brainbox-api</text>
+    <rect x="620" y="14" width="96" height="86" rx="10" fill="#ecfdf5" stroke="#10b981"/>
+    <text x="668" y="38" font-size="12" font-weight="700" fill="#047857">Live</text>
+    <text x="668" y="56">health check</text><text x="668" y="72">passes; /sdk/</text><text x="668" y="86">updated too</text>
+  </g>
+  <g stroke="#1d4ed8" stroke-width="2"><line x1="130" y1="57" x2="148" y2="57" marker-end="url(#d1)"/><line x1="286" y1="57" x2="304" y2="57" marker-end="url(#d1)"/><line x1="442" y1="57" x2="460" y2="57" marker-end="url(#d1)"/><line x1="598" y1="57" x2="616" y2="57" marker-end="url(#d1)"/></g>
+  <text x="360" y="122" text-anchor="middle" font-size="10.5" fill="#475569">If the check fails nothing is deployed. If the API does not become healthy, the job fails and prints the API logs.</text>
+</svg>
+<figcaption><b>Figure 2.</b> From a push on GitHub to the live server.</figcaption>
+</figure>
+
+<ul>
+  <li><b>Watch it:</b> GitHub → <b>Actions</b> tab → "Deploy brainBox". A red cross means look at the log of the failing step.</li>
+  <li><b>Re-run without a code change:</b> Actions → Deploy brainBox → <b>Run workflow</b>.</li>
+  <li><b>Postgres, Redis and Ollama keep running</b> during a deploy; only the API restarts (a few seconds of downtime). The API image is rebuilt only when <code>requirements.txt</code> or the <code>Dockerfile</code> changed.</li>
+  <li><b>Setup:</b> GitHub secrets <code>DEPLOY_HOST</code>, <code>DEPLOY_USER</code>, <code>DEPLOY_KNOWN_HOSTS</code>, <code>DEPLOY_SSH_KEY</code> and the forced-command line in the server's <code>authorized_keys</code> — see <code>deploy/README.md</code>.</li>
+</ul>
+
+<h3>Manual deploy</h3>
+<pre><span class="c"># on the server</span>
+bash /var/www/Spres-Ai-Agent/deploy/deploy.sh                  <span class="c"># same as GitHub does</span>
+FORCE=1 bash /var/www/Spres-Ai-Agent/deploy/deploy.sh          <span class="c"># restart even if already up to date</span>
+FORCE_BUILD=1 bash /var/www/Spres-Ai-Agent/deploy/deploy.sh    <span class="c"># also rebuild the API image</span></pre>
+<p class="small">deploy.sh only fast-forwards: if someone edited files directly on the server and committed there, it stops with an error instead of throwing their work away. Fix it by hand (<code>git status</code>, <code>git log</code>) before deploying again.</p>
+
+<h3>Database changes ("migrations")</h3>
+<p>There is <b>no separate migrate command</b>. Every time the API starts it runs <code>init_db</code>, which creates missing tables and adds missing columns (<code>CREATE … IF NOT EXISTS</code>, <code>ADD COLUMN IF NOT EXISTS</code>). It is safe to run any number of times and never deletes data. A deploy therefore upgrades the database automatically. Take a backup before a big release anyway.</p>
+
+<h3>Backups</h3>
+<p>Only the Postgres database matters: it holds every company's knowledge, chats, keys and staff. Redis is a cache and the AI model can be downloaded again. Also keep a copy of <code>brainBox/.env</code> in your password manager — without <code>JWT_SECRET_KEY</code> everyone is logged out, without the rest you start over.</p>
+<pre><span class="c"># on the server — one compressed dump file</span>
+mkdir -p /root/backups
+docker exec brainbox-postgres pg_dump -U spres -Fc spres_ai &gt; /root/backups/brainbox-$(date +%F).dump
+
+<span class="c"># copy it off the server (from your laptop)</span>
+scp root@165.227.77.33:/root/backups/brainbox-2026-10-09.dump .
+
+<span class="c"># optional: nightly at 03:00, keep 14 days (crontab -e)</span>
+0 3 * * * docker exec brainbox-postgres pg_dump -U spres -Fc spres_ai &gt; /root/backups/brainbox-$(date +\%F).dump &amp;&amp; find /root/backups -name 'brainbox-*.dump' -mtime +14 -delete</pre>
+
+<h3>Restore</h3>
+<p>Restoring <b>replaces</b> the whole database with the backup. Stop the API first so nothing writes in the meantime.</p>
+<pre>docker stop brainbox-api
+docker exec brainbox-postgres dropdb -U spres spres_ai
+docker exec brainbox-postgres createdb -U spres spres_ai
+docker exec -i brainbox-postgres pg_restore -U spres -d spres_ai --no-owner &lt; /root/backups/brainbox-2026-10-09.dump
+docker start brainbox-api
+curl -s http://127.0.0.1:8000/api/health</pre>
+<p class="small">Test a restore on a spare server once, so you know the backups are good before you need them. After restoring an older backup the API adds any newer columns itself on start.</p>
+
+<!-- =============================== 7 =============================== -->
+<h2 id="s7"><span class="num">7</span>SDK releases</h2>
+<p class="lead">There are two ways an SDK reaches people. The <b>web SDK file</b> is served by your own server, so every deploy updates it. The <b>packages</b> (npm, PyPI) are what other developers install, and you publish those by hand when you decide a version is ready.</p>
+
+<table class="keep compact">
+  <thead><tr><th style="width:17%">Folder</th><th style="width:19%">Package</th><th style="width:19%">Status (9 Oct 2026)</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td class="k">sdk-web</td><td>server copy <code>/sdk/brainbox-web-sdk.js</code></td><td><span class="status live">live</span></td><td>nginx serves it straight from the repo: every deploy publishes it. This is the URL to give websites today.</td></tr>
+    <tr><td class="k">sdk-web</td><td>npm <code>spres-web</code> 2.0.0</td><td><span class="status pend">prepared, not published</span></td><td>Never published: <code>npm view spres-web</code> → 404. The jsDelivr URLs in its README and the Odoo <code>sync_sdk.ps1 -Version</code> option need it.</td></tr>
+    <tr><td class="k">sdk-react</td><td>npm <code>spres-react</code> 1.1.0</td><td><span class="status pend">prepared, not published</span></td><td>npm has 1.0.4 (chat components only). 1.1.0 adds <code>TrainingPanel</code>, <code>StaffDashboard</code> and <code>BrainboxStaffClient</code>.</td></tr>
+    <tr><td class="k">sdk-node</td><td>npm <code>spres-ai</code> 1.0.0</td><td><span class="status live">published</span></td><td>Server-side client (secret key).</td></tr>
+    <tr><td class="k">sdk-python</td><td>PyPI <code>spres-ai</code> 1.0.0</td><td><span class="status live">published</span></td><td>Server-side client (secret key).</td></tr>
+    <tr><td class="k">sdk-react-native</td><td><code>brainbox-react-native-sdk</code> 1.0.0</td><td><span class="status old">outdated</span></td><td>Its streaming chat calls <code>/api/chat/stream</code>, which does not exist on the server. Do not give it to anyone until it is updated to the current API (the React SDK is the reference).</td></tr>
+  </tbody>
+</table>
+
+<h3>Publishing an npm package</h3>
+<ol class="steps">
+  <li><b class="h">Bump the version</b> in <code>package.json</code>. npm refuses to publish a version number twice, ever (even after unpublishing).
+    <span class="tech"><code>npm version patch</code> (1.1.0 → 1.1.1), <code>minor</code> for new features, <code>major</code> for breaking changes.</span></li>
+  <li><b class="h">Build and check.</b> <code>npm run build</code> (sdk-react: TypeScript → <code>dist/</code>; sdk-web: minified file in <code>dist/</code>, run automatically by <code>prepublishOnly</code>).</li>
+  <li><b class="h">Log in once</b> with the npm account that owns the packages: <code>npm login</code> (or an automation token in <code>~/.npmrc</code> — never commit that file).</li>
+  <li><b class="h">Publish</b> and commit the version bump.</li>
+</ol>
+<pre>cd ai\sdk-react
+npm install
+npm run build
+<span class="c"># list exactly which files will be uploaded: no .env, no keys</span>
+npm pack --dry-run
+npm publish --access public
+
+cd ..\sdk-web
+npm publish --access public   <span class="c"># prepublishOnly runs: node --check + build</span></pre>
+<pre><span class="c"># Python (sdk-python): bump version in pyproject.toml, then</span>
+pip install build twine
+python -m build
+twine upload dist/*          <span class="c"># uses a PyPI API token; see PUBLISHING_GUIDE.md</span></pre>
+<p class="small">Step-by-step account and token setup for npm and PyPI: <code>ai/PUBLISHING_GUIDE.md</code>. After publishing <code>spres-web</code>, websites can also use <code>https://cdn.jsdelivr.net/npm/spres-web@2</code>, and the Odoo add-on's <code>sync_sdk.ps1 -Version 2</code> starts working.</p>
+
+<!-- =============================== 8 =============================== -->
+<h2 id="s8"><span class="num">8</span>Moving to a new server</h2>
+<p class="lead">Moving means: set up a fresh server with one script, copy the database across, point the domain at the new machine, and tell GitHub where to deploy. Plan about an hour, most of it waiting for downloads. Users notice only a short pause while DNS switches.</p>
+
+<div class="callout imp"><span class="t">The current server is shared</span><p>165.227.77.33 also runs unrelated services. On it, only ever touch the <code>brainbox-*</code> containers, the brainBox nginx site and <code>/var/www/Spres-Ai-Agent</code>.</p></div>
+
+<h3>Step by step</h3>
+<ol class="steps">
+  <li><b class="h">Create the new server.</b> Ubuntu 22.04 or 24.04, at least 4 vCPU and 8 GB RAM for <code>qwen2.5:1.5b</code> on CPU (more cores = faster answers; a GPU server for answers under 5 s), 40 GB+ disk. Log in with an SSH key.</li>
+  <li><b class="h">Run the bootstrap script.</b> It installs Docker, clones the repo, writes a new <code>.env</code> with fresh secrets, starts the containers, downloads the model and waits for health.
+<pre>curl -fsSL https://raw.githubusercontent.com/resbrotherx/Spres-Ai-Agent/main/deploy/bootstrap-server.sh -o bootstrap-server.sh
+sudo bash bootstrap-server.sh https://github.com/resbrotherx/Spres-Ai-Agent.git port.smartpowerbilling.com</pre></li>
+  <li><b class="h">Carry over the secrets that must not change.</b> Copy <code>JWT_SECRET_KEY</code> (keeps staff logged in), <code>BRAINBOX_ADMIN_TOKEN</code>, <code>DASHBOARD_URL</code>, <code>SMTP_*</code> and any tuning variables from the old <code>.env</code> into the new one. Keep the <b>new</b> <code>POSTGRES_PASSWORD</code> (the new database was created with it). Then <code>docker restart brainbox-api</code>.
+    <span class="tech">API keys and staff passwords live in the database, so they move with the backup — companies change nothing.</span></li>
+  <li><b class="h">Back up the old database and restore it on the new server</b> (section 6). For a clean cut-over, take the final backup right before the DNS switch.
+<pre><span class="c"># old server</span>
+docker exec brainbox-postgres pg_dump -U spres -Fc spres_ai &gt; /root/backups/move.dump
+<span class="c"># copy across (from the old server, or via your laptop)</span>
+scp /root/backups/move.dump root@NEW_IP:/root/move.dump
+<span class="c"># new server: the restore commands from section 6 (stop api, dropdb, createdb, pg_restore, start api)</span></pre></li>
+  <li><b class="h">Test before switching.</b> On the new server <code>curl -s http://127.0.0.1:8000/api/health</code> and <code>curl -s -H "X-API-Key: sk_live_xxx" http://127.0.0.1:8000/api/health</code> with a real key (shows its tenant), then ask one question.</li>
+  <li><b class="h">nginx and HTTPS.</b> Create the nginx site printed by the script (proxy to 127.0.0.1:8000, <code>location /sdk/</code>, <code>proxy_read_timeout 300s</code>), plus <code>location /dashboard/</code> if you host the dashboard (section 3).</li>
+  <li><b class="h">Switch DNS.</b> Point the A record of <code>port.smartpowerbilling.com</code> to the new IP (lower the TTL to 300 a day before). Once it resolves to the new server, run <code>certbot --nginx -d port.smartpowerbilling.com</code>.</li>
+  <li><b class="h">Update GitHub.</b> Secrets <code>DEPLOY_HOST</code> (new IP) and <code>DEPLOY_KNOWN_HOSTS</code> (<code>ssh-keyscan -t ed25519 NEW_IP</code>); add the forced-command deploy key line to the new server's <code>~/.ssh/authorized_keys</code> (<code>deploy/README.md</code>). Then Actions → Run workflow to prove it works.</li>
+  <li><b class="h">Firewall, backups, clean-up.</b> Section 9 checklist, the nightly backup cron (section 6). Keep the old server stopped (not deleted) for a week, then remove its brainbox containers and volumes.</li>
+</ol>
+<p class="small">The AI model is not in the backup: the bootstrap script downloads the one named in <code>OLLAMA_MODEL</code> (by hand: <code>docker exec brainbox-ollama ollama pull &lt;model&gt;</code>). Changing model = edit <code>OLLAMA_MODEL</code>, pull it, restart the API.</p>
+
+<h3>Performance settings (answer speed)</h3>
+<p>Answers are written by the AI model running on the server's CPU, so speed depends mostly on the number of CPU cores, the model size and how much text goes into each prompt.</p>
+<div class="callout imp"><span class="t">What to expect today</span>
+<p>Production runs <code>qwen2.5:1.5b</code> on the shared 4-core CPU with the values in the "Production" column below. Measured: <b>about 9–20 s per answer</b>, depending on server load and answer length. Tuning cannot make a CPU much faster than that. <b>For answers under 5 s</b>, use a hosted OpenAI-compatible API (<code>LLM_PROVIDER=openai</code>, e.g. Groq <code>llama-3.1-8b-instant</code>: about 1–3 s, paid per use, questions leave your server) or move Ollama to a GPU server.</p></div>
+<p>These variables in <code>brainBox/.env</code> exist in the code as of this writing (restart the API after changing them):</p>
+<table class="compact">
+  <thead><tr><th style="width:30%">Variable</th><th style="width:16%">Production</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td class="k"><code>OLLAMA_MODEL</code></td><td><code>qwen2.5:1.5b</code></td><td>The model. Smaller = faster, larger = better answers (<code>llama3.2:3b</code> is roughly twice as slow on the same CPU). Must be pulled into the ollama container. Same value in <code>.env.example</code>; code fallback if unset: <code>llama2</code>.</td></tr>
+    <tr><td class="k"><code>LLM_PROVIDER</code></td><td><code>ollama</code> (default)</td><td><code>openai</code> = use any OpenAI-compatible API instead of the local model (much faster, costs money per question, questions leave your server). The other provider is tried as a fallback when configured.</td></tr>
+    <tr><td class="k"><code>OPENAI_API_KEY</code>, <code>OPENAI_BASE_URL</code>, <code>OPENAI_MODEL</code></td><td>not set (model default <code>gpt-4o-mini</code>)</td><td>For <code>LLM_PROVIDER=openai</code> (OpenAI, Groq, Together…; about 1–3 s per answer). Groq example: <code>OPENAI_BASE_URL=https://api.groq.com/openai/v1</code>, <code>OPENAI_MODEL=llama-3.1-8b-instant</code>. <code>USE_OPENAI=true</code> + a key enables it only as fallback.</td></tr>
+    <tr><td class="k"><code>OLLAMA_NUM_CTX</code></td><td>2048</td><td>Context window in tokens. Bigger = slower; keep it constant (changing it reloads the model).</td></tr>
+    <tr><td class="k"><code>OLLAMA_NUM_PREDICT</code></td><td>220</td><td>Maximum answer length in tokens. Lower = faster, shorter answers.</td></tr>
+    <tr><td class="k"><code>OLLAMA_NUM_THREAD</code></td><td>not set (0 = auto)</td><td>CPU threads for the model. Usually leave on auto; set to the number of physical cores if answers are slow.</td></tr>
+    <tr><td class="k"><code>OLLAMA_KEEP_ALIVE</code></td><td>-1 (forever)</td><td>How long the model stays in memory after a question. <code>-1</code> avoids the slow first question after a quiet period.</td></tr>
+    <tr><td class="k"><code>OLLAMA_WARMUP</code></td><td>true</td><td>Load the model when the API starts, so the first question after a deploy is not slow.</td></tr>
+    <tr><td class="k"><code>LLM_TEMPERATURE</code></td><td>not set (0.2)</td><td>Creativity. Low = factual and consistent.</td></tr>
+    <tr><td class="k"><code>LLM_TIMEOUT</code></td><td>not set (120 s)</td><td>How long the API waits for the model before giving the "model unavailable" answer. Keep it below nginx's <code>proxy_read_timeout</code> (300 s) and the Odoo proxy's 200 s.</td></tr>
+    <tr><td class="k"><code>RAG_MAX_CHUNKS</code>, <code>RAG_MAX_CHUNK_CHARS</code></td><td>3, 450</td><td>How much knowledge text goes into each prompt. Prompt size dominates CPU time: fewer/shorter = faster, but less context.</td></tr>
+  </tbody>
+</table>
+<p class="small">The API logs one line per answer: <code>Ollama answered in 9.3s (load 0.0s, prompt 812 tok, answer 140 tok)</code>. A large <i>load</i> means the model was reloaded; a large <i>prompt</i> means lower the RAG settings. <code>docker stats</code> shows whether the CPU is saturated.</p>
+
+<!-- =============================== 9 =============================== -->
+<h2 id="s9"><span class="num">9</span>Security checklist</h2>
+<p class="lead">Go through this list after every server change, and once a quarter anyway.</p>
+
+<h3>Network</h3>
+<ul class="check">
+  <li><b>Only ports 22, 80 and 443 are open to the internet.</b> <code>ufw allow 22/tcp</code>, <code>80/tcp</code>, <code>443/tcp</code>, default deny incoming — and/or the same rules in the cloud provider's firewall (DigitalOcean → Networking → Firewalls).</li>
+  <li><b>Port 8000 is not reachable from outside.</b> Docker publishes container ports past <code>ufw</code>, and <code>docker-compose.yml</code> maps the API as <code>8000:8000</code> on all interfaces. Block 8000 in the cloud firewall, or change the mapping to <code>"127.0.0.1:8000:8000"</code> (nginx reaches it locally either way). Test from your laptop: <code>curl -m 5 http://165.227.77.33:8000/api/health</code> must time out.</li>
+  <li><b>Postgres, Redis and Ollama are never published.</b> Postgres is bound to <code>127.0.0.1:5432</code> (use an SSH tunnel to inspect it); Redis and Ollama have no <code>ports:</code> at all. Keep it that way: Redis and Ollama have no password.</li>
+  <li><b>HTTPS only.</b> certbot installed with automatic renewal (<code>certbot renew --dry-run</code> succeeds).</li>
+</ul>
+
+<h3>Access</h3>
+<ul class="check">
+  <li><b>SSH keys, not passwords.</b> In <code>/etc/ssh/sshd_config</code>: <code>PasswordAuthentication no</code> (and ideally <code>PermitRootLogin prohibit-password</code>), then <code>systemctl reload ssh</code> — only after confirming your key login works in a second terminal.</li>
+  <li><b>The GitHub deploy key is restricted</b> to <code>command="bash /var/www/Spres-Ai-Agent/deploy/deploy.sh"</code> with <code>restrict</code>, and is used for nothing else.</li>
+  <li><b>No server password is written down</b> in the repo, in documents or in chats. Secrets live only in the server's <code>.env</code> and your password manager.</li>
+  <li><b>The repository is public:</b> never commit <code>.env</code>, keys, dumps or <code>.npmrc</code> tokens. Before every commit, <code>git status</code> and look.</li>
+</ul>
+
+<h3>Secrets and keys</h3>
+<ul class="check">
+  <li><b>Secret keys (sk_) only on servers</b> (Odoo, back-ends, scripts). Websites and mobile apps get publishable keys (pk_) or go through a server proxy.</li>
+  <li><b><code>BRAINBOX_ADMIN_TOKEN</code> and <code>JWT_SECRET_KEY</code> are long random values</b> (the bootstrap script generates 64 hex characters) and the startup log shows no placeholder warning.</li>
+  <li><b>Rotate</b> the admin token if it may have been seen (change <code>.env</code>, restart the API). Changing <code>JWT_SECRET_KEY</code> logs out every staff member — do it if a staff session may have been stolen.</li>
+  <li><b><code>REQUIRE_API_KEY=true</code></b> (the default). <code>false</code> is a migration-only kill switch that turns off key checks for everyone.</li>
+  <li><b><code>DEBUG=false</code></b> in production.</li>
+  <li><b>Unused keys revoked:</b> <code>keys list</code> shows <i>last used</i>; revoke keys of companies that left and keys that have not been used for months. Deactivate staff who left.</li>
+  <li><b>Backups exist off the server</b>, and a restore has been tested (section 6). Backups contain every company's data: store them encrypted.</li>
+</ul>
+
+<!-- =============================== 10 =============================== -->
+<h2 id="s10"><span class="num">10</span>Troubleshooting</h2>
+<p class="lead">Start with the three health checks, then the logs. Almost every problem shows up in <code>docker logs brainbox-api</code>.</p>
+
+<h3>First look</h3>
+<pre><span class="c"># from anywhere: through nginx + HTTPS</span>
+curl -s https://port.smartpowerbilling.com/api/health
+<span class="c"># on the server: straight to the API (skips nginx)</span>
+curl -s http://127.0.0.1:8000/api/health
+<span class="c"># is a key valid, and for which tenant?</span>
+curl -s -H "X-API-Key: sk_live_xxx" https://port.smartpowerbilling.com/api/health
+<span class="c"># database, cache and vector checks (secret key)</span>
+curl -s -H "X-API-Key: sk_live_xxx" https://port.smartpowerbilling.com/api/health/db
+
+<span class="c"># on the server</span>
+docker ps --filter name=brainbox            <span class="c"># all four Up? postgres/redis "(healthy)"?</span>
+docker logs --tail 100 brainbox-api         <span class="c"># add -f to follow live</span>
+docker logs --tail 50 brainbox-ollama
+docker stats --no-stream                    <span class="c"># CPU / memory per container</span>
+df -h /                                     <span class="c"># disk full breaks everything</span></pre>
+<p class="small">If <code>127.0.0.1:8000</code> works but the public URL does not, the problem is nginx or DNS (<code>nginx -t</code>, <code>systemctl status nginx</code>, <code>/var/log/nginx/error.log</code>). A <b>502</b> from nginx means the API container is down; a <b>504</b> means it answered too slowly.</p>
+
+<h3>Symptoms</h3>
+<table class="ts compact">
+  <thead><tr><th style="width:24%">Symptom</th><th style="width:30%">Likely cause</th><th>Fix</th></tr></thead>
+  <tbody>
+    <tr><td>401 "Invalid or missing API key"</td><td>No key sent, typo, revoked or expired key.</td><td><code>keys list --tenant X</code>: is it active? Send it as <code>X-API-Key</code> or <code>Authorization: Bearer</code>. Create a new one if lost (raw keys cannot be shown again).</td></tr>
+    <tr><td>403 "This endpoint requires a secret API key"</td><td>A publishable key used for training, ingest or detailed health.</td><td>Use the company's secret key on a server, or a staff login.</td></tr>
+    <tr><td>403 "tenant_id does not match API key"</td><td>The request names another tenant than the key's.</td><td>Remove <code>tenant_id</code> (the key decides) or fix the typo, e.g. in Odoo's Tenant ID.</td></tr>
+    <tr><td>403 "Staff login required"</td><td>An API key used on a dashboard endpoint (<code>/api/staff</code>, <code>/api/keys</code>, <code>/api/reports</code>…).</td><td>These need a staff login (email + password).</td></tr>
+    <tr><td>403 "Your role (viewer) can't do this"</td><td>Staff role too low.</td><td>An admin/owner raises the role in Staff.</td></tr>
+    <tr><td>429 on staff login</td><td>Too many failed logins (10 per 15 min per email + IP).</td><td>Wait 15 minutes, or reset with <code>staff set-password</code>.</td></tr>
+    <tr><td>401 / 503 on <code>/api/admin/*</code></td><td>Wrong <code>X-Admin-Token</code> (401) or <code>BRAINBOX_ADMIN_TOKEN</code> not set (503).</td><td>Check the token in <code>.env</code>; or use the CLI, which needs no token.</td></tr>
+    <tr><td>Answer: "the AI model service is currently unavailable"</td><td>Ollama down, model not pulled, or the model took longer than <code>LLM_TIMEOUT</code>.</td><td><code>docker exec brainbox-ollama ollama list</code>; if the model named in <code>OLLAMA_MODEL</code> is missing: <code>docker exec brainbox-ollama ollama pull &lt;model&gt;</code>. Check <code>docker logs brainbox-api | grep -i ollama</code>.</td></tr>
+    <tr><td>Slow answers</td><td>Normal on CPU: 9–20 s with <code>qwen2.5:1.5b</code> on the shared 4-core server. Worse when the model reloads, prompts are large or other services load the CPU.</td><td>Check the "Ollama answered in …" log line and <code>docker stats</code>; keep the section 8 values. <b>For under 5 s:</b> a hosted LLM (<code>LLM_PROVIDER=openai</code>, e.g. Groq <code>llama-3.1-8b-instant</code>, 1–3 s) or a GPU server.</td></tr>
+    <tr><td>First answer after a deploy is slow</td><td>The model is loaded into memory on first use.</td><td>Keep <code>OLLAMA_WARMUP=true</code> and <code>OLLAMA_KEEP_ALIVE=-1</code>.</td></tr>
+    <tr><td>"I don't have that information yet"</td><td>No matching knowledge for that user's audience.</td><td>Normal: it appears under Knowledge gaps. Train it, or check the source's audience (website = public).</td></tr>
+    <tr><td>Invite email never arrives</td><td>SMTP not configured or rejected.</td><td>Copy the invite link from the dashboard; check <code>SMTP_*</code> and <code>docker logs brainbox-api | grep -i smtp</code>.</td></tr>
+    <tr><td>Invite link opens the wrong page</td><td><code>DASHBOARD_URL</code> unset or wrong.</td><td>Set it to the hosted dashboard (section 3), restart the API, resend the invite.</td></tr>
+    <tr><td>GitHub deploy failed</td><td>Check job: syntax error. Deploy job: SSH (host key / key) or health check.</td><td>Read the failing step's log; on the server run <code>bash /var/www/Spres-Ai-Agent/deploy/deploy.sh</code> by hand to see the same output.</td></tr>
+    <tr><td>API keeps restarting</td><td>Database password mismatch, syntax error, missing package.</td><td><code>docker logs brainbox-api</code>; after a <code>requirements.txt</code> change: <code>FORCE_BUILD=1 bash deploy/deploy.sh</code>.</td></tr>
+    <tr><td>Odoo: "Cannot reach the Brainbox AI server"</td><td>Wrong Backend URL, server down, or firewall between Odoo and the server.</td><td>Settings → Brainbox AI → Test connection; <code>curl</code> the health URL from the Odoo machine.</td></tr>
+  </tbody>
+</table>
+
+<h3>Restarting things</h3>
+<pre><span class="c"># safe at any time (a few seconds of downtime)</span>
+docker restart brainbox-api
+<span class="c"># start whatever is missing</span>
+cd /var/www/Spres-Ai-Agent/brainBox &amp;&amp; docker compose up -d postgres redis ollama api
+<span class="c"># the model reloads on the next question</span>
+docker restart brainbox-ollama</pre>
+
+<!-- =============================== 11 =============================== -->
+<h2 id="s11"><span class="num">11</span>Quick reference card</h2>
+<div class="qr">
+  <div class="box"><h4>Connect</h4>
+<pre>ssh root@165.227.77.33
+cd /var/www/Spres-Ai-Agent/brainBox
+<span class="c"># CLI prefix used below:</span>
+CLI="docker exec brainbox-api python -m app.cli"</pre></div>
+  <div class="box"><h4>Health</h4>
+<pre>curl -s https://port.smartpowerbilling.com/api/health
+curl -s http://127.0.0.1:8000/api/health
+curl -s -H "X-API-Key: sk_live_xxx" \
+  https://port.smartpowerbilling.com/api/health</pre></div>
+  <div class="box"><h4>Staff</h4>
+<pre>$CLI staff create --tenant acme \
+  --email owner@acme.com --role owner   <span class="c"># invite link</span>
+$CLI staff list --tenant acme
+docker exec -it brainbox-api python -m app.cli \
+  staff set-password owner@acme.com
+$CLI staff deactivate someone@acme.com</pre></div>
+  <div class="box"><h4>Keys (raw key shown once)</h4>
+<pre>$CLI keys create --tenant acme \
+  --type publishable --name Website
+$CLI keys create --tenant acme \
+  --type secret --name Odoo
+$CLI keys list --tenant acme
+$CLI keys revoke 42</pre></div>
+  <div class="box"><h4>Admin API (X-Admin-Token)</h4>
+<pre>POST   /api/admin/staff   {tenant_id,email,role}
+POST   /api/admin/keys    {tenant_id,key_type,name}
+GET    /api/admin/keys?tenant_id=acme
+DELETE /api/admin/keys/{id}</pre></div>
+  <div class="box"><h4>Deploy</h4>
+<pre>git push origin main            <span class="c"># automatic</span>
+bash /var/www/Spres-Ai-Agent/deploy/deploy.sh
+FORCE=1 bash .../deploy/deploy.sh        <span class="c"># restart</span>
+FORCE_BUILD=1 bash .../deploy/deploy.sh  <span class="c"># rebuild</span></pre></div>
+  <div class="box"><h4>Logs and containers</h4>
+<pre>docker ps --filter name=brainbox
+docker logs --tail 100 -f brainbox-api
+docker stats --no-stream
+docker restart brainbox-api</pre></div>
+  <div class="box"><h4>AI model</h4>
+<pre>docker exec brainbox-ollama ollama list
+grep OLLAMA_MODEL .env       <span class="c"># the configured model</span>
+docker exec brainbox-ollama ollama pull qwen2.5:1.5b
+docker restart brainbox-api        <span class="c"># after changing it</span></pre></div>
+  <div class="box wide"><h4>Backup and restore</h4>
+<pre><span class="c"># backup</span>
+docker exec brainbox-postgres pg_dump -U spres -Fc spres_ai &gt; /root/backups/brainbox-$(date +%F).dump
+<span class="c"># restore (replaces everything)</span>
+docker stop brainbox-api
+docker exec brainbox-postgres dropdb -U spres spres_ai &amp;&amp; docker exec brainbox-postgres createdb -U spres spres_ai
+docker exec -i brainbox-postgres pg_restore -U spres -d spres_ai --no-owner &lt; FILE.dump &amp;&amp; docker start brainbox-api</pre></div>
+  <div class="box"><h4>Settings file</h4>
+<pre>nano /var/www/Spres-Ai-Agent/brainBox/.env
+docker restart brainbox-api     <span class="c"># apply changes</span>
+<span class="c"># never paste its contents anywhere</span></pre></div>
+  <div class="box"><h4>Odoo (local test)</h4>
+<pre>cd C:\Users\USER\Documents\PERSONAL\odoo
+.venv\Scripts\python.exe odoo-bin -c odoo.conf
+<span class="c"># http://localhost:8069 · DB test_odoo_db</span></pre></div>
+  <div class="box"><h4>Dashboard (local)</h4>
+<pre>cd ai\sdk-react\preview &amp;&amp; npm run dev
+<span class="c"># http://localhost:4173/#/staff</span>
+<span class="c"># mock data: ?mock=1#/staff/overview</span></pre></div>
+  <div class="box"><h4>Publish SDKs</h4>
+<pre>npm version minor &amp;&amp; npm run build
+npm pack --dry-run &amp;&amp; npm publish --access public
+<span class="c"># PyPI: python -m build &amp;&amp; twine upload dist/*</span></pre></div>
+  <div class="box"><h4>New server</h4>
+<pre>sudo bash deploy/bootstrap-server.sh \
+  https://github.com/resbrotherx/Spres-Ai-Agent.git \
+  port.smartpowerbilling.com</pre></div>
+  <div class="box"><h4>Which credential where</h4><p><code>pk_</code> websites, apps, sdk-web, ChatWidget · <code>sk_</code> Odoo, servers, sdk-node / sdk-python, training · staff login → dashboard · admin token → you only.</p><p><b>Never send:</b> admin token, JWT secret, <code>.env</code>, DB password, SSH credentials.</p></div>
+</div>
+
+</body>
+</html>
