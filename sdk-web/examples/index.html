@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="_host.css" />
 </head>
 <body>
-  <header class="demo"><strong>Brainbox Web SDK v2 examples</strong></header>
+  <header class="demo"><strong>Brainbox Web SDK v2.1 examples</strong></header>
   <main class="demo">
     <div class="demo-card">
       <p>Run <code>node examples/mock-server.js</code> and open one of:</p>
@@ -18,7 +18,9 @@
         <li><a href="page.html">page.html</a> - full-page layout with conversation list</li>
         <li><a href="v1-compat.html">v1-compat.html</a> - old <code>BrainboxWebSDK</code> / <code>BrainboxWebWidget</code> API</li>
       </ul>
-      <p>Mock keywords: <code>code</code>, <code>table</code>, <code>slow</code>, <code>fail</code>, <code>invalid</code>, <code>auth</code>.</p>
+      <p>Mock keywords: <code>code</code>, <code>table</code>, <code>slow</code>, <code>fail</code>, <code>invalid</code>, <code>auth</code>,
+         <code>nostream</code> (stream endpoint answers 404, so the SDK falls back to <code>/api/chat</code>).
+         Append <code>?theme=dark</code> or <code>?theme=auto</code> to any example.</p>
     </div>
   </main>
 </body>

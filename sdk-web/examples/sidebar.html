@@ -33,7 +33,7 @@
       sidebarWidth: 380,
       defaultOpen: true,
       allowedModes: ['sidebar', 'floating'],
-      theme: { primary: '#2563eb', panel: '#f3f7ff' },
+      theme: { mode: new URLSearchParams(location.search).get('theme') || 'light', primary: '#2563eb' },
       branding: { botName: 'Acme Assistant', subtitle: 'Ask about your account' },
       context: function () { return 'The user is viewing the Account dashboard page.'; },
       storageKey: 'bb-demo-sidebar'

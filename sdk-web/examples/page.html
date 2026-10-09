@@ -25,8 +25,9 @@
       mode: 'page',
       container: '#assistant',
       allowedModes: ['page'],
+      theme: { mode: new URLSearchParams(location.search).get('theme') || 'light' },
       branding: { botName: 'Cortex', title: 'Cortex' },
-      page: { greeting: 'Hello, {{name}}', heading: 'How can I assist you today?' },
+      page: { greeting: 'Hello, {{name}}', heading: 'How can I help you today?' },
       quickActions: [
         { title: 'Synthesize data', description: 'Turn my notes into 5 key bullet points.', prompt: 'Turn my meeting notes into 5 key bullet points.', icon: 'pie' },
         { title: 'Show code', description: 'How do I call the chat API from JavaScript?', prompt: 'Show me some code to call the API', icon: 'bulb' },

@@ -12,7 +12,8 @@
     <div class="demo-card">
       <h1>Acme Utilities</h1>
       <p>This page hosts the floating chat widget. Click the launcher in the bottom-right corner.
-         Ask for <code>code</code> or a <code>table</code>, or type <code>fail</code> to see the error banner.</p>
+         Answers stream token by token (with a Stop button). Ask for <code>code</code> or a <code>table</code>, type <code>fail</code> to see an error,
+         or <code>nostream</code> to test the fallback to <code>/api/chat</code>. Add <code>?theme=dark</code> to the URL for dark mode.</p>
       <p><button id="open-btn" type="button">Open chat from page JS</button></p>
     </div>
   </main>
@@ -32,7 +33,7 @@
         'Here are a few ways I can assist you right now.'
       ],
       quickActions: ['Show me some code', 'Compare plans in a table'],
-      launcher: { type: 'button', text: 'Chat' },
+      theme: { mode: new URLSearchParams(location.search).get('theme') || 'light' },  // 'light' | 'dark' | 'auto'
       storageKey: 'bb-demo-floating',
       onEvent: function (name, detail) { console.log('[bb event]', name, detail); }
     });

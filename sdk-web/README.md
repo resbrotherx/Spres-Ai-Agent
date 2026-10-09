@@ -1,4 +1,4 @@
-# Brainbox Web SDK (`spres-web`) v2
+# Brainbox Web SDK (`spres-web`) v2.1
 
 A single, dependency-free JavaScript file that adds the Brainbox AI chat assistant to any website:
 plain HTML, WordPress, Odoo, or any JavaScript app. It includes:
@@ -6,6 +6,11 @@ plain HTML, WordPress, Odoo, or any JavaScript app. It includes:
 - **`Brainbox.init()`**: an embeddable chat widget with four layouts (floating, sidebar, inline, page).
 - **`Brainbox.Client`**: a headless API client you can use without any UI. It works in the browser and in Node 18+.
 - **v1 compatibility**: `BrainboxWebSDK` and `BrainboxWebWidget` still work, so existing embeds keep running.
+
+New in 2.1: the Brainbox design system v2 (calm Apple-like look, light / dark / auto), **real token streaming**
+over `POST /api/chat/stream` with a Stop button and automatic fallback to `POST /api/chat`, subtle UI sounds,
+toasts, thumbs up/down feedback, a "Sources" disclosure, an unread badge on the launcher, grouped messages with
+day separators, skeleton loading and a full-screen sheet on phones.
 
 The widget scopes all of its CSS under `.bb-web-root`, takes every theme value from CSS custom properties, and
 resets fonts, buttons and inputs inside its root. Host CSS such as Bootstrap or Odoo therefore does not leak in.
@@ -30,7 +35,7 @@ that never uses `innerHTML`.
 </script>
 ```
 
-A launcher button appears in the bottom-right corner. Clicking it opens the chat window.
+A round launcher (56px, brand gradient) appears in the bottom-right corner. Clicking it opens the chat window.
 
 With npm, `npm install spres-web`, then `require('spres-web')` or `import Brainbox from 'spres-web'`.
 The module exports the same `Brainbox` object, and in a browser it also sets `window.Brainbox`.
@@ -41,7 +46,7 @@ The module exports the same `Brainbox` object, and in a browser it also sets `wi
 
 | Mode | What it renders | Needs `container` |
 |---|---|---|
-| `floating` (default) | Launcher in a corner. The window opens above it. Below 576px it becomes a full-width bottom sheet. | no |
+| `floating` (default) | Launcher in a corner. The 380×600 window opens above it. Below 576px it becomes a full-screen sheet (safe-area aware). | no |
 | `sidebar` | A fixed panel on the right at full height. While open it pushes the page with `padding-right` (on viewports 992px and wider; below that it overlays the page). | no |
 | `inline` | The chat panel fills the container. There is no launcher and no close button. | yes |
 | `page` | Full layout: a conversation sidebar (New chat, search, sessions grouped Today / Yesterday / This week / Older) and the main chat with a hero greeting and prompt cards. Below 760px of container width, the sidebar becomes a drawer. | yes |
@@ -83,20 +88,22 @@ own `storageKey` so they keep separate conversations.
 | `position` | `'bottom-right'` | Floating launcher corner: `'bottom-right'` or `'bottom-left'`. |
 | `offset` | `{ x: 24, y: 24 }` | Distance from the corner, in px. |
 | `zIndex` | `9999` | z-index for the floating and sidebar layers. |
-| `width` / `height` | `360` / `560` | Floating window size. The window is always capped to the viewport. |
+| `width` / `height` | `380` / `600` | Floating window size. The window is always capped to the viewport. |
 | `sidebarWidth` | `380` | Sidebar width. |
 | `sidebarTop` | `0` | Top offset of the sidebar, for example a fixed navbar height. |
 | `sidebarPushContent` | `document.body` | Element or selector that gets `padding-right` while the sidebar is open. Use `null` to never push. |
 | `defaultOpen` | `false` | Open on first load. After that, the user's last open or closed state is remembered. |
-| `launcher` | `{ type: 'button', text: 'Chat' }` | `type` is `'button'` (pill), `'icon'` (round), `'gif'` (uses `gifUrl`) or `'none'` (open it from your own UI with `bb.open()`). |
-| `theme` | `{ primary: '#b93fff', panel: '#fbf1ff', ink: '#08080a', radius: 22 }` | Brand colour, panel background, text colour and corner radius. `fontFamily` is optional. Lighter and darker shades are derived from `primary` automatically. |
-| `branding` | `{ botName: 'Brainbox AI', subtitle: 'Your AI assistant' }` | Also accepts `title` (header, defaults to `botName`), `logoUrl` (header orb) and `botAvatarUrl` (bot avatar and page hero). |
-| `welcomeMessages` | `["Hi {{name}}! I'm {{botName}}. ..."]` | Intro bubbles shown before the first message. `{{name}}` is the user's first name, or "there" when no name is set. `{{botName}}` is also replaced. |
+| `launcher` | `{ type: 'icon', text: 'Chat' }` | `type` is `'icon'` (56px gradient circle, default since 2.1), `'button'` (pill with `text`), `'gif'` (uses `gifUrl`) or `'none'` (open it from your own UI with `bb.open()`). An unread badge appears when a reply arrives while the widget is closed. |
+| `theme` | `{ mode: 'light' }` | `mode`: `'light'`, `'dark'` or `'auto'` (follows `prefers-color-scheme` live). `primary` overrides the accent colour (default `#0071E3`, dark `#0A84FF`); hover, pressed, tint and focus-ring shades are derived from it, and the launcher uses it instead of the brand gradient. Optional: `radius` (window corner, default 18), `fontFamily`, and the light-mode-only overrides `panel` (surface) and `ink` (text). |
+| `branding` | `{ botName: 'Brainbox AI', subtitle: 'Typically replies in seconds' }` | Also accepts `title` (header, defaults to `botName`), `logoUrl` (header logo; default is the Brainbox logo) and `botAvatarUrl` (bot avatar; defaults to `logoUrl`, then the Brainbox logo). |
+| `welcomeMessages` | `["I'm {{botName}}. Ask me anything ..."]` | Text of the empty state (logo, greeting from `page.greeting`, these lines, quick-action chips). `{{name}}` is the user's first name, or "there" when no name is set. `{{botName}}` is also replaced. |
 | `quickActions` | `[]` | Strings, or `{ title, description, prompt, icon }` objects. Clicking one sends it. In `page` mode they render as prompt cards. |
-| `placeholder` | `'Type message...'` | Composer placeholder. |
-| `features` | `{ history: true, upload: true, emoji: true, modeSwitch: true, newChat: true, export: false }` | Turns UI features on or off. `export` downloads the conversation as a `.txt` file. |
+| `placeholder` | `'Message'` | Composer placeholder. |
+| `features` | `{ history: true, upload: true, emoji: true, modeSwitch: true, newChat: true, export: false, feedback: true }` | Turns UI features on or off. `export` downloads the conversation as a `.txt` file. `feedback` shows thumbs up/down under answers (`POST /api/chat/feedback`). |
 | `allowedModes` | `['floating', 'sidebar']` | Modes the user can cycle through with the header dock/undock button. The button appears only when the current mode is in this list and the list has at least two usable modes. |
-| `page` | `{ greeting: 'Hello, {{name}}', heading: 'How can I assist you today?' }` | Hero text for `page` mode. |
+| `page` | `{ greeting: 'Hello, {{name}}', heading: 'How can I help you today?' }` | Hero text for `page` mode. `greeting` is also the title of the widget's empty state. |
+| `streaming` | `true` | Stream answers token by token from `POST /api/chat/stream`. When the server has no streaming endpoint (404/405) the SDK falls back to `POST /api/chat` automatically and remembers that for the page. `false` always uses `/api/chat`. |
+| `sounds` | `true` | Subtle WebAudio UI sounds (send, receive, notify, success, error). No audio files; nothing plays before the first user gesture or while the tab is hidden (except `notify`). Users can mute them with the speaker button in the header (remembered per `storageKey`). `false` disables sounds and hides the button. |
 | `context` | – | `() => string \| null` (it may also be async). The returned text is prepended to the question as `Context: ... Question: ...`, for example details of the record being viewed. Only the question is shown in the chat. |
 | `storageKey` | `'bb-web'` | localStorage namespace, combined with the tenant and user ID. It stores the last session ID, the open state and the user's mode choice. |
 | `locale` | browser default | Locale used to format times. |
@@ -107,13 +114,16 @@ own `storageKey` so they keep separate conversations.
 ```js
 bb.open(); bb.close(); bb.toggle(); bb.isOpen();
 bb.setMode('sidebar'); bb.getMode();      // saves the user's choice when the mode is in allowedModes
-bb.send('Hello');                         // Promise resolving to the raw /api/chat response, or null on error or when busy
+bb.send('Hello');                         // Promise resolving to the final answer (stream `done` payload or /api/chat JSON), or null on error / stop / busy
+bb.stop();                                // stops the answer being generated (keeps the text so far)
 bb.newChat();                             // cancels an in-flight request and starts a fresh conversation
 bb.loadSession(sessionId);                // loads a past conversation
 bb.updateConfig({ theme: { primary: '#0f9d76' } }); // re-renders and keeps the conversation and draft
 bb.destroy();                             // removes the DOM, listeners and sidebar padding
 const off = bb.on('response', d => {});   // returns an unsubscribe function
-bb.getSessionId(); bb.getMessages();      // read-only helpers
+bb.getSessionId(); bb.getMessages();      // read-only helpers (messages include messageId and rating)
+bb.setSoundEnabled(false); bb.isSoundEnabled();
+bb.toast({ type: 'success', title: 'Saved', body: 'Optional text', action: { label: 'Undo', onClick } });
 bb.client;                                // the Brainbox.Client this widget uses
 ```
 
@@ -126,7 +136,11 @@ Every event goes to `bb.on(name, fn)` listeners and to `onEvent(name, detail)`.
 | `ready` | `{ mode }` |
 | `open` / `close` | `{ mode }` |
 | `message` | `{ text, sessionId }`: the user sent a message |
-| `response` | `{ text, sessionId, reasoning, searchResults, raw }` |
+| `response` | `{ text, sessionId, reasoning, searchResults, messageId, streamed, raw }` |
+| `stop` | `{ sessionId, text }`: the user stopped a streaming answer |
+| `feedback` | `{ messageId, rating, sessionId }` after a thumbs up/down was saved |
+| `unread` | `{ count }`: a reply arrived while the widget was closed |
+| `soundchange` | `{ enabled }` |
 | `error` | `{ message, action, status, code }`. `action` is `'chat'`, `'session'` or `'upload'`. |
 | `modechange` | `{ mode, previous }` |
 | `session` | `{ sessionId, title? }`: a new or loaded conversation. `sessionId` is `null` after `newChat()`. |
@@ -135,9 +149,22 @@ Every event goes to `bb.on(name, fn)` listeners and to `onEvent(name, detail)`.
 
 ## Behaviour
 
-- **No streaming.** The backend returns the whole answer at once, so the widget shows typing dots ("Thinking...",
-  then "Searching the knowledge base...") until the reply arrives. Only one request runs at a time: Send is
-  disabled while the widget waits. Starting a new chat or loading a session cancels the pending request.
+- **Streaming.** The widget posts to `/api/chat/stream` and reads the Server-Sent Events with `fetch` +
+  `ReadableStream` (so auth headers work; `EventSource` can't send them). Events: `meta` (session id),
+  `token` (`{ t }`, appended live with a blinking caret), `done` (final text, `message_id`, `search_results`) and
+  `error`; `: ping` comments are ignored and events may be split across network chunks. While an answer streams,
+  Send turns into **Stop** (AbortController). Typing dots show until the first token. If the endpoint is missing
+  (404 "Not Found" / 405) the same request goes to `/api/chat`, so older servers keep working. A `200` JSON answer
+  from a non-streaming proxy is also accepted. One request runs at a time; a new chat or loading a session cancels it.
+- **Feedback and sources.** Each answer has copy and thumbs up/down buttons (shown on hover, always on the latest
+  answer and on touch screens) that call `POST /api/chat/feedback { session_id, message_id, rating }`; a toast
+  confirms. When the answer has `search_results`, a "N sources" button opens the list of sources.
+- **Messages** from the same sender within 5 minutes are grouped (avatar once, 2px gap). Day separators ("Today",
+  "Yesterday", weekday or date) are inserted, the time shows at the end of a group and on hover.
+- **Toasts** (upload done, feedback saved, upload or feedback errors) appear above the composer, auto-dismiss after
+  4 s (errors 6 s, hovering pauses), at most 3 at a time, announced via `aria-live`.
+- **Dark mode.** `theme.mode: 'dark'` or `'auto'`. All colours are CSS custom properties (`--bb-accent`,
+  `--bb-surface`, `--bb-label`, ...) on `.bb-web-root`; the dark palette is applied with the `.bb-web-dark` class.
 - **Errors** appear as a friendly inline banner with **Retry**. Raw JSON and stack traces are never shown. A network
   failure shows "Can't reach the assistant right now."
 - **History.** The last session ID is saved and its messages are restored the first time the widget opens. The
@@ -148,8 +175,10 @@ Every event goes to `bb.on(name, fn)` listeners and to `onEvent(name, detail)`.
   bullet and numbered lists, headings, simple pipe tables, and links. Links open in a new tab with
   `rel="noopener noreferrer"` and only `http`, `https` and `mailto` URLs are allowed.
 - **Accessibility.** Enter sends and Shift+Enter adds a new line. Escape closes the floating window or the sidebar.
-  The composer is focused when the widget opens. The message list is an `aria-live="polite"` log. Icon buttons have
-  aria-labels. `prefers-reduced-motion` is respected.
+  Escape also leaves the history view and closes the emoji picker. The composer is focused when the widget opens.
+  The message list is an `aria-live="polite"` log (busy while streaming; the finished answer is announced once).
+  Icon buttons have aria-labels, keyboard focus shows a 3px focus ring, and `prefers-reduced-motion` switches all
+  motion to short opacity fades.
 - **Timestamps.** Backend timestamps without a timezone are treated as UTC.
 
 ---
@@ -180,6 +209,10 @@ their values. This also stops users from reading another user's history.
 ```js
 const client = new Brainbox.Client({ apiUrl, apiKey, tenantId, user, headers, credentials });
 const { response, session_id } = await client.chat('Hello', null /* sessionId */, 'optional context');
+const done = await client.chatStream('Hello', sessionId, null, {   // POST /api/chat/stream, falls back to /api/chat
+  onMeta: (meta) => {}, onToken: (t, fullText) => {}, signal: abortController.signal
+});                                      // { response, message_id, search_results, session_id, streamed, ... }
+await client.sendFeedback({ session_id, message_id, rating: 'up' });
 await client.listSessions();             // { today, yesterday, this_week, older }
 await client.getSessionMessages(id);     // { session_id, title, created_at, messages: [...] }
 await client.createSession('Title');
@@ -206,8 +239,8 @@ What changed:
 
 - `BrainboxWebSDK` methods now **reject with a `BrainboxError`** on HTTP or network errors. In v1 they resolved with
   the error JSON. Successful calls return the same JSON as before.
-- `streamChat()` never really streamed (the backend has no streaming endpoint). It now calls `onChunk` once with the
-  whole answer, then `onComplete`. There is no fake word-by-word delay.
+- `streamChat()` now really streams: `onChunk` is called for every token from `/api/chat/stream`, then `onComplete`
+  with the final result. Against a server without the streaming endpoint it calls `onChunk` once with the whole answer.
 - `BrainboxWebWidget` options are mapped to v2: `primaryColor` to `theme.primary`, `accentColor` to `theme.ink`,
   `backgroundColor` to `theme.panel` (pure white is ignored so the v2 look applies), `buttonText` to `launcher.text`,
   `launcherType` to `launcher.type`, `title` and `subtitle` to `branding`, and `width`, `height` and `placeholder`
@@ -226,7 +259,14 @@ Brainbox.init({ apiUrl: url, apiKey: key, tenantId: tenant,
                 theme: { primary: '#2563EB' }, launcher: { text: 'Help' }, branding: { botName: 'Support' } });
 ```
 
-The README for v1 mentioned `POST /api/chat/stream`. That endpoint does not exist.
+v1 widgets keep their pill launcher (`launcherType` defaults to `'button'` there) and their `primaryColor`.
+
+### Upgrading from 2.0
+
+Everything is backwards compatible. Visible changes: the new look; `launcher.type` defaults to `'icon'` (pass
+`launcher: { type: 'button' }` for the pill); the default accent is `#0071E3` (hosts that pass `theme.primary`
+keep their colour); `theme.panel` / `theme.ink` only apply in light mode; the default window is 380×600; welcome
+messages render as an empty state instead of chat bubbles; the composer history pill moved to the header.
 
 ---
 
@@ -238,7 +278,10 @@ node examples/mock-server.js        # mock backend + static files on http://loca
 ```
 
 The mock implements every endpoint above using only Node built-ins. Some keywords in a question change its
-behaviour: `code`, `table`, `slow` (6 s), `fail` (500), `invalid` (422) and `auth` (401). To test cross-origin
+behaviour: `code`, `table`, `slow` (6 s), `fail` (500, or an SSE `error` event mid-stream), `invalid` (422), `auth` (401)
+and `nostream` (the stream endpoint answers 404, to test the fallback). The mock streams one token every ~30 ms
+(`--token-ms`), sends `: ping` comments, splits some events across writes and implements `/api/chat/feedback`.
+Append `?theme=dark` or `?theme=auto` to any example URL. To test cross-origin
 requests, serve the pages from a second port with `node examples/mock-server.js --static-only --port 8788`.
 
 ## Build

@@ -1,6 +1,6 @@
 {
   "name": "spres-web",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Framework-agnostic Brainbox AI chat widget and headless API client for plain HTML, WordPress, Odoo and any JavaScript site. No dependencies.",
   "main": "brainbox-web-sdk.js",
   "browser": "brainbox-web-sdk.js",

@@ -6,11 +6,17 @@
  *   node examples/mock-server.js            -> http://localhost:8787/examples/floating.html
  *   node examples/mock-server.js --port 9000
  *   node examples/mock-server.js --static-only --port 8788   (static files only, to test CORS)
+ *   node examples/mock-server.js --token-ms 30               (streaming speed, ms per token)
+ *
+ * Endpoints: /api/health, /api/chat, /api/chat/stream (SSE), /api/chat/feedback, /api/chat/sessions,
+ * /api/chat/session, /api/chat/session/{id}/messages, /api/chat/upload/{file,image}, /api/ingest.
  *
  * Keywords in a question trigger special behaviour:
- *   "fail"    -> 500 error           "invalid" -> 422 validation error
- *   "auth"    -> 401 error           "slow"    -> answers after 6 seconds
- *   "code"    -> answer with a code block, "table" -> answer with a table
+ *   "fail"     -> 500 (/api/chat) or an SSE `error` event after a few tokens (/api/chat/stream)
+ *   "invalid"  -> 422 validation error       "auth" -> 401 error
+ *   "slow"     -> answers after 6 seconds    "nostream" -> /api/chat/stream answers 404 (tests the SDK fallback)
+ *   "code"     -> answer with a code block,  "table" -> answer with a table
+ * Streaming sends one token every ~30 ms, with ": ping" comments and some events split across writes.
  */
 'use strict';
 
@@ -28,6 +34,7 @@ const PORT = Number(argValue('--port', process.env.PORT || 8787));
 const STATIC_ONLY = args.includes('--static-only');
 const ROOT = path.resolve(__dirname, '..');
 const DELAY = Number(argValue('--delay', 900));
+const TOKEN_MS = Number(argValue('--token-ms', 30));
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -66,6 +73,11 @@ addSession('Billing cycle questions', 2 * HOUR, null, [['When is my bill generat
 addSession('Reset my password', DAY + 2 * HOUR, null, [['How do I reset my password?', '1. Open **Settings**\n2. Click *Security*\n3. Choose **Reset password**']]);
 addSession('Meter reading upload', 3 * DAY, null, [['Can I upload a meter photo?', 'Yes - use the paperclip button to attach a photo of your meter.']]);
 addSession('Tariff comparison 2025', 20 * DAY, null, [['Compare tariffs', '| Plan | Price |\n|---|---|\n| Basic | $10 |\n| Pro | $25 |']]);
+
+const SOURCES = [
+  { id: 11, content: 'Bills are generated on the 1st of every month and emailed to the account holder within 24 hours.', source: 'pdf', file_path: '/docs/billing-guide.pdf', distance: 0.21 },
+  { id: 12, content: 'Payments can be made by card, bank transfer or direct debit from the customer portal.', source: 'web', file_path: 'https://example.com/help/payments', distance: 0.34 }
+];
 
 const ANSWERS = {
   code: [
@@ -158,6 +170,43 @@ function groupSessions(userId) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** SSE answer: meta, token... (one per ~TOKEN_MS), then done or error. Some events are split across writes. */
+async function streamAnswer(res, { s, q, answer, sources, userMsg }) {
+  let closed = false;
+  res.on('close', () => { closed = true; });
+  res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', Connection: 'keep-alive' });
+  res.flushHeaders();
+  const send = async (event, data, split) => {
+    if (closed) return;
+    const frame = 'event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n';
+    if (!split) { res.write(frame); return; }
+    const cut = Math.max(1, Math.floor(frame.length / 2));
+    res.write(frame.slice(0, cut));
+    await sleep(5);
+    if (!closed) res.write(frame.slice(cut));
+  };
+  res.write(': ping\n\n');
+  await send('meta', { session_id: s.session_id, user_message_id: userMsg.id });
+  await sleep(q.includes('slow') ? 6000 : Math.round(DELAY / 2));
+  const tokens = answer.match(/\s*\S+/g) || [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (closed) return;
+    if (q.includes('fail') && i === 6) {
+      await send('error', { detail: 'The assistant could not finish this answer. Please try again.', status: 500 });
+      res.end();
+      return;
+    }
+    await send('token', { t: tokens[i] }, i % 7 === 3);
+    if (i % 25 === 24) res.write(': ping\n\n');
+    await sleep(TOKEN_MS);
+  }
+  if (closed) return;
+  const botMsg = { id: messageId++, role: 'assistant', content: answer, created_at: iso(0) };
+  s.messages.push(botMsg);
+  await send('done', { response: answer, reasoning: 'mock', session_id: s.session_id, message_id: botMsg.id, user_message_id: userMsg.id, search_results: sources, cached: false });
+  res.end();
+}
+
 /* ---------------- API ---------------- */
 
 async function handleApi(req, res, url) {
@@ -165,25 +214,48 @@ async function handleApi(req, res, url) {
   try {
     if (req.method === 'GET' && p === '/api/health') return json(res, 200, { status: 'ok', mock: true });
 
-    if (req.method === 'POST' && p === '/api/chat') {
+    if (req.method === 'POST' && (p === '/api/chat' || p === '/api/chat/stream')) {
+      const stream = p === '/api/chat/stream';
       const body = JSON.parse((await readBody(req, 1e6)).toString('utf8') || '{}');
       const q = String(body.question || '');
       const lower = q.toLowerCase();
+      if (stream && lower.includes('nostream')) return json(res, 404, { detail: 'Not Found' });
       if (!q.trim()) return json(res, 422, { detail: [{ loc: ['body', 'question'], msg: 'field required', type: 'value_error' }] });
-      await sleep(lower.includes('slow') ? 6000 : DELAY);
-      if (lower.includes('fail')) return json(res, 500, { detail: 'Traceback (most recent call last): psycopg2.OperationalError ...' });
       if (lower.includes('invalid')) return json(res, 422, { detail: [{ loc: ['body', 'tenant_id'], msg: 'field required', type: 'value_error.missing' }] });
       if (lower.includes('auth')) return json(res, 401, { detail: 'Invalid API key' });
       let s = body.session_id && sessions.get(body.session_id);
       if (body.session_id && !s) return json(res, 404, { detail: 'Session not found' });
+      if (!stream) {
+        await sleep(lower.includes('slow') ? 6000 : DELAY);
+        if (lower.includes('fail')) return json(res, 500, { detail: 'Traceback (most recent call last): psycopg2.OperationalError ...' });
+      }
       if (!s) {
         const question = q.replace(/^Context:[\s\S]*?\n\nQuestion:\n/, '');
         s = addSession(question.slice(0, 40) || 'New chat', 0, body.user_id);
       }
       const answer = lower.includes('code') ? ANSWERS.code : lower.includes('table') ? ANSWERS.table : ANSWERS.default;
-      s.messages.push({ id: messageId++, role: 'user', content: q, created_at: iso(0) });
-      s.messages.push({ id: messageId++, role: 'assistant', content: answer, created_at: iso(0) });
-      return json(res, 200, { response: answer, reasoning: 'mock', search_results: [], session_id: s.session_id });
+      const sources = lower.includes('code') || lower.includes('table') ? [] : SOURCES;
+      const userMsg = { id: messageId++, role: 'user', content: q, created_at: iso(0) };
+      s.messages.push(userMsg);
+      if (stream) return streamAnswer(res, { s, q: lower, answer, sources, userMsg });
+      const botMsg = { id: messageId++, role: 'assistant', content: answer, created_at: iso(0) };
+      s.messages.push(botMsg);
+      return json(res, 200, { response: answer, reasoning: 'mock', search_results: sources, session_id: s.session_id, message_id: botMsg.id, user_message_id: userMsg.id });
+    }
+
+    if (req.method === 'POST' && p === '/api/chat/feedback') {
+      const body = JSON.parse((await readBody(req, 1e5)).toString('utf8') || '{}');
+      const s = sessions.get(body.session_id);
+      if (!s) return json(res, 404, { detail: 'Session not found' });
+      if (body.rating !== 'up' && body.rating !== 'down') return json(res, 422, { detail: [{ loc: ['body', 'rating'], msg: "Input should be 'up' or 'down'" }] });
+      let target = body.message_id != null
+        ? s.messages.find((m) => m.id === Number(body.message_id))
+        : [...s.messages].reverse().find((m) => m.role === 'assistant');
+      if (target && target.role === 'user') target = s.messages.find((m) => m.id > target.id && m.role === 'assistant');
+      if (!target || target.role !== 'assistant') return json(res, 404, { detail: 'Message not found' });
+      target.feedback = body.rating;
+      await sleep(150);
+      return json(res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && p === '/api/chat/sessions') {
@@ -223,6 +295,7 @@ async function handleApi(req, res, url) {
     return json(res, 404, { detail: 'Not Found' });
   } catch (err) {
     if (err && err.code === 413) return json(res, 413, { detail: 'File size exceeds 10.0MB limit' });
+    if (res.headersSent) { try { res.end(); } catch (e) { /* ignore */ } return undefined; }
     return json(res, 500, { detail: String(err && err.message) });
   }
 }
