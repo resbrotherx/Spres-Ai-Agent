@@ -22,7 +22,7 @@
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this), function (global) {
   'use strict';
 
-  var VERSION = '2.3.0';
+  var VERSION = '2.4.0';
   var HAS_DOM = typeof document !== 'undefined';
   var MODES = ['floating', 'sidebar', 'inline', 'page'];
   var THEME_MODES = ['light', 'dark', 'auto'];
@@ -385,6 +385,11 @@
     dock: [['rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }], ['path', { d: 'M15 3v18' }]],
     undock: [['path', { d: 'M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4' }], ['rect', { x: 12, y: 13, width: 10, height: 7, rx: 2 }]],
     expand: [['path', { d: 'M15 3h6v6' }], ['path', { d: 'M9 21H3v-6' }], ['path', { d: 'M21 3l-7 7' }], ['path', { d: 'M3 21l7-7' }]],
+    more: [['circle', { cx: 5, cy: 12, r: 1.2, fill: 'currentColor' }], ['circle', { cx: 12, cy: 12, r: 1.2, fill: 'currentColor' }], ['circle', { cx: 19, cy: 12, r: 1.2, fill: 'currentColor' }]],
+    pin: [['path', { d: 'M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1Z' }]],
+    pencil: [['path', { d: 'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5ZM15 5l4 4' }]],
+    trash: [['path', { d: 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6' }]],
+    pdf: [['path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z' }], ['path', { d: 'M14 2v6h6M9 15h6M9 18h4' }]],
     copy: [['rect', { x: 8, y: 8, width: 14, height: 14, rx: 2 }], ['path', { d: 'M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2' }]],
     check: [['path', { d: 'M20 6 9 17l-5-5' }]],
     refresh: [['path', { d: 'M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8' }], ['path', { d: 'M21 3v5h-5' }]],
@@ -466,6 +471,146 @@
       });
     });
     return code;
+  }
+
+  /* ----------------------------------------------------------------------
+   * Answer tools: tables get a Table / Chart switch and an Excel (CSV)
+   * download; answers can be saved as PDF (print dialog). No libraries.
+   * -------------------------------------------------------------------- */
+  function tokensText(tokens) {
+    return (tokens || []).map(function (t) { return t.v || ''; }).join('').trim();
+  }
+
+  function parseNum(raw) {
+    var x = String(raw == null ? '' : raw).replace(/[*_`]/g, '').trim();
+    if (!x) return null;
+    var neg = false;
+    if (/^\(.*\)$/.test(x)) { neg = true; x = x.slice(1, -1); }
+    x = x.replace(/^[^\d\-+.]+/, '').replace(/[%\s]+$/, '');
+    var mult = /k$/i.test(x) ? 1e3 : /m$/i.test(x) ? 1e6 : /b$/i.test(x) ? 1e9 : 1;
+    x = x.replace(/[kmb]$/i, '').replace(/,/g, '');
+    if (!/^[-+]?\d*\.?\d+$/.test(x)) return null;
+    var n = parseFloat(x) * mult;
+    return isFinite(n) ? (neg ? -n : n) : null;
+  }
+
+  function numericCols(head, rows) {
+    var cols = [];
+    if (rows.length < 2) return cols;
+    for (var c = 1; c < head.length; c++) {
+      var ok = rows.filter(function (r) { return parseNum(r[c]) !== null; }).length;
+      if (ok >= Math.max(2, Math.ceil(rows.length * 0.6))) cols.push(c);
+    }
+    return cols.slice(0, 4);
+  }
+
+  function saveBlob(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = h('a', { href: url, download: name });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function downloadCsv(head, rows) {
+    var esc = function (v) { v = String(v == null ? '' : v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var csv = [head].concat(rows).map(function (r) { return head.map(function (_, i) { return esc(r[i]); }).join(','); }).join('\r\n');
+    saveBlob(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }), 'table.csv');
+  }
+
+  var CHART_COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#db2777'];
+
+  function chartNode(head, rows, cols) {
+    var data = rows.slice(0, 20).map(function (r) { return { label: r[0] || '', values: cols.map(function (c) { return parseNum(r[c]) || 0; }) }; });
+    var max = 1;
+    data.forEach(function (d) { d.values.forEach(function (v) { max = Math.max(max, Math.abs(v)); }); });
+    var barH = 14, gap = 4, groupH = cols.length * (barH + gap) + 10, labelW = 120, width = 560, plotW = width - labelW - 60;
+    var svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + (data.length * groupH + 8), role: 'img', 'aria-label': 'Chart of ' + cols.map(function (c) { return head[c]; }).join(', ') });
+    var fmt = function (n) { return Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : Math.abs(n) >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(Math.round(n * 100) / 100); };
+    data.forEach(function (d, i) {
+      var y0 = i * groupH + 4;
+      var lab = svgEl('text', { x: labelW - 8, y: y0 + (groupH - 10) / 2 + 4, 'text-anchor': 'end', class: 'bb-web-chart-label' });
+      lab.textContent = d.label.length > 18 ? d.label.slice(0, 17) + '…' : d.label;
+      svg.appendChild(lab);
+      d.values.forEach(function (v, si) {
+        var w = Math.max(2, (Math.abs(v) / max) * plotW);
+        var y = y0 + si * (barH + gap);
+        var rect = svgEl('rect', { x: labelW, y: y, width: w, height: barH, rx: 4, fill: CHART_COLORS[si % CHART_COLORS.length] });
+        var tip = svgEl('title');
+        tip.textContent = d.label + ' · ' + head[cols[si]] + ': ' + v.toLocaleString();
+        rect.appendChild(tip);
+        var val = svgEl('text', { x: labelW + w + 6, y: y + barH - 3, class: 'bb-web-chart-value' });
+        val.textContent = fmt(v);
+        append(svg, [rect, val]);
+      });
+    });
+    var fig = h('figure', { class: 'bb-web-chart' }, svg);
+    if (cols.length > 1) {
+      fig.appendChild(h('figcaption', { class: 'bb-web-chart-legend' }, cols.map(function (c, si) {
+        return h('span', null, [h('i', { style: { background: CHART_COLORS[si % CHART_COLORS.length] } }), head[c]]);
+      })));
+    }
+    return fig;
+  }
+
+  function tableNode(block) {
+    var head = block.header.map(tokensText);
+    var rows = block.rows.map(function (r) { return head.map(function (_, i) { return tokensText(r[i]); }); });
+    var thead = h('thead', null, h('tr', null, block.header.map(function (cell) { return h('th', null, renderInline(cell)); })));
+    var tbody = h('tbody', null, block.rows.map(function (row) {
+      return h('tr', null, row.map(function (cell) { return h('td', null, renderInline(cell)); }));
+    }));
+    var tableWrap = h('div', { class: 'bb-web-table-wrap' }, h('table', { class: 'bb-web-table' }, [thead, tbody]));
+    var cols = numericCols(head, rows);
+    var bar = h('div', { class: 'bb-web-tbl-bar' });
+    var box = h('div', { class: 'bb-web-tbl' }, [bar, tableWrap]);
+    if (cols.length) {
+      var seg = h('span', { class: 'bb-web-tbl-seg', role: 'tablist', 'aria-label': 'Show as' });
+      var tBtn = h('button', { type: 'button', role: 'tab', 'aria-selected': 'true', text: 'Table' });
+      var cBtn = h('button', { type: 'button', role: 'tab', 'aria-selected': 'false', text: 'Chart' });
+      var chart = null;
+      tBtn.addEventListener('click', function () {
+        tBtn.setAttribute('aria-selected', 'true'); cBtn.setAttribute('aria-selected', 'false');
+        if (chart) { chart.remove(); chart = null; }
+        tableWrap.style.display = '';
+      });
+      cBtn.addEventListener('click', function () {
+        cBtn.setAttribute('aria-selected', 'true'); tBtn.setAttribute('aria-selected', 'false');
+        if (!chart) { chart = chartNode(head, rows, cols); box.appendChild(chart); }
+        tableWrap.style.display = 'none';
+      });
+      append(seg, [tBtn, cBtn]);
+      bar.appendChild(seg);
+    }
+    var dl = h('button', { type: 'button', class: 'bb-web-tbl-dl', title: 'Download as a spreadsheet (opens in Excel)' }, [icon('download', 13), h('span', { text: 'Excel' })]);
+    dl.addEventListener('click', function () { downloadCsv(head, rows); });
+    bar.appendChild(dl);
+    return box;
+  }
+
+  var PRINT_CSS = 'body{font:14px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Arial,sans-serif;color:#111;margin:32px 40px;}' +
+    'h1.doc-title{font-size:18px;margin:0 0 4px;}.doc-meta{color:#666;font-size:12px;margin:0 0 20px;}' +
+    'table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px;}th,td{border:1px solid #d0d7de;padding:6px 10px;text-align:left;}th{background:#f3f6fd;}' +
+    'pre{background:#272822;color:#f8f8f2;padding:12px 14px;border-radius:8px;white-space:pre-wrap;font:12px/1.6 "SF Mono",Menlo,Consolas,monospace;}' +
+    '.bb-tk-com{color:#75715e}.bb-tk-str{color:#e6db74}.bb-tk-num,.bb-tk-lit{color:#ae81ff}.bb-tk-kw{color:#f92672}.bb-tk-fn{color:#a6e22e}.bb-tk-type{color:#66d9ef}' +
+    '.bb-ln{display:block}.bb-web-code-head,.bb-web-tbl-bar,.bb-web-caret,button{display:none!important}svg{max-width:100%}a{color:#2563eb}';
+
+  /** Print rendered answer HTML (built from text nodes, safe) through a hidden iframe → "Save as PDF". */
+  function saveAsPdf(el, title) {
+    if (!el) return;
+    var frame = h('iframe', { 'aria-hidden': 'true', style: { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' } });
+    document.body.appendChild(frame);
+    var doc = frame.contentDocument;
+    if (!doc) return;
+    var safe = String(title || 'Answer').replace(/[<>&]/g, '');
+    doc.open();
+    doc.write('<!doctype html><html><head><meta charset="utf-8"><title>' + safe + '</title><style>' + PRINT_CSS + '</style></head><body><h1 class="doc-title">' + safe +
+      '</h1><p class="doc-meta">' + new Date().toLocaleString() + '</p>' + el.innerHTML + '</body></html>');
+    doc.close();
+    setTimeout(function () {
+      try { frame.contentWindow.focus(); frame.contentWindow.print(); } finally { setTimeout(function () { frame.remove(); }, 1500); }
+    }, 250);
   }
 
   function icon(name, size, stroke) {
@@ -683,11 +828,7 @@
           h('pre', null, codeNode(block.text, block.lang))
         ]));
       } else if (block.type === 'table') {
-        var thead = h('thead', null, h('tr', null, block.header.map(function (cell) { return h('th', null, renderInline(cell)); })));
-        var tbody = h('tbody', null, block.rows.map(function (row) {
-          return h('tr', null, row.map(function (cell) { return h('td', null, renderInline(cell)); }));
-        }));
-        root.appendChild(h('div', { class: 'bb-web-table-wrap' }, h('table', { class: 'bb-web-table' }, [thead, tbody])));
+        root.appendChild(tableNode(block));
       }
     });
     return root;
@@ -1056,6 +1197,17 @@
       return data;
     }
 
+    /** POST /api/chat/session/{id}/update { title?, pinned? } -> session (owner only) */
+    async updateSession(sessionId, changes) {
+      var body = this._scope(Object.assign({}, changes || {}));
+      return this.request('POST', '/api/chat/session/' + encodeURIComponent(sessionId) + '/update', { body: body, action: 'session' });
+    }
+
+    /** POST /api/chat/session/{id}/delete -> { ok } (removes it from the user's history) */
+    async deleteSession(sessionId) {
+      return this.request('POST', '/api/chat/session/' + encodeURIComponent(sessionId) + '/delete', { body: this._scope(), action: 'session' });
+    }
+
     /** POST /api/chat/session */
     async createSession(title) {
       var body = this._scope({}, true);
@@ -1125,7 +1277,8 @@
   ];
 
   function normalizeSessions(data) {
-    var out = { today: [], yesterday: [], this_week: [], older: [] };
+    var out = { pinned: [], today: [], yesterday: [], this_week: [], older: [] };
+    if (data && Array.isArray(data.pinned)) out.pinned = data.pinned.filter(function (s) { return s && s.session_id; }).map(function (s) { return Object.assign({}, s, { pinned: true }); });
     var list = Array.isArray(data) ? data : (data && Array.isArray(data.sessions) ? data.sessions : null);
     if (list) {
       var now = new Date();
@@ -1527,6 +1680,91 @@
     '.bbr .bb-web-prompt strong{display:block;font-size:13.5px;font-weight:760;line-height:1.3;}',
     '.bbr .bb-web-prompt small{display:block;margin-top:2px;color:var(--bb-secondary);font-size:12px;line-height:1.35;}',
     '.bbr .bb-web-page.is-empty .bb-web-log{flex:0 0 auto;}',
+
+    /* --- history rows with ⋯ menu --- */
+    '.bbr .bb-web-hist{position:relative;display:flex;align-items:center;border-radius:10px;margin-bottom:2px;}',
+    '.bbr .bb-web-hist.is-menu{z-index:20;}',
+    '.bbr .bb-web-hist .bb-web-hist-main{margin:0;flex:1;min-width:0;padding-right:4px;}',
+    '.bbr .bb-web-hist-more{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--bb-secondary);opacity:0;flex:0 0 28px;margin-left:-32px;position:relative;z-index:1;}',
+    '.bbr .bb-web-hist:hover .bb-web-hist-more,.bbr .bb-web-hist.is-active .bb-web-hist-more,.bbr .bb-web-hist.is-menu .bb-web-hist-more,.bbr .bb-web-hist-more:focus-visible{opacity:1;}',
+    '.bbr .bb-web-hist-more:hover{background:var(--bb-fill-strong);color:var(--bb-ink);}',
+    '.bbr .bb-web-hist.is-active .bb-web-hist-more{color:inherit;}',
+    '@media (hover:none){.bbr .bb-web-hist-more{opacity:1;}}',
+    '.bbr .bb-web-hist-menu{position:absolute;right:4px;top:34px;z-index:30;min-width:150px;padding:5px;border-radius:12px;background:var(--bb-solid,#fff);border:1px solid var(--bb-a18);animation:bb-web-fade 140ms ease-out;}',
+    '.bbr .bb-web-hist-menu button{width:100%;display:flex;align-items:center;gap:9px;height:34px;padding:0 10px;border-radius:8px;font-size:13px;color:var(--bb-ink);text-align:left;}',
+    '.bbr .bb-web-hist-menu button:hover{background:var(--bb-fill-strong);}',
+    '.bbr .bb-web-hist-menu button.is-danger{color:var(--bb-danger-text);}',
+    '.bbr .bb-web-hist-input{flex:1;min-width:0;height:32px;margin:2px;border:1px solid var(--bb-accent);border-radius:8px;background:var(--bb-solid);color:var(--bb-ink);font:inherit;font-size:13px;padding:0 8px;outline:none;}',
+    '.bbr .bb-web-hist.is-confirm{gap:6px;padding:4px 6px 4px 10px;background:var(--bb-danger-tint);}',
+    '.bbr .bb-web-hist-ask{flex:1;font-size:12.5px;color:var(--bb-ink);}',
+    '.bbr .bb-web-hist-del,.bbr .bb-web-hist-cancel{height:28px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;}',
+    '.bbr .bb-web-hist-del{background:var(--bb-danger);color:#fff;}',
+    '.bbr .bb-web-hist-cancel{background:var(--bb-fill-strong);color:var(--bb-ink);}',
+    /* --- table tools & chart --- */
+    '.bbr .bb-web-tbl{margin:8px 0;border:1px solid var(--bb-a18);border-radius:12px;overflow:hidden;background:var(--bb-solid);}',
+    '.bbr .bb-web-tbl .bb-web-table-wrap{margin:0;}',
+    '.bbr .bb-web-tbl-bar{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:5px 6px;border-bottom:1px solid var(--bb-a12);}',
+    '.bbr .bb-web-tbl-seg{display:inline-flex;padding:2px;border-radius:8px;background:var(--bb-fill-strong);margin-right:auto;}',
+    '.bbr .bb-web-tbl-seg button,.bbr .bb-web-tbl-dl{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:650;color:var(--bb-secondary);padding:3px 10px;border-radius:6px;}',
+    '.bbr .bb-web-tbl-seg button[aria-selected="true"]{background:var(--bb-solid);color:var(--bb-ink);}',
+    '.bbr .bb-web-tbl-dl:hover{background:var(--bb-fill-strong);color:var(--bb-ink);}',
+    '.bbr .bb-web-chart{margin:0;padding:10px 12px 8px;}',
+    '.bbr .bb-web-chart svg{width:100%;height:auto;display:block;}',
+    '.bbr .bb-web-chart-label{font-size:11px;fill:var(--bb-secondary);}',
+    '.bbr .bb-web-chart-value{font-size:10.5px;fill:var(--bb-tertiary);}',
+    '.bbr .bb-web-chart-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--bb-secondary);padding:4px 4px 0;}',
+    '.bbr .bb-web-chart-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:-1px;}',
+    /* --- full page: ChatGPT-style (flat, neutral, small type) --- */
+    '.bbr .bb-web-page{--pg-bg:#ffffff;--pg-side:#f9f9f9;--pg-hover:#ececec;--pg-active:#e6e6e6;--pg-ink:#0d0d0d;--pg-muted:#5d5d5d;--pg-faint:#8f8f8f;--pg-line:rgba(0,0,0,.08);--pg-user:#f4f4f4;--pg-box:#ffffff;--pg-send:#0d0d0d;--pg-send-ink:#ffffff;',
+    'font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--pg-bg);color:var(--pg-ink);border:1px solid var(--pg-line);border-radius:14px;}',
+    '.bbr.bb-web-dark .bb-web-page{--pg-bg:#212121;--pg-side:#171717;--pg-hover:#262626;--pg-active:#2f2f2f;--pg-ink:#ececec;--pg-muted:#b4b4b4;--pg-faint:#8e8e8e;--pg-line:rgba(255,255,255,.08);--pg-user:#303030;--pg-box:#303030;--pg-send:#ececec;--pg-send-ink:#0d0d0d;}',
+    '.bbr .bb-web-page .bb-web-page-side{background:var(--pg-side);border-right:0;gap:4px;padding:10px 8px;}',
+    '.bbr .bb-web-page .bb-web-page-brand{padding:0 6px 6px;min-height:36px;}',
+    '.bbr .bb-web-page .bb-web-page-logo{width:24px;height:24px;flex-basis:24px;}',
+    '.bbr .bb-web-page .bb-web-page-name{font-size:14px;font-weight:600;letter-spacing:-.01em;}',
+    '.bbr .bb-web-page .bb-web-newchat{justify-content:flex-start;height:36px;border-radius:9px;padding:0 10px;background:transparent;color:var(--pg-ink);font-size:13.5px;font-weight:500;}',
+    '.bbr .bb-web-page .bb-web-newchat:hover:not(:disabled){background:var(--pg-hover);}',
+    '.bbr .bb-web-page .bb-web-page-sessions{border-top:0;margin:0;padding:0;}',
+    '.bbr .bb-web-page .bb-web-group-label{font-size:12px;font-weight:500;color:var(--pg-faint);text-transform:none;letter-spacing:0;padding:14px 10px 6px;}',
+    '.bbr .bb-web-page .bb-web-page-sessions .bb-web-session{min-height:36px;padding:0 34px 0 10px;border:0;border-radius:9px;background:transparent;color:var(--pg-ink);font-size:13.5px;font-weight:400;}',
+    '.bbr .bb-web-page .bb-web-page-sessions .bb-web-session:hover:not(:disabled){background:var(--pg-hover);}',
+    '.bbr .bb-web-page .bb-web-page-sessions .bb-web-session.is-active{background:var(--pg-active);color:var(--pg-ink);font-weight:500;}',
+    '.bbr .bb-web-page .bb-web-page-sessions .bb-web-session .bb-web-icon{display:inline-block;color:var(--pg-faint);}',
+    '.bbr .bb-web-page .bb-web-hist-more{color:var(--pg-muted);}',
+    '.bbr .bb-web-page .bb-web-hist-menu{background:var(--pg-box);border-color:var(--pg-line);}',
+    '.bbr .bb-web-page .bb-web-hist-menu button{color:var(--pg-ink);}',
+    '.bbr .bb-web-page .bb-web-hist-menu button:hover{background:var(--pg-hover);}',
+    '.bbr .bb-web-page .bb-web-author{display:none;}',
+    '.bbr .bb-web-page .bb-web-hist-more:hover{background:var(--pg-active);}',
+    '.bbr .bb-web-page .bb-web-profile{border:0;border-top:1px solid var(--pg-line);border-radius:0;background:transparent;padding:10px 6px 2px;}',
+    '.bbr .bb-web-page .bb-web-page-card{background:var(--pg-bg);}',
+    '.bbr .bb-web-page .bb-web-page-top{min-height:52px;border-bottom:0;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;padding:6px 10px 6px 18px;}',
+    '.bbr .bb-web-page .bb-web-page-ws{font-size:14.5px;font-weight:500;}',
+    '.bbr .bb-web-page .bb-web-hbtn{color:var(--pg-muted);background:transparent;border:0;}',
+    '.bbr .bb-web-page .bb-web-hbtn:hover:not(:disabled){background:var(--pg-hover);color:var(--pg-ink);}',
+    '.bbr .bb-web-page .bb-web-row .bb-web-msg-meta,.bbr .bb-web-page .bb-web-row .bb-web-time,.bbr .bb-web-page .bb-web-row .bb-web-htime,.bbr .bb-web-page .bb-web-day{display:none!important;}',
+    '.bbr .bb-web-page .bb-web-row{margin-top:22px;}',
+    '.bbr .bb-web-page .bb-web-row.is-user>.bb-web-av{display:none;}',
+    '.bbr .bb-web-page .bb-web-row.is-user{grid-template-columns:minmax(0,1fr);}',
+    '.bbr .bb-web-page .bb-web-row>.bb-web-av{visibility:visible;width:28px;height:28px;}',
+    '.bbr .bb-web-page .bb-web-row.is-bot{grid-template-columns:28px minmax(0,1fr);gap:14px;}',
+    '.bbr .bb-web-page .bb-web-bubble{background:transparent;color:var(--pg-ink);padding:2px 0 0;border-radius:0;max-width:100%;width:100%;font-size:15px;line-height:1.65;font-weight:400;}',
+    '.bbr .bb-web-page .bb-web-row.is-user .bb-web-bubble{width:fit-content;max-width:72%;margin-left:auto;background:var(--pg-user);color:var(--pg-ink);border-radius:20px;padding:9px 16px;font-size:15px;}',
+    '.bbr .bb-web-page .bb-web-acts{margin-left:-6px;}',
+    '.bbr .bb-web-page .bb-web-act{color:var(--pg-faint);}',
+    '.bbr .bb-web-page .bb-web-act:hover:not(:disabled){color:var(--pg-ink);background:var(--pg-hover);}',
+    '.bbr .bb-web-page .bb-web-composer{background:var(--pg-box);border:1px solid var(--pg-line);border-radius:26px;padding:10px 10px 8px 14px;box-shadow:0 2px 10px rgba(0,0,0,.04);}',
+    '.bbr .bb-web-page .bb-web-composer textarea{font-size:15px;color:var(--pg-ink);}',
+    '.bbr .bb-web-page .bb-web-send{background:var(--pg-send);color:var(--pg-send-ink);width:36px;height:36px;flex-basis:36px;}',
+    '.bbr .bb-web-page .bb-web-hero .bb-web-welcome-logo{width:48px;height:48px;}',
+    '.bbr .bb-web-page .bb-web-hello{font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--pg-ink);}',
+    '.bbr .bb-web-page .bb-web-heading{font-size:15px;font-weight:400;color:var(--pg-muted);}',
+    '.bbr .bb-web-page .bb-web-prompts{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;}',
+    '.bbr .bb-web-page .bb-web-prompt{flex-direction:row;align-items:center;gap:8px;padding:0 14px;height:36px;border-radius:999px;border:1px solid var(--pg-line);background:var(--pg-bg);color:var(--pg-muted);}',
+    '.bbr .bb-web-page .bb-web-prompt:hover:not(:disabled){background:var(--pg-hover);color:var(--pg-ink);border-color:var(--pg-line);}',
+    '.bbr .bb-web-page .bb-web-prompt small{display:none;}',
+    '.bbr .bb-web-page .bb-web-prompt strong{font-size:13px;font-weight:500;}',
+    '.bbr .bb-web-page .bb-web-prompt-ic{width:auto;height:auto;background:transparent;}',
 
     /* page compact (container narrower than 760px, set via ResizeObserver) */
     '.bbr.bb-web-compact .bb-web-page-side{position:absolute;top:0;bottom:0;left:0;z-index:5;width:min(288px,86%);transform:translateX(-102%);transition:transform 260ms var(--bb-spring);box-shadow:none;}',
@@ -2717,6 +2955,13 @@
         });
       });
       acts.appendChild(copyBtn);
+      var pdfBtn = h('button', { type: 'button', class: 'bb-web-act', title: 'Save as PDF', 'aria-label': 'Save as PDF' }, icon('pdf', 15));
+      pdfBtn.addEventListener('click', function () {
+        var row = pdfBtn.closest('.bb-web-row');
+        var md = row && row.querySelector('.bb-web-md');
+        saveAsPdf(md || (row && row._bbBubble), self._botName() + ' answer');
+      });
+      acts.appendChild(pdfBtn);
       var canRate = this._cfg.features.feedback && !m.local && (m.serverId != null || this._st.sessionId);
       if (canRate) {
         var up = h('button', { type: 'button', class: 'bb-web-act bb-web-fb-up', title: 'Good answer', 'aria-label': 'Good answer', 'aria-pressed': 'false' }, icon('thumbsUp', 15));
@@ -2922,27 +3167,167 @@
       }
       var q = (st.search || '').trim().toLowerCase();
       var any = false;
-      GROUPS.forEach(function (g) {
-        var items = ((st.sessions && st.sessions[g.key]) || []).filter(function (s) {
-          return !q || String(s.title || '').toLowerCase().indexOf(q) !== -1;
+      var all = [];
+      var seen = {};
+      ['pinned'].concat(GROUPS.map(function (g) { return g.key; })).forEach(function (k) {
+        ((st.sessions && st.sessions[k]) || []).forEach(function (s) {
+          if (seen[s.session_id]) return;
+          seen[s.session_id] = true;
+          if (k === 'pinned') s.pinned = true;
+          if (!q || String(s.title || '').toLowerCase().indexOf(q) !== -1) all.push(s);
         });
-        if (!items.length) return;
+      });
+      [['Pinned', all.filter(function (s) { return s.pinned; })], ['Chats', all.filter(function (s) { return !s.pinned; })]].forEach(function (g) {
+        if (!g[1].length) return;
         any = true;
-        var group = h('div', { class: 'bb-web-group' }, h('div', { class: 'bb-web-group-label', text: g.label }));
-        items.forEach(function (s) {
-          var title = s.title || 'Untitled conversation';
-          var active = s.session_id === st.sessionId;
-          var btn = h('button', { type: 'button', class: 'bb-web-session' + (active ? ' is-active' : ''), title: title, 'aria-current': active ? 'true' : null }, [
-            withIcons ? icon('chat', 16) : null,
-            h('span', { text: title })
-          ]);
-          btn.addEventListener('click', function () { self.loadSession(s.session_id); });
-          group.appendChild(btn);
-        });
+        var group = h('div', { class: 'bb-web-group' }, h('div', { class: 'bb-web-group-label', text: g[0] }));
+        g[1].forEach(function (s) { group.appendChild(self._historyItem(s, withIcons)); });
         container.appendChild(group);
       });
       if (!any) {
         container.appendChild(h('p', { class: 'bb-web-muted bb-web-center', text: q ? 'No conversation matches.' : (st.sessionsLoading ? 'Loading…' : 'No conversations yet.') }));
+      }
+    }
+
+    /** One history row: title + ⋯ menu (pin / rename / delete). */
+    _historyItem(s, withIcons) {
+      var self = this;
+      var st = this._st;
+      var title = s.title || 'New chat';
+      var active = s.session_id === st.sessionId;
+      var row = h('div', { class: 'bb-web-hist' + (active ? ' is-active' : '') });
+      var main = h('button', { type: 'button', class: 'bb-web-session bb-web-hist-main' + (active ? ' is-active' : ''), title: title, 'aria-current': active ? 'true' : null }, [
+        s.pinned ? icon('pin', 13) : (withIcons ? icon('chat', 15) : null),
+        h('span', { text: title })
+      ]);
+      main.addEventListener('click', function () { self.loadSession(s.session_id); });
+      var more = h('button', { type: 'button', class: 'bb-web-hist-more', 'aria-label': 'Options for ' + title, 'aria-haspopup': 'menu', 'aria-expanded': 'false' }, icon('more', 16));
+      var menu = null;
+      var closeMenu = function () {
+        if (!menu) return;
+        menu.remove();
+        menu = null;
+        row.classList.remove('is-menu');
+        more.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('mousedown', outside, true);
+        document.removeEventListener('keydown', esc, true);
+      };
+      var outside = function (e) { if (!row.contains(e.target)) closeMenu(); };
+      var esc = function (e) { if (e.key === 'Escape') { closeMenu(); more.focus(); } };
+      var item = function (ic, label, cls, fn) {
+        var b = h('button', { type: 'button', role: 'menuitem', class: cls || '' }, [icon(ic, 15), h('span', { text: label })]);
+        b.addEventListener('click', function () { closeMenu(); fn(); });
+        return b;
+      };
+      more.addEventListener('click', function () {
+        if (menu) { closeMenu(); return; }
+        menu = h('div', { class: 'bb-web-hist-menu', role: 'menu' }, [
+          item('pin', s.pinned ? 'Unpin' : 'Pin', '', function () { self._updateSession(s, { pinned: !s.pinned }); }),
+          item('pencil', 'Rename', '', function () { self._renameInline(row, s); }),
+          item('trash', 'Delete', 'is-danger', function () { self._confirmDelete(row, s); })
+        ]);
+        row.appendChild(menu);
+        row.classList.add('is-menu');
+        more.setAttribute('aria-expanded', 'true');
+        document.addEventListener('mousedown', outside, true);
+        document.addEventListener('keydown', esc, true);
+        var first = menu.querySelector('button');
+        if (first) first.focus();
+      });
+      append(row, [main, more]);
+      return row;
+    }
+
+    _renameInline(row, s) {
+      var self = this;
+      clear(row);
+      row.className = 'bb-web-hist is-editing';
+      var input = h('input', { class: 'bb-web-hist-input', value: s.title || '', maxlength: '120', 'aria-label': 'Chat name' });
+      input.value = s.title || '';
+      var done = false;
+      var finish = function (save) {
+        if (done) return;
+        done = true;
+        var v = input.value.trim();
+        if (save && v && v !== s.title) self._updateSession(s, { title: v });
+        else self._renderSessionLists();
+      };
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') finish(true);
+        if (e.key === 'Escape') finish(false);
+      });
+      input.addEventListener('blur', function () { finish(true); });
+      row.appendChild(input);
+      input.focus();
+      input.select();
+    }
+
+    _confirmDelete(row, s) {
+      var self = this;
+      clear(row);
+      row.className = 'bb-web-hist is-confirm';
+      row.setAttribute('role', 'alertdialog');
+      var yes = h('button', { type: 'button', class: 'bb-web-hist-del', text: 'Delete' });
+      var no = h('button', { type: 'button', class: 'bb-web-hist-cancel', text: 'Cancel' });
+      yes.addEventListener('click', function () { self._deleteSession(s); });
+      no.addEventListener('click', function () { self._renderSessionLists(); });
+      append(row, [h('span', { class: 'bb-web-hist-ask', text: 'Delete this chat?' }), yes, no]);
+      yes.focus();
+    }
+
+    _eachSession(fn) {
+      var data = this._st.sessions;
+      if (!data) return;
+      Object.keys(data).forEach(function (k) { (data[k] || []).forEach(function (s) { fn(s, k); }); });
+    }
+
+    async _updateSession(s, changes) {
+      var self = this;
+      var before = JSON.stringify(this._st.sessions);
+      this._eachSession(function (x) {
+        if (x.session_id !== s.session_id) return;
+        if (changes.title != null) x.title = changes.title;
+        if (changes.pinned != null) x.pinned = changes.pinned;
+      });
+      if (changes.pinned != null && this._st.sessions) {
+        var data = this._st.sessions;
+        var moved = null;
+        Object.keys(data).forEach(function (k) {
+          data[k] = (data[k] || []).filter(function (x) {
+            if (x.session_id === s.session_id) { moved = x; return false; }
+            return true;
+          });
+        });
+        if (moved) (changes.pinned ? data.pinned : data.today).unshift(moved);
+      }
+      if (changes.title != null && s.session_id === this._st.sessionId) this._st.sessionTitle = changes.title;
+      this._renderSessionLists();
+      this._renderPageState();
+      try {
+        await this.client.updateSession(s.session_id, changes);
+        this._toast({ type: 'success', title: changes.title != null ? 'Chat renamed' : (changes.pinned ? 'Chat pinned' : 'Chat unpinned') });
+      } catch (err) {
+        self._st.sessions = JSON.parse(before);
+        self._renderSessionLists();
+        self._toast({ type: 'error', title: err.message || 'Could not update the chat.' });
+      }
+    }
+
+    async _deleteSession(s) {
+      var self = this;
+      var before = JSON.stringify(this._st.sessions);
+      var data = this._st.sessions || {};
+      Object.keys(data).forEach(function (k) { data[k] = (data[k] || []).filter(function (x) { return x.session_id !== s.session_id; }); });
+      var wasOpen = s.session_id === this._st.sessionId;
+      this._renderSessionLists();
+      try {
+        await this.client.deleteSession(s.session_id);
+        if (wasOpen) this.newChat();
+        this._toast({ type: 'success', title: 'Chat deleted' });
+      } catch (err) {
+        self._st.sessions = JSON.parse(before);
+        self._renderSessionLists();
+        self._toast({ type: 'error', title: err.message || 'Could not delete the chat.' });
       }
     }
 
@@ -3230,8 +3615,9 @@
     _findSessionTitle(id) {
       var s = this._st.sessions;
       if (!s) return null;
-      for (var i = 0; i < GROUPS.length; i++) {
-        var list = s[GROUPS[i].key] || [];
+      var keys = ['pinned'].concat(GROUPS.map(function (g) { return g.key; }));
+      for (var i = 0; i < keys.length; i++) {
+        var list = s[keys[i]] || [];
         for (var j = 0; j < list.length; j++) if (list[j].session_id === id) return list[j].title || null;
       }
       return null;

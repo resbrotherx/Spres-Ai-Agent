@@ -105,6 +105,10 @@ class ChatSession(Base):
     external_user_id = Column(String, index=True, nullable=True)
     user_name = Column(String, nullable=True)
     user_role = Column(String, nullable=True)  # admin | internal | portal | customer | vendor | public
+    # Chat history controls (set by the end user): pinned to the top / removed from their history.
+    # Removed chats stay visible to staff (reports, knowledge gaps).
+    pinned_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

@@ -1,6 +1,6 @@
 {
   "name": "spres-react",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "React SDK and chat UI (omago-style streaming ChatWidget, ChatPanel, TrainingPanel, staff dashboard) for the Brainbox AI backend",
   "main": "dist/index.js",
   "module": "dist/index.js",

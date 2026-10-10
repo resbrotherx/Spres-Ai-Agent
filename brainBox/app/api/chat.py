@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from uuid import uuid4
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app import realtime
 from app.agents.nodes import log_node as nodes
@@ -17,6 +17,7 @@ from app.db.models import ChatFeedback, ChatSession, ChatMessage as ChatMessageM
 from app.schemas.chat import (
     ChatPayload, ChatResponse, ChatSessionCreate, ChatSessionResponse,
     ChatMessageDetail, ChatSessionDetail, ChatSessionsListRequest, SessionsGroupedByDate,
+    ChatSessionDelete, ChatSessionUpdate,
     FeedbackPayload,
 )
 from app import gaps
@@ -492,7 +493,7 @@ def get_sessions_grouped_by_date(
     yesterday_start = today_start - timedelta(days=1)
     week_start = today_start - timedelta(days=7)
 
-    query = db.query(ChatSession).filter(ChatSession.tenant_id == tenant_id)
+    query = db.query(ChatSession).filter(ChatSession.tenant_id == tenant_id, ChatSession.deleted_at.is_(None))
     user_id = _clean(user_id)
     if user_id:
         # Per-user history; without user_id the whole tenant is listed (legacy behaviour).
@@ -500,6 +501,7 @@ def get_sessions_grouped_by_date(
     sessions = query.order_by(ChatSession.created_at.desc()).all()
 
     grouped = {
+        "pinned": [],
         "today": [],
         "yesterday": [],
         "this_week": [],
@@ -512,11 +514,14 @@ def get_sessions_grouped_by_date(
             title=session.title,
             created_at=session.created_at.isoformat(),
             user_id=session.external_user_id,
+            pinned=session.pinned_at is not None,
         )
 
         created = session.created_at.replace(tzinfo=None)
 
-        if created >= today_start:
+        if session.pinned_at is not None:
+            grouped["pinned"].append(session_response)
+        elif created >= today_start:
             grouped["today"].append(session_response)
         elif created >= yesterday_start:
             grouped["yesterday"].append(session_response)
@@ -525,7 +530,63 @@ def get_sessions_grouped_by_date(
         else:
             grouped["older"].append(session_response)
 
+    grouped["pinned"].sort(key=lambda s: next(
+        (x.pinned_at for x in sessions if x.session_id == s.session_id), None) or now, reverse=True)
     return SessionsGroupedByDate(**grouped)
+
+
+def _session_out(session: ChatSession) -> ChatSessionResponse:
+    return ChatSessionResponse(
+        session_id=session.session_id,
+        title=session.title,
+        created_at=session.created_at.isoformat() if session.created_at else datetime.utcnow().isoformat(),
+        user_id=session.external_user_id,
+        pinned=session.pinned_at is not None,
+    )
+
+
+@router.post("/chat/session/{session_id}/update", response_model=ChatSessionResponse)
+@router.patch("/chat/session/{session_id}", response_model=ChatSessionResponse)
+async def update_chat_session(
+    session_id: str,
+    payload: ChatSessionUpdate,
+    auth: AuthContext = Depends(require_api_key),
+    db: Session = Depends(get_db),
+):
+    """Rename and/or pin/unpin a chat in the user's history (owner only)."""
+    tenant_id = auth.resolve_tenant(None, required=False)
+    session = resolve_session(db, session_id, tenant_id, user_id=payload.user_id)
+    if session.deleted_at is not None:
+        raise _session_not_found()
+    if payload.title is not None:
+        title = " ".join(payload.title.split())
+        if not title:
+            raise HTTPException(status_code=422, detail="The name can't be empty")
+        session.title = title[:120]
+    if payload.pinned is not None:
+        session.pinned_at = datetime.now(timezone.utc) if payload.pinned else None
+    db.commit()
+    return _session_out(session)
+
+
+@router.post("/chat/session/{session_id}/delete")
+@router.delete("/chat/session/{session_id}")
+async def delete_chat_session(
+    session_id: str,
+    payload: Optional[ChatSessionDelete] = None,
+    user_id: Optional[str] = Query(None, description="External user id owning the session"),
+    auth: AuthContext = Depends(require_api_key),
+    db: Session = Depends(get_db),
+):
+    """Remove a chat from the user's history. Staff reports keep the conversation."""
+    tenant_id = auth.resolve_tenant(None, required=False)
+    owner = (payload.user_id if payload else None) or user_id
+    session = resolve_session(db, session_id, tenant_id, user_id=owner)
+    if session.deleted_at is None:
+        session.deleted_at = datetime.now(timezone.utc)
+        session.pinned_at = None
+        db.commit()
+    return {"ok": True, "session_id": session_id}
 
 @router.post("/chat/sessions", response_model=SessionsGroupedByDate)
 @router.post("/sessions", response_model=SessionsGroupedByDate, include_in_schema=False)

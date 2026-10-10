@@ -2,12 +2,13 @@
 import { memo, useInsertionEffect, useLayoutEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { EditorDots, HighlightedCode, useSublimeStyles } from './design/code';
+import { ANSWER_TOOLS_CSS, TableBlock } from './design/exports';
 
 /* ------------------------------------------------------------------ */
 /* Styles (token-aware, injected once)                                 */
 /* ------------------------------------------------------------------ */
 
-const STYLE_ID = 'bb-md-styles-v3';
+const STYLE_ID = 'bb-md-styles-v4';
 const MD_CSS = `
 .bb-md { font-size: inherit; line-height: 1.45; overflow-wrap: anywhere; }
 .bb-md > :first-child { margin-top: 0; }
@@ -29,6 +30,7 @@ const MD_CSS = `
 .bb-md th, .bb-md td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--bb-separator, rgba(60,60,67,0.12)); vertical-align: top; }
 .bb-md th { font-weight: 600; color: var(--bb-secondary, #6E6E73); }
 .bb-md tr:last-child td { border-bottom: 0; }
+${ANSWER_TOOLS_CSS}
 `;
 
 const useIsoEffect: typeof useInsertionEffect =
@@ -222,28 +224,7 @@ function parseBlocks(text: string): ReactNode[] {
       const rows: string[][] = [];
       while (i < lines.length && lines[i].trim() && lines[i].includes('|')) rows.push(splitRow(lines[i++]));
       const k2 = key();
-      out.push(
-        <div key={k2} className="bb-md-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                {head.map((h, hi) => (
-                  <th key={hi}>{renderInline(h, `${k2}-h${hi}`)}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, ri) => (
-                <tr key={ri}>
-                  {head.map((_, ci) => (
-                    <td key={ci}>{renderInline(r[ci] || '', `${k2}-${ri}-${ci}`)}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
+      out.push(<TableBlock key={k2} head={head} rows={rows} renderCell={(t, ck) => renderInline(t, `${k2}-${ck}`)} />);
       continue;
     }
 

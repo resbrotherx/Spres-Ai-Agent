@@ -151,16 +151,17 @@ function formField(buf, name) {
 }
 
 function groupSessions(userId) {
-  const out = { today: [], yesterday: [], this_week: [], older: [] };
+  const out = { pinned: [], today: [], yesterday: [], this_week: [], older: [] };
   const now = new Date();
   const startToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   [...sessions.values()]
-    .filter((s) => !userId || !s.user_id || s.user_id === userId)
+    .filter((s) => !s.deleted && (!userId || !s.user_id || s.user_id === userId))
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
     .forEach((s) => {
       const t = Date.parse(s.created_at + 'Z');
-      const item = { session_id: s.session_id, title: s.title, created_at: s.created_at };
-      if (t >= startToday) out.today.push(item);
+      const item = { session_id: s.session_id, title: s.title, created_at: s.created_at, pinned: !!s.pinned };
+      if (s.pinned) out.pinned.push(item);
+      else if (t >= startToday) out.today.push(item);
       else if (t >= startToday - DAY) out.yesterday.push(item);
       else if (t >= startToday - 7 * DAY) out.this_week.push(item);
       else out.older.push(item);
@@ -268,6 +269,22 @@ async function handleApi(req, res, url) {
       const body = JSON.parse((await readBody(req, 1e5)).toString('utf8') || '{}');
       const s = addSession(body.title || 'New chat', 0, body.user_id);
       return json(res, 200, { session_id: s.session_id, title: s.title, created_at: s.created_at, user_id: s.user_id });
+    }
+
+    const um = p.match(/^\/api\/chat\/session\/([^/]+)\/(update|delete)$/);
+    if (req.method === 'POST' && um) {
+      const body = JSON.parse((await readBody(req, 1e5)).toString('utf8') || '{}');
+      const s = sessions.get(decodeURIComponent(um[1]));
+      if (!s || s.deleted) return json(res, 404, { detail: 'Session not found' });
+      await sleep(120);
+      if (um[2] === 'delete') {
+        s.deleted = true;
+        s.pinned = false;
+        return json(res, 200, { ok: true, session_id: s.session_id });
+      }
+      if (typeof body.title === 'string' && body.title.trim()) s.title = body.title.trim().slice(0, 120);
+      if (typeof body.pinned === 'boolean') s.pinned = body.pinned;
+      return json(res, 200, { session_id: s.session_id, title: s.title, created_at: s.created_at, user_id: s.user_id, pinned: !!s.pinned });
     }
 
     const m = p.match(/^\/api\/chat\/session\/([^/]+)\/messages$/);

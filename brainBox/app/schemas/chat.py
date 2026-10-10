@@ -55,6 +55,17 @@ class ChatSessionResponse(BaseModel):
     title: Optional[str]
     created_at: str
     user_id: Optional[str] = None
+    pinned: bool = False
+
+
+class ChatSessionUpdate(UserScope):
+    """Rename and/or pin a chat in the user's history."""
+    title: Optional[str] = Field(None, min_length=1, max_length=120)
+    pinned: Optional[bool] = None
+
+
+class ChatSessionDelete(UserScope):
+    """Remove a chat from the user's history (staff reports keep it)."""
 
 class ChatMessageDetail(BaseModel):
     id: int
@@ -78,6 +89,7 @@ class ChatSessionDetail(BaseModel):
         from_attributes = True
 
 class SessionsGroupedByDate(BaseModel):
+    pinned: List[ChatSessionResponse] = []
     today: List[ChatSessionResponse] = []
     yesterday: List[ChatSessionResponse] = []
     this_week: List[ChatSessionResponse] = []

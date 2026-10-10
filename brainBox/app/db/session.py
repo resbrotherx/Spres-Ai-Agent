@@ -56,6 +56,8 @@ def init_db(reset_interrupted: bool = True):
     _run_ddl("ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS external_user_id VARCHAR")
     _run_ddl("ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS user_name VARCHAR")
     _run_ddl("ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS user_role VARCHAR")
+    _run_ddl("ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMP WITH TIME ZONE")
+    _run_ddl("ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE")
     _run_ddl(
         "CREATE INDEX IF NOT EXISTS ix_chat_sessions_external_user_id "
         "ON chat_sessions (external_user_id)"

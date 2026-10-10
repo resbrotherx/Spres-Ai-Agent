@@ -5,6 +5,7 @@
  * Shares the chat logic and a few building blocks with ChatPanel (chatUi.tsx), but every visual rule of the
  * widget lives in OMAGO_CSS below and is scoped to `.bb-o`, so ChatPanel's look is unaffected.
  */
+import { saveAnswerAsPdf } from './design/exports';
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
 import { useBrainboxChat } from './useBrainboxChat';
@@ -343,10 +344,14 @@ const OMAGO_CSS = `
 .bb-o-send:active:not(:disabled) { transform: translateY(1px) scale(.95); }
 .bb-o-send:disabled { opacity: .6; cursor: default; }
 .bb-o-send.is-stop { background: var(--bb-o-close-bg); color: var(--bb-o-close-fg); }
-.bb-o-send.is-recording { background: #dc2626; animation: bb-o-pulse 1.2s ease-in-out infinite; }
+.bb-o-send.is-recording { outline: 3px solid color-mix(in srgb, var(--bb-o-primary) 30%, transparent); outline-offset: 2px; animation: bb-o-pulse 1.2s ease-in-out infinite; }
 .bb-o-file { display: none; }
-.bb-o-status { display: flex; align-items: center; gap: 6px; color: #dc2626; font-size: 12px; font-weight: 760; margin-top: 8px; }
-.bb-o-status::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: #dc2626; animation: bb-o-pulse 1.2s ease-in-out infinite; }
+.bb-o-status { display: flex; align-items: center; gap: 8px; color: var(--bb-o-primary); font-size: 12px; font-weight: 760; margin-top: 8px; }
+.bb-o-status::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--bb-o-primary); animation: bb-o-pulse 1.2s ease-in-out infinite; }
+.bb-o-wave { display: inline-flex; align-items: center; gap: 2px; height: 14px; }
+.bb-o-wave b { width: 3px; border-radius: 2px; background: currentColor; animation: bb-o-wave 900ms ease-in-out infinite; }
+.bb-o-wave b:nth-child(2) { animation-delay: .15s; } .bb-o-wave b:nth-child(3) { animation-delay: .3s; } .bb-o-wave b:nth-child(4) { animation-delay: .45s; }
+@keyframes bb-o-wave { 0%, 100% { height: 3px; } 50% { height: 13px; } }
 .bb-o-emoji {
   position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 8; display: grid; grid-template-columns: repeat(6, 32px); gap: 2px; padding: 6px;
   background: var(--bb-o-pop); border: 1px solid var(--bb-o-pop-line); border-radius: 14px; animation: bb-o-pop 160ms cubic-bezier(.32,.72,0,1) both;
@@ -556,6 +561,17 @@ function OmagoMessages({ messages, botName, botAvatar, userName, userAvatar, sho
                           </button>
                         </>
                       ) : null}
+                      {m.text ? (
+                        <button
+                          type="button"
+                          className="bb-o-tool-btn"
+                          aria-label="Save as PDF"
+                          title="Save as PDF"
+                          onClick={(e) => saveAnswerAsPdf((e.currentTarget.closest('.bb-o-row') as HTMLElement | null)?.querySelector('.bb-md') as HTMLElement | null, `${botName} answer`)}
+                        >
+                          <ChatIcon name="filePdf" size={14} />
+                        </button>
+                      ) : null}
                       {m.status === 'stopped' ? <span className="bb-o-note">Stopped</span> : null}
                       {m.status === 'error' ? <span className="bb-o-note is-error">Interrupted</span> : null}
                     </div>
@@ -754,7 +770,13 @@ function OmagoComposer(props: OmagoComposerProps) {
       </div>
       {recording ? (
         <div className="bb-o-status" role="status">
-          Recording… tap the button to send
+          Listening… tap the button to send
+          <span className="bb-o-wave" aria-hidden="true">
+            <b />
+            <b />
+            <b />
+            <b />
+          </span>
         </div>
       ) : null}
     </div>
@@ -1092,6 +1114,9 @@ export function ChatWidget({
                       void chat.loadSession(id);
                       focusInput();
                     }}
+                    onPin={(id, pin) => void chat.pinSession(id, pin)}
+                    onRename={(id, t) => void chat.renameSession(id, t)}
+                    onDelete={(id) => void chat.deleteSession(id)}
                   />
                 </div>
               ) : !hasMessages && !chat.loading ? (

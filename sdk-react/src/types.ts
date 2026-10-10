@@ -216,6 +216,12 @@ export interface UseBrainboxChatHook {
   createSession: (title?: string) => Promise<string | null>;
   loadSession: (sessionId: string) => Promise<void>;
   refreshSessions: () => Promise<void>;
+  /** Rename a chat in the history. */
+  renameSession: (sessionId: string, title: string) => Promise<void>;
+  /** Pin / unpin a chat (pinned chats are listed first). */
+  pinSession: (sessionId: string, pinned: boolean) => Promise<void>;
+  /** Remove a chat from the history (opens a new chat if it was the open one). */
+  deleteSession: (sessionId: string) => Promise<void>;
   exportChat: (format: 'json' | 'pdf') => Promise<void>;
   clearError: () => void;
   reset: () => void;
@@ -261,6 +267,8 @@ export interface ChatSession {
   title: string;
   created_at: string;
   updated_at?: string;
+  /** Pinned to the top of the history. */
+  pinned?: boolean;
 }
 
 /** `tenant_id` is optional: the backend takes the tenant from the API key (and rejects a mismatch). */
@@ -285,6 +293,7 @@ export interface IngestPayload {
 }
 
 export interface SessionsGroupedByDate {
+  pinned?: ChatSession[];
   today: ChatSession[];
   yesterday: ChatSession[];
   this_week: ChatSession[];

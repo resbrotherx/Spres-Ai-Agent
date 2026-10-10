@@ -113,7 +113,8 @@ export type ChatIconName =
   | 'chat' | 'x' | 'compose' | 'history' | 'search' | 'volume' | 'volumeOff' | 'expand' | 'shrink' | 'arrowUp'
   | 'stop' | 'copy' | 'check' | 'thumbUp' | 'thumbDown' | 'paperclip' | 'image' | 'smile' | 'mic' | 'chevronDown'
   | 'chevronRight' | 'chevronLeft' | 'sidebar' | 'sun' | 'moon' | 'download' | 'alert' | 'info' | 'checkCircle'
-  | 'warning' | 'refresh' | 'doc' | 'sparkles' | 'bulb' | 'book' | 'wrench' | 'help' | 'arrowDown';
+  | 'warning' | 'refresh' | 'doc' | 'sparkles' | 'bulb' | 'book' | 'wrench' | 'help' | 'arrowDown'
+  | 'more' | 'pin' | 'pencil' | 'trash' | 'plus' | 'filePdf';
 
 const ICONS: Record<ChatIconName, ReactNode> = {
   chat: <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />,
@@ -254,7 +255,24 @@ const ICONS: Record<ChatIconName, ReactNode> = {
       <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" />
     </>
   ),
-  arrowDown: <path d="M12 5v14M19 12l-7 7-7-7" />
+  arrowDown: <path d="M12 5v14M19 12l-7 7-7-7" />,
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1.2" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+      <circle cx="19" cy="12" r="1.2" fill="currentColor" />
+    </>
+  ),
+  pin: <path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1Z" />,
+  pencil: <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5ZM15 5l4 4" />,
+  trash: <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />,
+  plus: <path d="M12 5v14M5 12h14" />,
+  filePdf: (
+    <>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 2v6h6M9 15h6M9 18h4" />
+    </>
+  )
 };
 
 export function ChatIcon({ name, size = 18, strokeWidth = 1.75, className }: { name: ChatIconName | string; size?: number; strokeWidth?: number; className?: string }) {
@@ -285,7 +303,7 @@ export function ChatIcon({ name, size = 18, strokeWidth = 1.75, className }: { n
 const lightVars = tokensToCss({ ...LIGHT, onAccent: '#FFFFFF', brand: BRAND_GRADIENT });
 const darkVars = tokensToCss({ ...DARK, onAccent: '#FFFFFF' });
 
-export const CHAT_STYLE_ID = 'bb-chat-styles-v2';
+export const CHAT_STYLE_ID = 'bb-chat-styles-v3';
 
 export const CHAT_CSS = `
 .bb-c {
@@ -539,6 +557,29 @@ export const CHAT_CSS = `
 .bb-c-session-title { font-size: 13px; color: var(--bb-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bb-c-session.is-active .bb-c-session-title { font-weight: 500; color: var(--bb-accent); }
 .bb-c-session-date { font-size: 11px; color: var(--bb-tertiary); font-variant-numeric: tabular-nums; }
+.bb-c-hist { position: relative; display: flex; align-items: center; border-radius: 10px; min-height: 36px; transition: background-color 120ms; }
+.bb-c-hist:hover, .bb-c-hist.is-menu { background: var(--bb-fill); }
+.bb-c-hist.is-active { background: var(--bb-fill-strong); }
+.bb-c-hist-main { appearance: none; border: 0; background: transparent; flex: 1; min-width: 0; height: 36px; padding: 0 6px 0 10px; text-align: left; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--bb-label); border-radius: 10px; }
+.bb-c-hist-main span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bb-c-hist-main svg { color: var(--bb-tertiary); flex: none; }
+.bb-c-hist-more { opacity: 0; margin-right: 4px; }
+.bb-c-hist:hover .bb-c-hist-more, .bb-c-hist.is-active .bb-c-hist-more, .bb-c-hist.is-menu .bb-c-hist-more, .bb-c-hist-more:focus-visible { opacity: 1; }
+@media (hover: none) { .bb-c-hist-more { opacity: 1; } }
+.bb-c-hist-menu { position: absolute; right: 4px; top: 34px; z-index: 30; min-width: 150px; padding: 5px; border-radius: 12px; background: var(--bb-surface);
+  border: 1px solid var(--bb-separator); box-shadow: 0 10px 28px rgba(0,0,0,.14); animation: bb-c-pop-in 140ms var(--bb-ease) both; }
+.bb-c-hist-menu button { appearance: none; border: 0; background: transparent; width: 100%; display: flex; align-items: center; gap: 9px; height: 34px; padding: 0 10px;
+  border-radius: 8px; font-size: 13px; color: var(--bb-label); cursor: pointer; text-align: left; }
+.bb-c-hist-menu button:hover { background: var(--bb-fill); }
+.bb-c-hist-menu button.is-danger { color: var(--bb-danger-text, #d70015); }
+.bb-c-hist-input { flex: 1; min-width: 0; height: 32px; margin: 2px; border: 1px solid var(--bb-accent); border-radius: 8px; background: var(--bb-surface);
+  color: var(--bb-label); font: inherit; font-size: 13.5px; padding: 0 8px; outline: none; }
+.bb-c-hist.is-confirm { gap: 6px; padding: 4px 6px 4px 10px; background: var(--bb-danger-tint, rgba(255,59,48,.08)); }
+.bb-c-hist-ask { flex: 1; font-size: 13px; color: var(--bb-label); }
+.bb-c-hist-del, .bb-c-hist-cancel { appearance: none; border: 0; height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.bb-c-hist-del { background: var(--bb-danger, #ff3b30); color: #fff; }
+.bb-c-hist-cancel { background: var(--bb-fill); color: var(--bb-label); }
 .bb-c-skel { height: 34px; border-radius: 8px; margin: 4px 0; background: linear-gradient(90deg, var(--bb-fill) 0%, var(--bb-fill-strong) 50%, var(--bb-fill) 100%); background-size: 200% 100%; animation: bb-c-shimmer 1.4s linear infinite; }
 .bb-c-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 32px 16px; color: var(--bb-secondary); }
 .bb-c-empty-icon { width: 72px; height: 72px; border-radius: 999px; display: grid; place-items: center; background: var(--bb-accent-tint); color: var(--bb-accent); margin-bottom: 14px; }
@@ -1325,18 +1366,173 @@ export function Composer({
 /* Sessions list                                                       */
 /* ------------------------------------------------------------------ */
 
+function SessionRow({
+  session,
+  active,
+  onSelect,
+  onPin,
+  onRename,
+  onDelete
+}: {
+  session: ChatSession;
+  active: boolean;
+  onSelect: () => void;
+  onPin?: (pinned: boolean) => void;
+  onRename?: (title: string) => void;
+  onDelete?: () => void;
+}) {
+  const [menu, setMenu] = useState(false);
+  const [mode, setMode] = useState<'view' | 'rename' | 'delete'>('view');
+  const [draft, setDraft] = useState(session.title || '');
+  const wrap = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return undefined;
+    const down = (e: MouseEvent) => {
+      if (wrap.current && !wrap.current.contains(e.target as Node)) setMenu(false);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenu(false);
+    };
+    document.addEventListener('mousedown', down);
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('mousedown', down);
+      document.removeEventListener('keydown', key);
+    };
+  }, [menu]);
+  const title = session.title || 'New chat';
+  const hasMenu = !!(onPin || onRename || onDelete);
+  const commit = () => {
+    setMode('view');
+    const v = draft.trim();
+    if (v && v !== session.title) onRename?.(v);
+  };
+  if (mode === 'rename') {
+    return (
+      <div className="bb-c-hist is-editing">
+        <input
+          className="bb-c-hist-input"
+          value={draft}
+          autoFocus
+          maxLength={120}
+          aria-label="Chat name"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            if (e.key === 'Escape') setMode('view');
+          }}
+        />
+      </div>
+    );
+  }
+  if (mode === 'delete') {
+    return (
+      <div className="bb-c-hist is-confirm" role="alertdialog" aria-label={`Delete ${title}?`}>
+        <span className="bb-c-hist-ask">Delete this chat?</span>
+        <button
+          type="button"
+          className="bb-c-hist-del"
+          autoFocus
+          onClick={() => {
+            setMode('view');
+            onDelete?.();
+          }}
+        >
+          Delete
+        </button>
+        <button type="button" className="bb-c-hist-cancel" onClick={() => setMode('view')}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div ref={wrap} className={`bb-c-hist${active ? ' is-active' : ''}${menu ? ' is-menu' : ''}`}>
+      <button type="button" className="bb-c-hist-main" onClick={onSelect} aria-current={active ? 'true' : undefined} title={title}>
+        {session.pinned ? <ChatIcon name="pin" size={13} /> : null}
+        <span>{title}</span>
+      </button>
+      {hasMenu ? (
+        <button
+          type="button"
+          className="bb-c-iconbtn is-sm bb-c-hist-more"
+          aria-label={`Options for ${title}`}
+          aria-haspopup="menu"
+          aria-expanded={menu}
+          onClick={() => setMenu((m) => !m)}
+        >
+          <ChatIcon name="more" size={16} />
+        </button>
+      ) : null}
+      {menu ? (
+        <div className="bb-c-hist-menu" role="menu">
+          {onPin ? (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenu(false);
+                onPin(!session.pinned);
+              }}
+            >
+              <ChatIcon name="pin" size={15} />
+              {session.pinned ? 'Unpin' : 'Pin'}
+            </button>
+          ) : null}
+          {onRename ? (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenu(false);
+                setDraft(session.title || '');
+                setMode('rename');
+              }}
+            >
+              <ChatIcon name="pencil" size={15} />
+              Rename
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="is-danger"
+              onClick={() => {
+                setMenu(false);
+                setMode('delete');
+              }}
+            >
+              <ChatIcon name="trash" size={15} />
+              Delete
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Chat history: "Pinned" then "Chats" (no dates), each with a ⋯ menu to pin, rename or delete. */
 export function SessionList({
   sessions,
   activeId,
   loading,
   query,
-  onSelect
+  onSelect,
+  onPin,
+  onRename,
+  onDelete
 }: {
   sessions: ChatSession[];
   activeId: string | null;
   loading: boolean;
   query: string;
   onSelect: (id: string) => void;
+  onPin?: (id: string, pinned: boolean) => void;
+  onRename?: (id: string, title: string) => void;
+  onDelete?: (id: string) => void;
 }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -1364,29 +1560,25 @@ export function SessionList({
       </div>
     );
   }
-  const groups: { label: string; items: ChatSession[] }[] = [];
-  filtered.forEach((s) => {
-    const label = sessionGroupLabel(s.updated_at || s.created_at);
-    const g = groups.find((x) => x.label === label);
-    if (g) g.items.push(s);
-    else groups.push({ label, items: [s] });
-  });
+  const groups = [
+    { label: 'Pinned', items: filtered.filter((s) => s.pinned) },
+    { label: 'Chats', items: filtered.filter((s) => !s.pinned) }
+  ].filter((g) => g.items.length);
   return (
     <nav className="bb-c-sessions" aria-label="Conversations">
       {groups.map((g) => (
         <div key={g.label} role="group" aria-label={g.label}>
           <div className="bb-c-session-label">{g.label}</div>
           {g.items.map((s) => (
-            <button
+            <SessionRow
               key={s.session_id}
-              type="button"
-              className={`bb-c-session${s.session_id === activeId ? ' is-active' : ''}`}
-              aria-current={s.session_id === activeId ? 'true' : undefined}
-              onClick={() => onSelect(s.session_id)}
-            >
-              <span className="bb-c-session-title">{s.title || 'Untitled conversation'}</span>
-              <span className="bb-c-session-date">{shortDate(s.updated_at || s.created_at)}</span>
-            </button>
+              session={s}
+              active={s.session_id === activeId}
+              onSelect={() => onSelect(s.session_id)}
+              onPin={onPin ? (pin) => onPin(s.session_id, pin) : undefined}
+              onRename={onRename ? (t) => onRename(s.session_id, t) : undefined}
+              onDelete={onDelete ? () => onDelete(s.session_id) : undefined}
+            />
           ))}
         </div>
       ))}

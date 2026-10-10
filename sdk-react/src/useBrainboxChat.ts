@@ -62,6 +62,7 @@ function flattenSessions(grouped: any): ChatSession[] {
   if (Array.isArray(grouped)) return grouped;
   if (Array.isArray(grouped.sessions)) return grouped.sessions;
   const all: ChatSession[] = [
+    ...(grouped.pinned || []).map((s: ChatSession) => ({ ...s, pinned: true })),
     ...(grouped.today || []),
     ...(grouped.yesterday || []),
     ...(grouped.this_week || []),
@@ -141,6 +142,40 @@ export function useBrainboxChat(
       if (mounted.current) setSessionsLoading(false);
     }
   }, [sdk]);
+
+  const renameSession = useCallback(
+    async (sid: string, title: string) => {
+      const clean = title.trim();
+      if (!clean) return;
+      const before = sessions;
+      setSessions((list) => list.map((s) => (s.session_id === sid ? { ...s, title: clean } : s)));
+      try {
+        await sdk.renameSession(sid, clean);
+      } catch (err) {
+        if (mounted.current) {
+          setSessions(before);
+          setError(toBrainboxError(err).message);
+        }
+      }
+    },
+    [sdk, sessions]
+  );
+
+  const pinSession = useCallback(
+    async (sid: string, pinned: boolean) => {
+      const before = sessions;
+      setSessions((list) => list.map((s) => (s.session_id === sid ? { ...s, pinned } : s)));
+      try {
+        await sdk.pinSession(sid, pinned);
+      } catch (err) {
+        if (mounted.current) {
+          setSessions(before);
+          setError(toBrainboxError(err).message);
+        }
+      }
+    },
+    [sdk, sessions]
+  );
 
   /** Refresh the session list only if the UI has asked for it before. */
   const refreshIfLoaded = useCallback(() => {
@@ -464,6 +499,23 @@ export function useBrainboxChat(
     [sdk, setSessionId]
   );
 
+  const deleteSession = useCallback(
+    async (sid: string) => {
+      const before = sessions;
+      setSessions((list) => list.filter((s) => s.session_id !== sid));
+      if (sid === sessionId) void createSession();
+      try {
+        await sdk.deleteSession(sid);
+      } catch (err) {
+        if (mounted.current) {
+          setSessions(before);
+          setError(toBrainboxError(err).message);
+        }
+      }
+    },
+    [createSession, sdk, sessionId, sessions]
+  );
+
   const exportChat = useCallback(
     async (format: 'json' | 'pdf' = 'json') => {
       try {
@@ -527,6 +579,9 @@ export function useBrainboxChat(
     createSession,
     loadSession,
     refreshSessions,
+    renameSession,
+    pinSession,
+    deleteSession,
     exportChat,
     clearError,
     reset

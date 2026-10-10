@@ -2,6 +2,7 @@ import axios, { AxiosInstance } from 'axios';
 import {
   ChatPayload,
   ChatFeedbackPayload,
+  ChatSession,
   ChatSessionPayload,
   IngestPayload,
   BrainboxChatResponse,
@@ -362,6 +363,28 @@ export class BrainboxReactSDK {
   async listSessions(): Promise<SessionsGroupedByDate> {
     const response = await this.client.post('/api/chat/sessions', this.tenant());
     return response.data;
+  }
+
+  /** Rename and/or pin a chat in the history. */
+  async updateSession(sessionId: string, changes: { title?: string; pinned?: boolean }): Promise<ChatSession> {
+    return this.request(() =>
+      this.client.post<ChatSession>(`/api/chat/session/${encodeURIComponent(sessionId)}/update`, { ...this.tenant(), ...changes })
+    );
+  }
+
+  renameSession(sessionId: string, title: string): Promise<ChatSession> {
+    return this.updateSession(sessionId, { title });
+  }
+
+  pinSession(sessionId: string, pinned: boolean): Promise<ChatSession> {
+    return this.updateSession(sessionId, { pinned });
+  }
+
+  /** Remove a chat from the history (staff reports keep it). */
+  async deleteSession(sessionId: string): Promise<{ ok: boolean }> {
+    return this.request(() =>
+      this.client.post<{ ok: boolean }>(`/api/chat/session/${encodeURIComponent(sessionId)}/delete`, this.tenant())
+    );
   }
 
   async getSessionMessages(sessionId: string): Promise<any> {
