@@ -62,12 +62,71 @@ async def lifespan(app: FastAPI):
     finally:
         await broker.stop()
 
+API_DESCRIPTION = """
+Brainbox is a private AI assistant: it learns from your documents, APIs and support tickets and
+answers questions with a **local** model (Ollama) running on your own server.
+
+### Credentials — click **Authorize** (top right) before using "Try it out"
+| Credential | Looks like | Header | Use it for |
+|---|---|---|---|
+| **Publishable key** | `pk_live_…` | `X-API-Key` (or `Authorization: Bearer`) | Websites & mobile apps — chat only. Safe to embed. |
+| **Secret key** | `sk_live_…` | `X-API-Key` (or `Authorization: Bearer`) | Servers, Odoo, training/ingest. Never put it in a browser. |
+| **Staff login token** | `eyJ…` (JWT from `POST /api/staff/login`) | `Authorization: Bearer` | Staff dashboard endpoints (reports, staff, keys, settings). Expires after 12 h. |
+| **Admin token** | long random string from the server's `.env` | `X-Admin-Token` | Platform administration from the server only. |
+
+**Tenant ID** is not a credential — it is the name of a company's separate knowledge base. Every key
+belongs to exactly one tenant, so you normally don't need to send `tenant_id` at all.
+
+Streaming endpoints (`/api/chat/stream`, `/api/staff/events`) return Server-Sent Events; use `curl -N`
+or the SDKs — Swagger's "Try it out" waits for the stream to finish.
+"""
+
+OPENAPI_TAGS = [
+    {"name": "chat", "description": "Ask questions (normal and streaming), sessions, feedback."},
+    {"name": "train", "description": "Teach the AI: files (PDF, XML, DOCX, CSV, JSON, TXT), text and APIs. Secret key or staff login."},
+    {"name": "ingest", "description": "Low-level ingestion used by the server SDKs and log collector. Secret key."},
+    {"name": "upload", "description": "Attach files/images to a chat session."},
+    {"name": "staff", "description": "Staff dashboard login, profile and team management (staff login token)."},
+    {"name": "reports", "description": "Knowledge gaps (unanswered questions), conversations and analytics."},
+    {"name": "dashboard", "description": "Notifications, tenant settings, widget config and API keys."},
+    {"name": "realtime", "description": "Live Server-Sent Events for the staff dashboard."},
+    {"name": "platform", "description": "Platform admin: all companies, users and keys."},
+    {"name": "admin", "description": "Server-side administration with the admin token."},
+    {"name": "health", "description": "Status checks. Send a key to verify it."},
+    {"name": "auth", "description": "Legacy endpoints."},
+]
+
 app = FastAPI(
-    title="Brainbox AI Backend",
-    description="Production AI backend for REST AI infrastructure",
-    version="1.0.0",
+    title="Brainbox AI API",
+    description=API_DESCRIPTION,
+    version="2.0.0",
+    openapi_tags=OPENAPI_TAGS,
+    swagger_ui_parameters={"persistAuthorization": True, "displayRequestDuration": True, "docExpansion": "none"},
     lifespan=lifespan
 )
+
+
+def custom_openapi():
+    """Add the security schemes so Swagger's Authorize button can send keys / tokens."""
+    if app.openapi_schema:
+        return app.openapi_schema
+    from fastapi.openapi.utils import get_openapi
+    schema = get_openapi(title=app.title, version=app.version, description=app.description,
+                         routes=app.routes, tags=OPENAPI_TAGS)
+    schema.setdefault("components", {})["securitySchemes"] = {
+        "ApiKey": {"type": "apiKey", "in": "header", "name": "X-API-Key",
+                   "description": "Publishable (pk_live_…) or secret (sk_live_…) key."},
+        "Bearer": {"type": "http", "scheme": "bearer",
+                   "description": "Staff login token from POST /api/staff/login (or an API key)."},
+        "AdminToken": {"type": "apiKey", "in": "header", "name": "X-Admin-Token",
+                       "description": "Server admin token (BRAINBOX_ADMIN_TOKEN)."},
+    }
+    schema["security"] = [{"ApiKey": []}, {"Bearer": []}, {"AdminToken": []}]
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = custom_openapi
 
 app.add_middleware(
     CORSMiddleware,
@@ -109,5 +168,6 @@ def root():
     return {
         "service": "Brainbox AI Backend",
         "status": "running",
-        "version": "1.0.0"
+        "version": "2.0.0",
+        "docs": "/docs"
     }
