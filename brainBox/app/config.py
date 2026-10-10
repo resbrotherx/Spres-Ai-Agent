@@ -106,7 +106,7 @@ class Settings:
     KNOWLEDGE_AUTO_LABEL = os.getenv("KNOWLEDGE_AUTO_LABEL", "true").lower() not in ("0", "false", "no", "off")
     KNOWLEDGE_LABEL_USE_AI = os.getenv("KNOWLEDGE_LABEL_USE_AI", "true").lower() not in ("0", "false", "no", "off")
     # Pause between AI-labelled chunks so live chats get the model in between.
-    KNOWLEDGE_LABEL_PAUSE_S = float(os.getenv("KNOWLEDGE_LABEL_PAUSE_S", "0.5") or 0.5)
+    KNOWLEDGE_LABEL_PAUSE_S = float(os.getenv("KNOWLEDGE_LABEL_PAUSE_S", "1.0") or 1.0)
 
     # --- Staff dashboard ---------------------------------------------------------------------
     # Staff JWTs are signed with JWT_SECRET_KEY (HS256); a placeholder secret logs a loud warning.

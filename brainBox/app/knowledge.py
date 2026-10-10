@@ -154,6 +154,15 @@ def start_job(tenant_id: str, scope: str = "unlabelled", use_ai: bool = True, st
     return dict(job)
 
 
+def _wait_for_idle_model(max_wait_s: float = 120.0) -> None:
+    """Let live chats use the model first: wait while answers are being generated."""
+    from app.agents.nodes.log_node import active_chats
+    waited = 0.0
+    while active_chats() > 0 and waited < max_wait_s:
+        time.sleep(0.5)
+        waited += 0.5
+
+
 def _publish(tenant_id: str, action: str) -> None:
     try:
         from app import realtime
@@ -177,6 +186,8 @@ def _run_job(tenant_id: str, scope: str, use_ai: bool) -> None:
                 continue
             if scope != "auto" and doc.audience is not None:
                 continue
+            if use_ai:
+                _wait_for_idle_model()
             audience, reason = classify_text(doc.content or "", use_ai=use_ai)
             doc.audience = audience
             doc.audience_origin = ORIGIN_AUTO
@@ -250,7 +261,9 @@ def label_legacy_on_startup() -> None:
         db.close()
     for tenant_id in tenants:
         logger.info(f"knowledge: labelling legacy chunks for tenant {tenant_id[:8]}…")
-        start_job(tenant_id, "unlabelled", use_ai=settings.KNOWLEDGE_LABEL_USE_AI, started_by="startup")
+        # Startup uses the fast keyword rules only (never the model), so live chat isn't slowed
+        # down; staff can ask the AI to review from the dashboard ("Re-check automatic labels").
+        start_job(tenant_id, "unlabelled", use_ai=False, started_by="startup")
         # one tenant at a time: wait for this job before the next
         while job_status(tenant_id).get("state") == "running":
             time.sleep(2)

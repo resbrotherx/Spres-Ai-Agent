@@ -212,6 +212,7 @@ def graph_state(turn: ChatTurn) -> Dict[str, Any]:
         "user_id": turn.user_id,
         "user_role": turn.retrieval_role,
         "small_talk": None,
+        "instant_reply": None,
     }
 
 
@@ -359,6 +360,9 @@ def _answer_events(turn: ChatTurn):
     state = nodes.router_node(graph_state(turn))
     state = nodes.log_node(state)  # audience-filtered retrieval, same as the graph
     yield ("state", state)
+    if state.get("instant_reply"):
+        yield ("instant", state["instant_reply"], nodes.SMALL_TALK_REASONING)
+        return
     prompt = nodes.build_prompt(state)
     if prompt is None:
         yield ("instant", nodes.no_context_response(), nodes.NO_CONTEXT_REASONING)

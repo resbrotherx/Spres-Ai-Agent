@@ -1,4 +1,6 @@
 import re
+import threading
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from app.agents.tools.vector_search import semantic_search
@@ -70,7 +72,8 @@ def is_small_talk_reasoning(reasoning) -> bool:
     return (reasoning or "").startswith("Small talk")
 
 
-def _now_text() -> str:
+def _now():
+    """(local datetime, part of day) in ASSISTANT_TIMEZONE."""
     from app.config import settings
     now = datetime.now(timezone.utc)
     try:
@@ -79,7 +82,68 @@ def _now_text() -> str:
     except Exception:  # unknown zone: stay on UTC
         pass
     part = "morning" if 5 <= now.hour < 12 else "afternoon" if 12 <= now.hour < 17 else "evening" if 17 <= now.hour < 22 else "night"
+    return now, part
+
+
+def _now_text() -> str:
+    now, part = _now()
     return f"{now.strftime('%A %d %B %Y, %H:%M')} ({part}, {now.tzname() or 'UTC'})"
+
+
+def _has(q: str, pattern: str) -> bool:
+    return re.search(pattern, q) is not None
+
+
+def small_talk_reply(question: str) -> str:
+    """Instant, correct reply to small talk (no model call: faster, and the time is always right)."""
+    q = (question or "").lower()
+    now, part = _now()
+    clock = now.strftime("%I:%M %p").lstrip("0")
+    day = f"{now.strftime('%A')}, {now.day} {now.strftime('%B %Y')}"
+    hello = f"Good {part}!" if part != "night" else "Hello!"
+    parts = []
+    if _has(q, r"\btime\b"):
+        return f"It's {clock} ({part}) on {day}. How can I help you?"
+    if _has(q, r"\b(?:date|what day)\b"):
+        return f"Today is {day}. How can I help you?"
+    if _has(q, r"\b(?:thanks?|thank you|thx|ty|cheers)\b"):
+        return "You're welcome! Is there anything else I can help you with?"
+    if _has(q, r"\b(?:bye|goodbye|good bye|see you)\b"):
+        return f"Goodbye! Have a great {part if part != 'night' else 'night'}. 👋"
+    if _has(q, r"\b(?:hi+|hello+|hey+|hiya|yo|howdy|greetings|good (?:morning|afternoon|evening|day|night)|morning|evening)\b"):
+        parts.append(f"{hello} 👋")
+    if _has(q, r"how are (?:you|u)|how(?:'s| is) it going|how (?:is|was) your day|what'?s up|\bsup\b"):
+        parts.append("I'm doing great, thank you for asking!")
+    if _has(q, r"who are you|what are you|your name|are you (?:a bot|human)|what can you do|how can you help"):
+        parts.append("I'm your AI assistant — I can answer questions about our products, services and your "
+                     "account, and help with general questions too.")
+    if _has(q, r"are you there"):
+        parts.append("Yes, I'm here!")
+    if not parts:
+        return "Great! Let me know if there's anything else I can help you with."
+    return " ".join(parts + ["How can I help you today?"])
+
+
+# Answers being generated right now; background jobs (knowledge labelling) wait while > 0 so
+# live chats always get the model first.
+_active = 0
+_active_lock = threading.Lock()
+
+
+@contextmanager
+def _chat_in_progress():
+    global _active
+    with _active_lock:
+        _active += 1
+    try:
+        yield
+    finally:
+        with _active_lock:
+            _active -= 1
+
+
+def active_chats() -> int:
+    return _active
 
 
 def log_node(state: AgentState) -> AgentState:
@@ -87,8 +151,9 @@ def log_node(state: AgentState) -> AgentState:
     tenant_id = state["tenant_id"]
 
     if is_small_talk(question):
-        logger.info("Log node - small talk, skipping knowledge search")
-        return {**state, "small_talk": True, "context": [], "search_results": []}
+        logger.info("Log node - small talk, instant reply")
+        return {**state, "small_talk": True, "instant_reply": small_talk_reply(question),
+                "context": [], "search_results": []}
 
     logger.info(f"Log node - Searching for: {question}")
 
@@ -223,7 +288,8 @@ def llm_providers():
 def generate_answer(prompt: str):
     """(response, reasoning) from the first provider that answers, else the fallback text."""
     for _name, ask, _stream, label in llm_providers():
-        response = ask(prompt)
+        with _chat_in_progress():
+            response = ask(prompt)
         if response:
             return response.strip(), f"Used semantic search and {label} LLM for response"
     return LLM_FALLBACK_RESPONSE, LLM_FALLBACK_REASONING
@@ -236,6 +302,11 @@ def stream_answer(prompt: str):
     ``("fallback", LLM_FALLBACK_RESPONSE, LLM_FALLBACK_REASONING)`` (every provider failed before
     producing any text). A provider that fails after it streamed text raises ``LLMStreamError``.
     """
+    with _chat_in_progress():
+        yield from _stream_answer(prompt)
+
+
+def _stream_answer(prompt: str):
     for name, _ask, stream, label in llm_providers():
         parts = []
         try:
@@ -260,6 +331,8 @@ def stream_answer(prompt: str):
 
 
 def response_node(state: AgentState) -> AgentState:
+    if state.get("instant_reply"):
+        return {**state, "response": state["instant_reply"], "reasoning": SMALL_TALK_REASONING}
     prompt = build_prompt(state)
 
     # Nothing in the knowledge base this user may see: reply at once; chat.py records it as a

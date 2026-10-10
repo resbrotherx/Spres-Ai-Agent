@@ -13,3 +13,4 @@ class AgentState(TypedDict):
     user_role: Optional[str]
     # Greeting / thanks / "what time is it": answered conversationally, no knowledge search.
     small_talk: Optional[bool]
+    instant_reply: Optional[str]
