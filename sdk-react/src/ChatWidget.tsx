@@ -1,6 +1,6 @@
 'use client';
 /**
- * Floating chat widget — "omago" design (lavender frosted glass, no shadows).
+ * Floating chat widget — "omago" design (frosted glass, blue accent, no shadows).
  *
  * Shares the chat logic and a few building blocks with ChatPanel (chatUi.tsx), but every visual rule of the
  * widget lives in OMAGO_CSS below and is scoped to `.bb-o`, so ChatPanel's look is unaffected.
@@ -52,14 +52,14 @@ const OMAGO_STYLE_ID = 'bb-omago-styles-v3';
 
 const OMAGO_CSS = `
 .bb-c.bb-o {
-  --bb-o-primary: #b93fff;
+  --bb-o-primary: #2563eb;
   --bb-o-ink: #08080a;
-  --bb-o-panel: #fbf1ff;
+  --bb-o-panel: #f3f6fd;
   --bb-o-radius: 22px;
   --bb-o-border: 2px solid rgba(255,255,255,.82);
   --bb-o-header: rgba(255,255,255,.36);
   --bb-o-header-line: rgba(255,255,255,.88);
-  --bb-o-body: radial-gradient(circle at 86% 42%, rgba(255,255,255,.7), transparent 30%), linear-gradient(180deg, rgba(255,250,255,.7), rgba(249,230,255,.72));
+  --bb-o-body: radial-gradient(circle at 86% 42%, rgba(255,255,255,.7), transparent 30%), linear-gradient(180deg, rgba(251,252,255,.7), rgba(224,233,253,.72));
   --bb-o-text: rgba(12,12,16,.74);
   --bb-o-muted: rgba(12,12,16,.5);
   --bb-o-faint: rgba(12,12,16,.42);
@@ -67,13 +67,13 @@ const OMAGO_CSS = `
   --bb-o-glass-hover: rgba(255,255,255,.45);
   --bb-o-glass-line: rgba(255,255,255,.86);
   --bb-o-bot: rgba(255,255,255,.94);
-  --bb-o-pill-line: rgba(184,64,255,.18);
+  --bb-o-pill-line: rgba(37,99,235,.18);
   --bb-o-pill-text: var(--bb-o-primary);
   --bb-o-close-bg: #050506;
   --bb-o-close-fg: #fff;
   --bb-o-pop: #fff;
-  --bb-o-pop-line: rgba(163,89,220,.18);
-  --bb-o-scroll: rgba(163,89,220,.18);
+  --bb-o-pop-line: rgba(37,99,235,.18);
+  --bb-o-scroll: rgba(37,99,235,.18);
   /* Shared tokens used by toasts, sources, history list and markdown. */
   --bb-accent: var(--bb-o-primary);
   --bb-label: var(--bb-o-ink);
@@ -81,51 +81,51 @@ const OMAGO_CSS = `
   --bb-tertiary: rgba(12,12,16,.46);
   --bb-quaternary: rgba(12,12,16,.3);
   --bb-surface: #ffffff;
-  --bb-surface2: #fdf8ff;
-  --bb-fill: rgba(163,89,220,.08);
-  --bb-fill-strong: rgba(163,89,220,.14);
-  --bb-separator: rgba(163,89,220,.16);
-  --bb-separator-strong: rgba(163,89,220,.26);
+  --bb-surface2: #f8faff;
+  --bb-fill: rgba(37,99,235,.08);
+  --bb-fill-strong: rgba(37,99,235,.14);
+  --bb-separator: rgba(37,99,235,.16);
+  --bb-separator-strong: rgba(37,99,235,.26);
   --bb-material: rgba(255,255,255,.94);
-  --bb-accent-tint: rgba(185,63,255,.12);
+  --bb-accent-tint: rgba(37,99,235,.12);
   --bb-ring: none;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 13px;
   color: var(--bb-o-ink);
 }
 .bb-c.bb-o[data-theme="dark"] {
-  --bb-o-ink: #f6eefc;
-  --bb-o-panel: #1a1022;
-  --bb-o-border: 2px solid rgba(217,135,255,.2);
+  --bb-o-ink: #eef3fc;
+  --bb-o-panel: #0e1526;
+  --bb-o-border: 2px solid rgba(143,179,255,.2);
   --bb-o-header: rgba(255,255,255,.04);
-  --bb-o-header-line: rgba(217,135,255,.16);
-  --bb-o-body: radial-gradient(circle at 86% 42%, rgba(185,63,255,.12), transparent 34%), linear-gradient(180deg, rgba(34,20,46,.9), rgba(26,16,34,.96));
-  --bb-o-text: rgba(246,238,252,.84);
-  --bb-o-muted: rgba(246,238,252,.6);
-  --bb-o-faint: rgba(246,238,252,.46);
+  --bb-o-header-line: rgba(143,179,255,.16);
+  --bb-o-body: radial-gradient(circle at 86% 42%, rgba(37,99,235,.12), transparent 34%), linear-gradient(180deg, rgba(20,30,52,.9), rgba(13,20,38,.96));
+  --bb-o-text: rgba(238,243,252,.84);
+  --bb-o-muted: rgba(238,243,252,.6);
+  --bb-o-faint: rgba(238,243,252,.46);
   --bb-o-glass: rgba(255,255,255,.06);
   --bb-o-glass-hover: rgba(255,255,255,.12);
-  --bb-o-glass-line: rgba(217,135,255,.2);
+  --bb-o-glass-line: rgba(143,179,255,.2);
   --bb-o-bot: rgba(255,255,255,.08);
-  --bb-o-pill-line: rgba(217,135,255,.3);
-  --bb-o-pill-text: #dca8ff;
-  --bb-o-close-bg: #f3e6ff;
-  --bb-o-close-fg: #1a1022;
-  --bb-o-pop: #241530;
-  --bb-o-pop-line: rgba(217,135,255,.22);
-  --bb-o-scroll: rgba(217,135,255,.22);
+  --bb-o-pill-line: rgba(143,179,255,.3);
+  --bb-o-pill-text: #a9c4ff;
+  --bb-o-close-bg: #e6eeff;
+  --bb-o-close-fg: #0e1526;
+  --bb-o-pop: #151f37;
+  --bb-o-pop-line: rgba(143,179,255,.22);
+  --bb-o-scroll: rgba(143,179,255,.22);
   --bb-label: var(--bb-o-ink);
-  --bb-secondary: rgba(246,238,252,.66);
-  --bb-tertiary: rgba(246,238,252,.48);
-  --bb-quaternary: rgba(246,238,252,.3);
-  --bb-surface: #241530;
-  --bb-surface2: #2a1938;
-  --bb-fill: rgba(217,135,255,.1);
-  --bb-fill-strong: rgba(217,135,255,.16);
-  --bb-separator: rgba(217,135,255,.16);
-  --bb-separator-strong: rgba(217,135,255,.26);
-  --bb-material: rgba(36,21,48,.96);
-  --bb-accent-tint: rgba(217,135,255,.16);
+  --bb-secondary: rgba(238,243,252,.66);
+  --bb-tertiary: rgba(238,243,252,.48);
+  --bb-quaternary: rgba(238,243,252,.3);
+  --bb-surface: #151f37;
+  --bb-surface2: #1a2540;
+  --bb-fill: rgba(143,179,255,.1);
+  --bb-fill-strong: rgba(143,179,255,.16);
+  --bb-separator: rgba(143,179,255,.16);
+  --bb-separator-strong: rgba(143,179,255,.26);
+  --bb-material: rgba(20,30,52,.96);
+  --bb-accent-tint: rgba(143,179,255,.16);
 }
 @supports (color: color-mix(in srgb, red 50%, blue)) {
   .bb-c.bb-o { --bb-accent-tint: color-mix(in srgb, var(--bb-o-primary) 12%, transparent); --bb-o-pill-line: color-mix(in srgb, var(--bb-o-primary) 18%, transparent); }
@@ -187,7 +187,7 @@ const OMAGO_CSS = `
   position: relative; display: grid; place-items: center; flex: none; border-radius: 999px; overflow: hidden;
   background:
     radial-gradient(circle at 36% 28%, rgba(255,255,255,.95) 0 12%, transparent 13%),
-    radial-gradient(circle at 50% 50%, #d987ff 0 14%, #b334ff 42%, #8e31dc 66%, rgba(142,49,220,.05) 71%);
+    radial-gradient(circle at 50% 50%, #9dbcff 0 14%, #2f6bff 42%, #1d3fae 66%, rgba(29,63,174,.05) 71%);
 }
 .bb-o-orb::before { content: ""; width: 45%; height: 45%; border-radius: 999px; background: #fff; clip-path: polygon(0 50%, 53% 15%, 100% 0, 100% 100%, 53% 85%); }
 .bb-o-orb.has-image { background: var(--bb-o-glass); }
@@ -198,7 +198,7 @@ const OMAGO_CSS = `
   color: #fff; font-size: 12px; font-weight: 820;
   background: radial-gradient(circle at 50% 24%, #f7ded0 0 20%, transparent 21%), linear-gradient(145deg, #c9b8ad, #9e6f59);
 }
-.bb-o-person.has-initials { background: linear-gradient(145deg, #c9a8e8, #8e5cb8); }
+.bb-o-person.has-initials { background: linear-gradient(145deg, #a8bde8, #5c78b8); }
 .bb-o-person img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* ---------- Body ---------- */
@@ -209,11 +209,14 @@ const OMAGO_CSS = `
 .bb-o-scroll { scrollbar-width: thin; scrollbar-color: var(--bb-o-scroll) transparent; }
 
 /* Welcome */
-.bb-o-welcome { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 9px; align-items: start; padding-bottom: 8px; animation: bb-o-msg-in 300ms cubic-bezier(.32,.72,0,1) both; }
+.bb-o-welcome { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px 14px 24px; animation: bb-o-msg-in 300ms cubic-bezier(.32,.72,0,1) both; }
+.bb-o-start-title { margin: 14px 0 6px; font-size: 19px; line-height: 1.25; font-weight: 820; letter-spacing: -.01em; color: var(--bb-o-ink); }
+.bb-o-start-text { max-width: 270px; margin: 0 auto; font-size: 13px; line-height: 1.5; font-weight: 520; color: var(--bb-o-muted); overflow-wrap: anywhere; }
+.bb-o-start-text + .bb-o-start-text { margin-top: 6px; }
+.bb-o-welcome .bb-o-actions { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
+.bb-o-welcome .bb-o-pill { text-align: center; }
 .bb-o-author { display: flex; align-items: baseline; gap: 8px; margin: 7px 0 8px; font-weight: 820; font-size: 15px; color: var(--bb-o-ink); }
 .bb-o-author span { color: var(--bb-o-faint); font-size: 11px; font-weight: 760; }
-.bb-o-intro { width: fit-content; max-width: min(100%, 260px); padding: 9px 11px; border-radius: 0 14px 14px 14px; background: var(--bb-o-bot); color: var(--bb-o-text); font-size: 12.5px; line-height: 1.45; font-weight: 590; overflow-wrap: anywhere; }
-.bb-o-intro + .bb-o-intro { margin-top: 10px; border-radius: 14px; }
 .bb-o-actions { display: grid; gap: 8px; margin-top: 12px; justify-items: start; }
 .bb-o-pill {
   appearance: none; width: fit-content; max-width: 100%; min-height: 32px; padding: 0 11px; border: 1px solid var(--bb-o-pill-line); border-radius: 999px;
@@ -333,7 +336,7 @@ const OMAGO_CSS = `
 .bb-o-tool[aria-expanded="true"], .bb-o-history-btn[aria-pressed="true"] { background: var(--bb-o-glass-hover); color: var(--bb-o-primary); }
 .bb-o-send {
   appearance: none; border: 0; margin-left: auto; width: 38px; height: 38px; border-radius: 999px; display: grid; place-items: center; cursor: pointer; flex: none;
-  color: #fff; background: radial-gradient(circle at 36% 28%, #c3d9ff, var(--bb-o-primary) 53%, #8120d2 100%);
+  color: #fff; background: radial-gradient(circle at 36% 28%, #c3d9ff, var(--bb-o-primary) 53%, #1d3fae 100%);
   transition: transform 120ms ease, filter 160ms ease, opacity 160ms ease;
 }
 .bb-o-send:hover:not(:disabled) { filter: brightness(1.08) saturate(1.1); }
@@ -355,12 +358,14 @@ const OMAGO_CSS = `
 .bb-o-launcher {
   appearance: none; border: 0; cursor: pointer; position: relative; flex: none; color: #fff; display: inline-flex; align-items: center; justify-content: center;
   min-width: 104px; height: 46px; padding: 0 15px; gap: 10px; border-radius: 999px; font-size: 14px; font-weight: 760;
-  background: radial-gradient(circle at 20% 20%, #efc3ff, var(--bb-o-primary) 50%, #8120d2 100%);
+  background: radial-gradient(circle at 20% 20%, #9dbcff, var(--bb-o-primary) 50%, #1d3fae 100%);
   animation: bb-o-launch 300ms cubic-bezier(.32,.72,0,1) both; transition: transform 120ms ease, filter 160ms ease;
 }
 .bb-o-launcher:hover { filter: brightness(1.06) saturate(1.1); }
 .bb-o-launcher:active { transform: translateY(1px) scale(.96); }
-.bb-o-launcher.is-icon { min-width: 0; width: 56px; height: 56px; padding: 0; background: var(--bb-o-primary); }
+.bb-o-launcher.is-icon { min-width: 0; width: 60px; height: 60px; padding: 0; border: 3px solid rgba(255,255,255,.7); background: radial-gradient(circle at 30% 24%, #9dbcff, var(--bb-o-primary) 52%, #1d3fae 100%); }
+.bb-o-launcher.is-icon svg { transition: transform 260ms cubic-bezier(.32,.72,0,1); }
+.bb-o-launcher.is-icon:hover svg { transform: rotate(-8deg) scale(1.06); }
 .bb-o-launcher.is-gif { min-width: 0; width: 64px; height: 64px; padding: 0; background: transparent; }
 .bb-o-launcher.is-gif img { width: 100%; height: 100%; border-radius: 999px; object-fit: cover; display: block; }
 .bb-o-badge {
@@ -429,8 +434,14 @@ function Person({ name, src }: { name?: string; src?: string }) {
 }
 
 /** Chat bubble + sparkle (original omago launcher icon). */
-function OmagoIcon({ name, size = 22, strokeWidth = 2 }: { name: 'chat' | 'voice' | 'send'; size?: number; strokeWidth?: number }) {
+function OmagoIcon({ name, size = 22, strokeWidth = 2 }: { name: 'chat' | 'aichat' | 'voice' | 'send'; size?: number; strokeWidth?: number }) {
   const paths: Record<string, ReactNode> = {
+    aichat: (
+      <>
+        <path d="M21 11.5a8.5 8.5 0 0 1-12.2 7.7L3 21l1.8-5.4A8.5 8.5 0 1 1 21 11.5Z" />
+        <path d="M12 6.9l1.15 2.75L15.9 10.8l-2.75 1.15L12 14.7l-1.15-2.75L8.1 10.8l2.75-1.15Z" fill="currentColor" stroke="none" />
+      </>
+    ),
     chat: (
       <>
         <path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.3-5.1A8 8 0 1 1 21 12Z" />
@@ -759,14 +770,14 @@ type View = 'chat' | 'history';
 export function ChatWidget({
   sdk,
   position = 'bottom-right',
-  primaryColor = '#b93fff',
+  primaryColor = '#2563eb',
   accentColor = '#08080a',
-  backgroundColor = '#fbf1ff',
+  backgroundColor = '#f3f6fd',
   border,
   borderRadius,
-  launcherType = 'button',
+  launcherType = 'auto',
   launcherGifUrl,
-  buttonText = 'Chat',
+  buttonText,
   placeholder,
   width = '360px',
   height = '540px',
@@ -955,7 +966,7 @@ export function ChatWidget({
   rootStyle['--bb-o-height'] = height;
   if (borderRadius) rootStyle['--bb-o-radius'] = borderRadius;
   if (border) rootStyle['--bb-o-border'] = border;
-  // Ink and panel colours are light-mode colours; dark mode keeps its own aubergine palette.
+  // Ink and panel colours are light-mode colours; dark mode keeps its own navy palette.
   if (theme === 'light') {
     rootStyle['--bb-o-ink'] = accentColor;
     rootStyle['--bb-o-panel'] = backgroundColor;
@@ -971,27 +982,30 @@ export function ChatWidget({
   ) : null;
   const launcherLabel = unread ? `Open chat, ${unread} unread ${unread === 1 ? 'reply' : 'replies'}` : 'Open chat';
 
+  const launcherText = (buttonText || '').trim();
+  // 'auto': round icon until a launcher text is configured.
+  const effectiveLauncher = launcherType === 'auto' || !launcherType ? (launcherText ? 'button' : 'icon') : launcherType;
   let launcher: ReactNode = null;
   if (!open) {
-    if (launcherType === 'gif' && launcherGifUrl) {
+    if (effectiveLauncher === 'gif' && launcherGifUrl) {
       launcher = (
         <button ref={launcherRef} type="button" className="bb-o-launcher is-gif" onClick={() => setOpen(true)} aria-label={launcherLabel}>
           <img src={launcherGifUrl} alt="" />
           {badge}
         </button>
       );
-    } else if (launcherType === 'icon') {
+    } else if (effectiveLauncher !== 'button') {
       launcher = (
         <button ref={launcherRef} type="button" className="bb-o-launcher is-icon" onClick={() => setOpen(true)} aria-label={launcherLabel}>
-          <OmagoIcon name="chat" size={26} />
+          <OmagoIcon name="aichat" size={28} strokeWidth={1.9} />
           {badge}
         </button>
       );
     } else {
       launcher = (
         <button ref={launcherRef} type="button" className="bb-o-launcher" onClick={() => setOpen(true)} aria-label={launcherLabel}>
-          <OmagoIcon name="chat" size={22} />
-          <span>{buttonText}</span>
+          <OmagoIcon name="aichat" size={22} strokeWidth={1.9} />
+          <span>{launcherText || 'Chat'}</span>
           {badge}
         </button>
       );
@@ -1082,25 +1096,23 @@ export function ChatWidget({
                 </div>
               ) : !hasMessages && !chat.loading ? (
                 <div className="bb-o-welcome">
-                  <Orb size={34} src={ui.botAvatar || undefined} />
-                  <div>
-                    <div className="bb-o-author">{ui.botName}</div>
-                    {ui.welcome.map((m, i) => (
-                      <div key={i} className="bb-o-intro">
-                        {m}
-                      </div>
-                    ))}
-                    {ui.actions.length ? (
-                      <div className="bb-o-actions">
-                        {ui.actions.map((a) => (
-                          <button key={a.label} type="button" className="bb-o-pill" onClick={() => send(a.prompt || a.label)}>
-                            {a.icon ? <ChatIcon name={a.icon} size={14} /> : null}
-                            {a.label}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
+                  <Orb size={64} src={ui.botAvatar || undefined} />
+                  <h2 className="bb-o-start-title">{ui.botName}</h2>
+                  {ui.welcome.map((m, i) => (
+                    <p key={i} className="bb-o-start-text">
+                      {m}
+                    </p>
+                  ))}
+                  {ui.actions.length ? (
+                    <div className="bb-o-actions">
+                      {ui.actions.map((a) => (
+                        <button key={a.label} type="button" className="bb-o-pill" onClick={() => send(a.prompt || a.label)}>
+                          {a.icon ? <ChatIcon name={a.icon} size={14} /> : null}
+                          {a.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <OmagoMessages

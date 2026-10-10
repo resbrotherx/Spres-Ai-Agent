@@ -4,6 +4,9 @@ The Brainbox AI assistant for iOS and Android apps. It looks and behaves like th
 same chat flow and options, in the original **omago** pop-up design: lavender frosted glass, a purple orb
 logo, and no shadows.
 
+> **2.1.0:** blue default colour (`#2563eb`), round icon-only launcher until `launcherText` is set
+> (`launcherVariant: 'auto'`), centred start screen, and Sublime-style code blocks with line numbers.
+
 > **2.0.1:** the components use the omago design again (lavender panel `#fbf1ff`, purple `#b93fff`, ink
 > `#08080a`, a 2pt frosted border, radius 22, flat with no shadows or elevation). The bot avatar is now the purple
 > orb, and the launcher is a purple "Chat" pill by default (`launcherVariant="icon"` gives a round button).

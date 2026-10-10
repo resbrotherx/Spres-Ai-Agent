@@ -13,6 +13,7 @@ from app.api.staff import router as staff_router
 from app.api.reports import router as reports_router
 from app.api.dashboard import router as dashboard_router
 from app.api.platform import router as platform_router
+from app.api.knowledge import router as knowledge_router
 from app.api.events import router as events_router
 from app.config import settings
 from app.db.session import init_db
@@ -57,6 +58,9 @@ async def lifespan(app: FastAPI):
     # Live staff events: capture the loop so publish() works from threads/BackgroundTasks.
     from app.realtime import broker
     broker.start()
+    # Give knowledge stored before audiences existed a "who may see it" label (background, once).
+    from app.knowledge import label_legacy_on_startup
+    threading.Thread(target=label_legacy_on_startup, name="knowledge-labels", daemon=True).start()
     try:
         yield
     finally:
@@ -91,6 +95,7 @@ OPENAPI_TAGS = [
     {"name": "dashboard", "description": "Notifications, tenant settings, widget config and API keys."},
     {"name": "realtime", "description": "Live Server-Sent Events for the staff dashboard."},
     {"name": "platform", "description": "Platform admin: all companies, users and keys."},
+    {"name": "knowledge", "description": "Who may see each piece of knowledge (audience labels, automatic labelling) and every chat message."},
     {"name": "admin", "description": "Server-side administration with the admin token."},
     {"name": "health", "description": "Status checks. Send a key to verify it."},
     {"name": "auth", "description": "Legacy endpoints."},
@@ -162,6 +167,7 @@ app.include_router(staff_router, prefix="/api", tags=["staff"])
 app.include_router(reports_router, prefix="/api", tags=["reports"])
 app.include_router(dashboard_router, prefix="/api", tags=["dashboard"])
 app.include_router(platform_router, prefix="/api/platform", tags=["platform"])
+app.include_router(knowledge_router, prefix="/api", tags=["knowledge"])
 
 @app.get("/")
 def root():

@@ -548,11 +548,34 @@ function createApi() {
   const randomKey = (type) => `${type === 'secret' ? 'sk' : 'pk'}_live_${Array.from({ length: 40 }, () => 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 56)]).join('')}`;
   const newKey = (tenant_id, type, name, expires_at) => {
     const raw = randomKey(type);
-    const key = { id: ++db.seq.key, tenant_id, name, key_type: type, key_prefix: raw.slice(0, 12), is_active: true, created_at: new Date().toISOString(), last_used: null, expires_at: expires_at || null, expired: false };
+    const key = { id: ++db.seq.key, tenant_id, name, key_type: type, key_prefix: raw.slice(0, 12), is_active: true, created_at: new Date().toISOString(), last_used: null, expires_at: expires_at || null, expired: false, can_reveal: true, __raw: raw };
     db.keys.unshift(key);
     return { key, raw };
   };
-  const keyOut = (k) => ({ ...k, expired: !!k.expires_at && new Date(k.expires_at).getTime() < Date.now() });
+  const keyOut = (k) => {
+    const { __raw, ...rest } = k;
+    return { ...rest, can_reveal: !!__raw, expired: !!k.expires_at && new Date(k.expires_at).getTime() < Date.now() };
+  };
+  // ----- knowledge (Messages page) demo data
+  const KB_TEXTS = [
+    ['FAQ: Our support desk is open Monday to Friday, 8am–6pm WAT. Email help@acme.test or call +234 1 555 0100.', 'faq.pdf', null, null, null],
+    ['Plans and pricing: Starter ₦15,000/month (1 site), Growth ₦45,000/month (5 sites), Enterprise on request.', 'pricing.pdf', null, null, null],
+    ['To see your invoice or your order status, sign in to the customer portal and open Billing → Invoices.', 'portal-guide.pdf', 'customer', 'auto', 'mentions invoice, customer portal, order status'],
+    ['Vendors must send purchase orders to procurement@acme.test; supplier invoices are paid within 30 days.', 'supplier-terms.docx', 'vendor', 'auto', 'mentions purchase orders, procurement, supplier invoices'],
+    ['Internal SOP: escalate unresolved tickets to the team lead after 4 hours. Do not share margins with customers.', 'sop.docx', 'internal', 'staff', null],
+    ['Root password for the reporting database is stored in the vault — admins only. Rotate API keys quarterly.', 'ops-notes.txt', 'admin', 'auto', 'mentions password, api keys'],
+    ['Meter readings are taken on the 25th; your bill is issued on the 1st and is due within 14 days.', 'billing.pdf', 'customer', 'source', null],
+    ['Welcome to Acme Utilities! We provide prepaid and postpaid metering for homes and businesses across Lagos.', 'about.html', 'public', 'auto', 'mentions welcome, services'],
+  ];
+  if (!db.knowledge) {
+    db.knowledge = Array.from({ length: 46 }, (_, i) => {
+      const [content, file, audience, origin, reason] = KB_TEXTS[i % KB_TEXTS.length];
+      return { id: 1000 + i, content: i < KB_TEXTS.length ? content : `${content} (section ${Math.floor(i / KB_TEXTS.length) + 1})`, length: content.length, source_type: file.split('.').pop(), source_id: origin === 'source' ? 'src-billing' : null, source_name: file, file_path: file, audience: i >= 40 ? null : audience || (i % 3 === 0 ? null : 'public'), origin: i >= 40 ? null : audience ? origin : i % 3 === 0 ? null : 'auto', reason: audience ? reason : 'general information (no sensitive terms found)', created_at: new Date(Date.now() - i * 3.6e6 * 7).toISOString() };
+    });
+    db.labelJob = { state: 'idle' };
+  }
+  const kbOut = (d, full) => ({ ...d, content: full ? d.content : d.content.slice(0, 280), effective_audience: d.audience || 'public' });
+  const KB_GUESS = (t) => (/password|key|secret/i.test(t) ? 'admin' : /internal|sop|staff/i.test(t) ? 'internal' : /vendor|supplier|purchase/i.test(t) ? 'vendor' : /invoice|order|bill|portal/i.test(t) ? 'customer' : 'public');
   const tenantKeyOut = (k) => {
     const { tenant_id, ...rest } = keyOut(k);
     return rest;
@@ -1162,6 +1185,84 @@ function createApi() {
       const { key, raw } = newKey(k.tenant_id, k.key_type, k.name, k.expires_at);
       k.is_active = false;
       return { key: tenantKeyOut(key), raw_key: raw, revoked_id: k.id };
+    }],
+    // ----- knowledge / messages
+    ['GET', /^\/api\/knowledge\/documents$/, ({ headers, query }) => {
+      auth(headers);
+      const q = norm(query.q);
+      const counts = { public: 0, customer: 0, vendor: 0, internal: 0, admin: 0, unlabelled: 0 };
+      db.knowledge.forEach((d) => (counts[d.audience || 'unlabelled'] += 1));
+      const page = Math.max(1, Number(query.page) || 1);
+      const size = Math.min(100, Math.max(1, Number(query.page_size) || 25));
+      const items = db.knowledge.filter((d) =>
+        (!query.audience || (query.audience === 'unlabelled' ? !d.audience : d.audience === query.audience)) &&
+        (!query.origin || d.origin === query.origin) && (!q || norm(d.content).includes(q)));
+      return { items: items.slice((page - 1) * size, page * size).map((d) => kbOut(d)), total: items.length, page, page_size: size, counts, origin_counts: {}, legacy_audience: 'public', job: db.labelJob };
+    }],
+    ['GET', /^\/api\/knowledge\/documents\/(\d+)$/, ({ headers, m }) => {
+      auth(headers);
+      const d = db.knowledge.find((x) => String(x.id) === m[1]);
+      if (!d) throw new HttpError(404, 'Knowledge entry not found');
+      return kbOut(d, true);
+    }],
+    ['PATCH', /^\/api\/knowledge\/documents\/(\d+)$/, ({ headers, m, body }) => {
+      auth(headers, 'trainer');
+      const d = db.knowledge.find((x) => String(x.id) === m[1]);
+      if (!d) throw new HttpError(404, 'Knowledge entry not found');
+      Object.assign(d, { audience: body.audience, origin: 'staff', reason: null });
+      return kbOut(d, true);
+    }],
+    ['POST', /^\/api\/knowledge\/documents\/bulk$/, ({ headers, body }) => {
+      auth(headers, 'trainer');
+      let n = 0;
+      db.knowledge.forEach((d) => { if (body.ids.includes(d.id)) { Object.assign(d, { audience: body.audience, origin: 'staff', reason: null }); n += 1; } });
+      return { ok: true, updated: n };
+    }],
+    ['GET', /^\/api\/knowledge\/label$/, ({ headers }) => {
+      auth(headers);
+      return { job: db.labelJob, pending: db.knowledge.filter((d) => !d.audience).length };
+    }],
+    ['POST', /^\/api\/knowledge\/label$/, ({ headers, body }) => {
+      const me = auth(headers, 'admin');
+      const todo = db.knowledge.filter((d) => !d.audience || (body.scope === 'auto' && d.origin === 'auto'));
+      db.labelJob = { state: 'running', scope: body.scope || 'unlabelled', use_ai: true, done: 0, total: todo.length, counts: {}, started_at: new Date().toISOString(), started_by: me.email };
+      const step = () => {
+        const d = todo[db.labelJob.done];
+        if (!d) { db.labelJob = { ...db.labelJob, state: 'done', finished_at: new Date().toISOString() }; return; }
+        const aud = KB_GUESS(d.content);
+        Object.assign(d, { audience: aud, origin: 'auto', reason: 'AI review' });
+        db.labelJob.done += 1;
+        db.labelJob.counts[aud] = (db.labelJob.counts[aud] || 0) + 1;
+        setTimeout(step, 250);
+      };
+      setTimeout(step, 300);
+      return { __status: 202, body: { job: db.labelJob } };
+    }],
+    ['POST', /^\/api\/knowledge\/label\/reset$/, ({ headers }) => {
+      auth(headers, 'admin');
+      let n = 0;
+      db.knowledge.forEach((d) => { if (d.origin === 'auto') { Object.assign(d, { audience: null, origin: null, reason: null }); n += 1; } });
+      return { ok: true, reset: n };
+    }],
+    ['GET', /^\/api\/knowledge\/messages$/, ({ headers, query }) => {
+      auth(headers);
+      const q = norm(query.q);
+      const all = [];
+      db.conversations.forEach((c) => c.messages.forEach((msg) => all.push({ id: msg.id, session_id: c.session_id, sender: msg.role, content: msg.content, created_at: msg.created_at, conversation_title: c.title, user_name: c.user_name, user_id: c.user_id, user_role: c.user_role || null, role_recorded: !!c.user_role })));
+      all.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+      const role_counts = {};
+      all.forEach((x) => { const r = x.user_role || 'public'; role_counts[r] = (role_counts[r] || 0) + 1; });
+      const items = all.filter((x) => (!query.role || (x.user_role || 'public') === query.role) && (!query.sender || x.sender === query.sender) && (!q || norm(x.content).includes(q) || norm(x.user_name).includes(q)));
+      const page = Math.max(1, Number(query.page) || 1);
+      const size = Math.min(100, Math.max(1, Number(query.page_size) || 30));
+      return { items: items.slice((page - 1) * size, page * size), total: items.length, page, page_size: size, role_counts };
+    }],
+    ['GET', /^\/api\/keys\/([^/]+)\/reveal$/, ({ headers, m }) => {
+      const me = auth(headers, 'admin');
+      const k = db.keys.find((x) => String(x.id) === m[1] && x.tenant_id === me.tenant_id);
+      if (!k) throw new HttpError(404, 'API key not found');
+      if (!k.__raw) throw new HttpError(409, 'This key was created before keys could be shown again. Roll it to get a new key you can view and share (the old one stops working).');
+      return { key: tenantKeyOut(k), raw_key: k.__raw };
     }],
     ['DELETE', /^\/api\/keys\/([^/]+)$/, ({ headers, m }) => {
       const me = auth(headers, 'admin');

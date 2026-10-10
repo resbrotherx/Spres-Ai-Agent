@@ -1,6 +1,6 @@
 {
   "name": "spres-react-native",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Brainbox AI chat for React Native: headless client with streaming, a useBrainboxChat hook and ready-made chat, launcher and widget components.",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

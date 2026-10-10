@@ -64,9 +64,12 @@ def init_db(reset_interrupted: bool = True):
     # API key types + audience-based permissions.
     _run_ddl("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS key_type VARCHAR")
     _run_ddl("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS key_prefix VARCHAR")
+    _run_ddl("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS key_encrypted TEXT")
     _run_ddl("ALTER TABLE documents ADD COLUMN IF NOT EXISTS audience VARCHAR")
     _run_ddl("CREATE INDEX IF NOT EXISTS ix_documents_audience ON documents (audience)")
     _run_ddl("ALTER TABLE training_sources ADD COLUMN IF NOT EXISTS audience VARCHAR")
+    _run_ddl("ALTER TABLE documents ADD COLUMN IF NOT EXISTS audience_origin VARCHAR")
+    _run_ddl("ALTER TABLE documents ADD COLUMN IF NOT EXISTS audience_reason VARCHAR")
 
     # Staff dashboard accounts live in `users` (new tables are created by create_all above).
     # (SQLite has no ADD COLUMN IF NOT EXISTS; its databases are created fresh by create_all.)

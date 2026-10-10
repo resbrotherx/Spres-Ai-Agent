@@ -22,7 +22,7 @@
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this), function (global) {
   'use strict';
 
-  var VERSION = '2.2.0';
+  var VERSION = '2.3.0';
   var HAS_DOM = typeof document !== 'undefined';
   var MODES = ['floating', 'sidebar', 'inline', 'page'];
   var THEME_MODES = ['light', 'dark', 'auto'];
@@ -79,11 +79,11 @@
     return 'rgba(' + c.r + ', ' + c.g + ', ' + c.b + ', ' + a + ')';
   }
 
-  var DEFAULT_PRIMARY = '#b93fff';
+  var DEFAULT_PRIMARY = '#2563eb';
 
   /**
    * "omago" accent family derived from a customer `primary` color. The default
-   * (#b93fff) keeps the hand-tuned original values; other hex colors are mixed;
+   * (#2563eb) keeps the hand-tuned original values; other hex colors are mixed;
    * non-hex CSS colors fall back to color-mix().
    */
   function accentVars(primary, dark) {
@@ -94,8 +94,8 @@
       var lum = (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255;
       var vars = {
         '--bb-accent': primary,
-        '--bb-accent-light': isDefault ? '#efc3ff' : mix(c, white, 0.7),
-        '--bb-accent-dark': isDefault ? '#8120d2' : mix(c, { r: 0, g: 0, b: 0 }, 0.28),
+        '--bb-accent-light': isDefault ? '#9dbcff' : mix(c, white, 0.7),
+        '--bb-accent-dark': isDefault ? '#1d3fae' : mix(c, { r: 0, g: 0, b: 0 }, 0.28),
         '--bb-accent-text': dark ? mix(c, white, 0.35) : primary,
         '--bb-a06': rgba(c, 0.06), '--bb-a08': rgba(c, 0.08), '--bb-a12': rgba(c, 0.12),
         '--bb-a18': rgba(c, 0.18), '--bb-a30': rgba(c, 0.3), '--bb-a45': rgba(c, 0.45),
@@ -379,6 +379,7 @@
     send: [['path', { d: 'm22 2-7 20-4-9-9-4Z' }], ['path', { d: 'M22 2 11 13' }]],
     stop: [['rect', { x: 7, y: 7, width: 10, height: 10, rx: 2, fill: 'currentColor', stroke: 'none' }]],
     chat: [['path', { d: 'M7.9 20A9 9 0 1 0 4 16.1L2 22Z' }]],
+    aichat: [['path', { d: 'M21 11.5a8.5 8.5 0 0 1-12.2 7.7L3 21l1.8-5.4A8.5 8.5 0 1 1 21 11.5Z' }], ['path', { d: 'M12 6.9l1.15 2.75L15.9 10.8l-2.75 1.15L12 14.7l-1.15-2.75L8.1 10.8l2.75-1.15Z', fill: 'currentColor', stroke: 'none' }]],
     newchat: [['path', { d: 'M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7' }], ['path', { d: 'M18.4 2.6a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z' }]],
     history: [['path', { d: 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8' }], ['path', { d: 'M3 3v5h5' }], ['path', { d: 'M12 7v5l4 2' }]],
     dock: [['rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }], ['path', { d: 'M15 3v18' }]],
@@ -407,6 +408,65 @@
     book: [['path', { d: 'M12 7v14' }], ['path', { d: 'M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z' }]],
     link: [['path', { d: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7' }], ['path', { d: 'M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7' }]]
   };
+
+  /* ----------------------------------------------------------------------
+   * Sublime-style (Monokai) syntax colouring for code blocks: comments,
+   * strings, numbers, keywords, literals, calls and types. Builds text nodes
+   * only (never innerHTML), one .bb-ln span per line for the line gutter.
+   * -------------------------------------------------------------------- */
+  var HL_KEYWORDS = /^(?:import|from|as|def|class|return|if|elif|else|for|while|in|not|and|or|is|with|try|except|finally|raise|lambda|yield|await|async|pass|break|continue|global|const|let|var|function|new|this|self|export|default|extends|typeof|instanceof|case|switch|throw|catch|delete|of|do|void|static|public|private|interface|type|enum|echo|then|fi|done|sudo|curl|pip|npm|npx|cd|require|module)$/;
+  var HL_LITERALS = /^(?:true|false|null|undefined|None|True|False|NaN)$/;
+  var HL_CLIKE = /^(?:js|javascript|jsx|mjs|ts|typescript|tsx|json|css|scss|html|xml|java|c|cpp|cs|go|rust|swift|kotlin|php)$/i;
+  var HL_RE_HASH = /(\/\*[\s\S]*?\*\/|\/\/[^\n]*|#[^\n]*)|("(?:\\[\s\S]|[^"\\\n])*"|'(?:\\[\s\S]|[^'\\\n])*'|`(?:\\[\s\S]|[^`\\])*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)/g;
+  var HL_RE_C = /(\/\*[\s\S]*?\*\/|\/\/[^\n]*)|("(?:\\[\s\S]|[^"\\\n])*"|'(?:\\[\s\S]|[^'\\\n])*'|`(?:\\[\s\S]|[^`\\])*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)/g;
+
+  function highlightTokens(src, lang) {
+    var text = String(src == null ? '' : src);
+    var re = new RegExp((HL_CLIKE.test(String(lang || '')) ? HL_RE_C : HL_RE_HASH).source, 'g');
+    var out = [];
+    var last = 0;
+    var m;
+    while ((m = re.exec(text))) {
+      var start = m.index;
+      var tok = m[0];
+      var cls = null;
+      if (m[1]) {
+        var prev = text.charAt(start - 1);
+        if (tok.charAt(0) === '/' && tok.charAt(1) === '/' && prev === ':') { re.lastIndex = start + 2; continue; } // URL, not a comment
+        if (tok.charAt(0) === '#' && start > 0 && !/\s/.test(prev)) { re.lastIndex = start + 1; continue; }
+        cls = 'com';
+      } else if (m[2]) cls = 'str';
+      else if (m[3]) cls = 'num';
+      else if (m[4]) {
+        if (HL_KEYWORDS.test(tok)) cls = 'kw';
+        else if (HL_LITERALS.test(tok)) cls = 'lit';
+        else if (/^\s*\(/.test(text.slice(re.lastIndex, re.lastIndex + 24))) cls = 'fn';
+        else if (/^[A-Z][a-z]/.test(tok)) cls = 'type';
+      }
+      if (!cls) continue;
+      if (start > last) out.push([null, text.slice(last, start)]);
+      out.push([cls, tok]);
+      last = re.lastIndex;
+    }
+    if (last < text.length) out.push([null, text.slice(last)]);
+    return out;
+  }
+
+  function codeNode(src, lang) {
+    var code = h('code', { class: 'bb-web-hl' });
+    var line = h('span', { class: 'bb-ln' });
+    code.appendChild(line);
+    highlightTokens(String(src == null ? '' : src).replace(/\n+$/, ''), lang).forEach(function (t) {
+      String(t[1]).split('\n').forEach(function (part, i) {
+        if (i > 0) {
+          line = h('span', { class: 'bb-ln' });
+          code.appendChild(line);
+        }
+        if (part) line.appendChild(t[0] ? h('span', { class: 'bb-tk-' + t[0], text: part }) : document.createTextNode(part));
+      });
+    });
+    return code;
+  }
 
   function icon(name, size, stroke) {
     var svg = svgEl('svg', {
@@ -445,7 +505,7 @@
     }
     var defs = svgEl('defs');
     var grad = svgEl('radialGradient', { id: gid, cx: '50%', cy: '50%', r: '50%' });
-    [[0, '#efc3ff'], [0.14, '#efc3ff'], [0.42, '#b93fff'], [0.66, '#8120d2'], [0.71, 'rgba(185,63,255,.06)'], [1, 'rgba(185,63,255,0)']].forEach(function (s) {
+    [[0, '#9dbcff'], [0.14, '#9dbcff'], [0.42, '#2563eb'], [0.66, '#1d3fae'], [0.71, 'rgba(37,99,235,.06)'], [1, 'rgba(37,99,235,0)']].forEach(function (s) {
       grad.appendChild(svgEl('stop', { offset: s[0], 'stop-color': s[1] }));
     });
     var hi = svgEl('radialGradient', { id: hid, cx: '36%', cy: '28%', r: '50%' });
@@ -615,8 +675,12 @@
           });
         });
         root.appendChild(h('div', { class: 'bb-web-code' }, [
-          h('div', { class: 'bb-web-code-head' }, [h('span', { text: block.lang || 'code' }), btn]),
-          h('pre', null, h('code', { text: block.text }))
+          h('div', { class: 'bb-web-code-head' }, [
+            h('span', { class: 'bb-web-code-dots', 'aria-hidden': 'true' }, [h('i'), h('i'), h('i')]),
+            h('span', { class: 'bb-web-code-lang', text: block.lang || 'code' }),
+            btn
+          ]),
+          h('pre', null, codeNode(block.text, block.lang))
         ]));
       } else if (block.type === 'table') {
         var thead = h('thead', null, h('tr', null, block.header.map(function (cell) { return h('th', null, renderInline(cell)); })));
@@ -1104,7 +1168,7 @@
 
   /* ======================================================================
    * Styles (injected once, every selector scoped under .bb-web-root).
-   * "omago" design: lavender frosted glass, purple orb, translucent white
+   * "omago" design: frosted glass, blue orb, translucent white
    * borders. No drop shadows anywhere: separation comes from borders and
    * translucency (focus rings are outlines).
    * ==================================================================== */
@@ -1112,25 +1176,25 @@
   var CSS = [
     /* --- tokens (light) --- */
     '.bbr{--bb-font:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--bb-mono:"Fira Code",ui-monospace,Menlo,Consolas,"Liberation Mono",monospace;',
-    '--bb-accent:#b93fff;--bb-accent-light:#efc3ff;--bb-accent-dark:#8120d2;--bb-accent-text:#b93fff;--bb-on-accent:#ffffff;',
-    '--bb-a06:rgba(185,63,255,.06);--bb-a08:rgba(185,63,255,.08);--bb-a12:rgba(185,63,255,.12);--bb-a18:rgba(185,63,255,.18);--bb-a30:rgba(185,63,255,.3);--bb-a45:rgba(185,63,255,.45);',
-    '--bb-accent-tint:rgba(185,63,255,.1);--bb-accent-ring:rgba(185,63,255,.35);',
-    '--bb-panel:#fbf1ff;--bb-body-top:rgba(255,250,255,.7);--bb-body-bottom:rgba(249,230,255,.72);--bb-body-glow:rgba(255,255,255,.7);',
+    '--bb-accent:#2563eb;--bb-accent-light:#9dbcff;--bb-accent-dark:#1d3fae;--bb-accent-text:#2563eb;--bb-on-accent:#ffffff;',
+    '--bb-a06:rgba(37,99,235,.06);--bb-a08:rgba(37,99,235,.08);--bb-a12:rgba(37,99,235,.12);--bb-a18:rgba(37,99,235,.18);--bb-a30:rgba(37,99,235,.3);--bb-a45:rgba(37,99,235,.45);',
+    '--bb-accent-tint:rgba(37,99,235,.1);--bb-accent-ring:rgba(37,99,235,.35);',
+    '--bb-panel:#f3f6fd;--bb-body-top:rgba(251,252,255,.7);--bb-body-bottom:rgba(224,233,253,.72);--bb-body-glow:rgba(255,255,255,.7);',
     '--bb-ink:#08080a;--bb-secondary:rgba(12,12,16,.54);--bb-tertiary:rgba(12,12,16,.42);--bb-meta:rgba(12,12,16,.72);--bb-bubble:rgba(255,255,255,.94);--bb-bubble-ink:rgba(12,12,16,.78);--bb-strong:rgba(12,12,16,.9);',
     '--bb-frame:rgba(255,255,255,.82);--bb-glass:rgba(255,255,255,.36);--bb-glass-line:rgba(255,255,255,.88);--bb-fill:rgba(255,255,255,.4);--bb-fill-2:rgba(255,255,255,.55);--bb-fill-strong:rgba(255,255,255,.8);--bb-solid:#ffffff;',
-    '--bb-composer:rgba(255,255,255,.45);--bb-composer-focus:rgba(255,255,255,.62);--bb-toast:rgba(251,241,255,.86);--bb-close-bg:#050506;--bb-close-ink:#ffffff;',
+    '--bb-composer:rgba(255,255,255,.45);--bb-composer-focus:rgba(255,255,255,.62);--bb-toast:rgba(243,246,253,.9);--bb-close-bg:#050506;--bb-close-ink:#ffffff;',
     '--bb-success:#16a34a;--bb-warning:#f59e0b;--bb-danger:#e5484d;--bb-danger-text:#b91c1c;--bb-danger-tint:rgba(254,242,242,.95);--bb-danger-line:rgba(220,38,38,.22);',
     '--bb-avatar:linear-gradient(145deg,#c9b8ad,#9e6f59);',
     '--bb-spring:cubic-bezier(.32,.72,0,1);--bb-ease:cubic-bezier(.25,.1,.25,1);',
     '--bb-radius:22px;--bb-z:9999;--bb-w:360px;--bb-h:560px;--bb-ox:24px;--bb-oy:24px;--bb-sb-w:380px;--bb-sb-top:0px;',
     'font-family:var(--bb-font);font-size:13px;font-weight:400;line-height:1.45;color:var(--bb-ink);letter-spacing:normal;text-align:left;text-transform:none;text-indent:0;word-spacing:normal;direction:ltr;',
     '-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color-scheme:light;}',
-    /* --- tokens (dark: deep aubergine glass, lavender accents) --- */
-    '.bbr.bb-web-dark{--bb-accent-text:#d49bff;--bb-accent-tint:rgba(185,63,255,.18);',
-    '--bb-panel:#1a1022;--bb-body-top:rgba(36,21,48,.9);--bb-body-bottom:rgba(26,14,36,.96);--bb-body-glow:rgba(185,63,255,.1);',
-    '--bb-ink:#f6eefc;--bb-secondary:rgba(246,238,252,.6);--bb-tertiary:rgba(246,238,252,.44);--bb-meta:rgba(246,238,252,.78);--bb-bubble:rgba(255,255,255,.075);--bb-bubble-ink:rgba(246,238,252,.9);--bb-strong:#ffffff;',
-    '--bb-frame:rgba(212,155,255,.18);--bb-glass:rgba(255,255,255,.04);--bb-glass-line:rgba(255,255,255,.08);--bb-fill:rgba(255,255,255,.06);--bb-fill-2:rgba(255,255,255,.08);--bb-fill-strong:rgba(255,255,255,.14);--bb-solid:#241630;',
-    '--bb-composer:rgba(255,255,255,.05);--bb-composer-focus:rgba(255,255,255,.08);--bb-toast:rgba(40,24,54,.9);--bb-close-bg:#f6eefc;--bb-close-ink:#1a1022;',
+    /* --- tokens (dark: deep navy glass, soft blue accents) --- */
+    '.bbr.bb-web-dark{--bb-accent-text:#8fb3ff;--bb-accent-tint:rgba(37,99,235,.18);',
+    '--bb-panel:#0e1526;--bb-body-top:rgba(20,30,52,.9);--bb-body-bottom:rgba(13,20,38,.96);--bb-body-glow:rgba(37,99,235,.1);',
+    '--bb-ink:#eef3fc;--bb-secondary:rgba(238,243,252,.6);--bb-tertiary:rgba(238,243,252,.44);--bb-meta:rgba(238,243,252,.78);--bb-bubble:rgba(255,255,255,.075);--bb-bubble-ink:rgba(238,243,252,.9);--bb-strong:#ffffff;',
+    '--bb-frame:rgba(143,179,255,.18);--bb-glass:rgba(255,255,255,.04);--bb-glass-line:rgba(255,255,255,.08);--bb-fill:rgba(255,255,255,.06);--bb-fill-2:rgba(255,255,255,.08);--bb-fill-strong:rgba(255,255,255,.14);--bb-solid:#17213a;',
+    '--bb-composer:rgba(255,255,255,.05);--bb-composer-focus:rgba(255,255,255,.08);--bb-toast:rgba(22,32,56,.9);--bb-close-bg:#eef3fc;--bb-close-ink:#0e1526;',
     '--bb-danger-text:#ff8a80;--bb-danger-tint:rgba(255,69,58,.12);--bb-danger-line:rgba(255,105,97,.3);color-scheme:dark;}',
 
     /* --- host-CSS resets --- */
@@ -1179,13 +1243,15 @@
     '.bbr .bb-web-window.is-leaving{animation:bb-web-close 180ms ease-in forwards;pointer-events:none;}',
     '.bbr .bb-web-window .bb-web-panel{height:min(var(--bb-h),calc(100vh - var(--bb-oy) - 86px));}',
 
-    /* --- launcher (purple radial-gradient pill) --- */
+    /* --- launcher (blue radial-gradient button) --- */
     '.bbr .bb-web-launcher{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;width:56px;height:56px;padding:0;border-radius:999px;color:#fff;background:radial-gradient(circle at 20% 20%,var(--bb-accent-light),var(--bb-accent) 50%,var(--bb-accent-dark) 100%);border:2px solid rgba(255,255,255,.55);box-shadow:none;filter:none;animation:bb-web-scale-in 260ms var(--bb-spring);}',
     '.bbr .bb-web-launcher:hover:not(:disabled){filter:brightness(1.06) saturate(1.05);transform:translateY(-1px);}',
     '.bbr .bb-web-launcher:active:not(:disabled){transform:translateY(1px) scale(.97);}',
     '.bbr .bb-web-launcher:focus-visible{outline:3px solid var(--bb-accent-ring);outline-offset:3px;}',
     '.bbr .bb-web-launcher.is-button{width:auto;min-width:104px;height:46px;padding:0 18px 0 15px;font-size:15px;font-weight:760;white-space:nowrap;}',
-    '.bbr .bb-web-launcher.is-icon{background:var(--bb-accent);}',
+    '.bbr .bb-web-launcher.is-icon{width:60px;height:60px;background:radial-gradient(circle at 30% 24%,var(--bb-accent-light),var(--bb-accent) 52%,var(--bb-accent-dark) 100%);border:3px solid rgba(255,255,255,.7);}',
+    '.bbr .bb-web-launcher.is-icon .bb-web-icon{transition:transform 260ms var(--bb-spring);}',
+    '.bbr .bb-web-launcher.is-icon:hover:not(:disabled) .bb-web-icon{transform:rotate(-8deg) scale(1.06);}',
     '.bbr .bb-web-launcher.is-gif{width:64px;height:64px;overflow:hidden;background:#fff;}',
     '.bbr .bb-web-launcher.is-gif img{width:100%;height:100%;object-fit:cover;display:block;border-radius:999px;}',
     '.bbr .bb-web-launcher.is-open{min-width:0;width:52px;height:52px;padding:0;background:var(--bb-close-bg);color:var(--bb-close-ink);border-color:var(--bb-a18);}',
@@ -1220,14 +1286,17 @@
     '.bbr .bb-web-transcript::-webkit-scrollbar-thumb{background:var(--bb-a18);border-radius:999px;}',
     '.bbr .bb-web-log{flex:1 0 auto;display:flex;flex-direction:column;padding-bottom:4px;}',
 
-    /* --- intro (empty state) --- */
-    '.bbr .bb-web-intro{display:grid;grid-template-columns:40px minmax(0,1fr);gap:9px;align-items:start;margin-bottom:12px;animation:bb-web-fade 200ms ease-out;}',
-    '.bbr .bb-web-intro .bb-web-av{margin-top:2px;}',
+    /* --- start screen (empty state) --- */
     '.bbr .bb-web-author{display:flex;align-items:baseline;gap:8px;margin:8px 0;font-weight:820;font-size:15px;color:var(--bb-ink);}',
     '.bbr .bb-web-author time{color:var(--bb-tertiary);font-size:11px;font-weight:700;}',
-    '.bbr .bb-web-intro-bubble{width:fit-content;max-width:min(100%,252px);padding:9px 11px;border-radius:0 14px 14px 14px;background:var(--bb-bubble);color:var(--bb-bubble-ink);font-size:12.5px;line-height:1.45;font-weight:560;overflow-wrap:anywhere;}',
-    '.bbr .bb-web-intro-bubble+.bb-web-intro-bubble{margin-top:8px;border-radius:14px;}',
     '.bbr .bb-web-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}',
+    '.bbr .bb-web-start{margin:auto 0;padding:20px 14px 24px;display:flex;flex-direction:column;align-items:center;text-align:center;animation:bb-web-fade 240ms ease-out;}',
+    '.bbr .bb-web-start .bb-web-start-logo{width:64px;height:64px;margin-bottom:14px;}',
+    '.bbr .bb-web-start-title{font-size:19px;line-height:1.25;font-weight:820;letter-spacing:-.01em;color:var(--bb-ink);margin:0 0 6px;}',
+    '.bbr .bb-web-start-text{max-width:270px;margin:0 auto;font-size:13px;line-height:1.5;font-weight:520;color:var(--bb-secondary);overflow-wrap:anywhere;}',
+    '.bbr .bb-web-start-text+.bb-web-start-text{margin-top:6px;}',
+    '.bbr .bb-web-start .bb-web-chips{justify-content:center;margin-top:18px;}',
+    '.bbr .bb-web-start .bb-web-chip{text-align:center;}',
     '.bbr .bb-web-chip{max-width:100%;min-height:32px;padding:6px 12px;border:1px solid var(--bb-a18);border-radius:999px;background:var(--bb-fill);color:var(--bb-accent-text);font-size:12.5px;font-weight:780;line-height:1.3;text-align:left;}',
     '.bbr .bb-web-chip:hover:not(:disabled){background:var(--bb-fill-strong);border-color:var(--bb-a30);}',
 
@@ -1311,11 +1380,27 @@
     '.bbr .bb-web-md .bb-web-md-list li{margin-bottom:3px;display:list-item;}',
     '.bbr .bb-web-icode{padding:1px 5px;border-radius:5px;background:var(--bb-a08);color:var(--bb-accent-dark);font-family:var(--bb-mono);font-size:12px;}',
     '.bbr.bb-web-dark .bb-web-icode{color:var(--bb-accent-text);background:var(--bb-a18);}',
-    '.bbr .bb-web-code{margin:8px 0;border-radius:10px;overflow:hidden;background:#1e1e2e;border:1px solid #2e2e3e;}',
-    '.bbr .bb-web-code pre{margin:0;padding:10px 12px;overflow-x:auto;background:transparent;border:0;font-family:var(--bb-mono);font-size:12px;line-height:1.5;color:#e4e4f0;white-space:pre;}',
-    '.bbr .bb-web-code code{color:inherit;background:transparent;font-family:inherit;padding:0;}',
-    '.bbr .bb-web-code-head{display:flex;justify-content:space-between;align-items:center;padding:5px 8px 5px 12px;background:#14141e;color:#9d9db3;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}',
-    '.bbr .bb-web-code-copy{display:inline-flex;align-items:center;gap:4px;color:#b8b8d1;font-size:11px;padding:2px 8px;border-radius:6px;text-transform:none;}',
+    /* --- code blocks: Sublime / Monokai editor --- */
+    '.bbr .bb-web-code{margin:8px 0;border-radius:10px;overflow:hidden;background:#272822;border:1px solid #1b1c18;}',
+    '.bbr .bb-web-code pre{margin:0;padding:10px 12px 10px 6px;overflow-x:auto;background:transparent;border:0;font-family:var(--bb-mono);font-size:12px;line-height:1.6;color:#f8f8f2;white-space:pre;tab-size:2;scrollbar-width:thin;scrollbar-color:#49483e transparent;}',
+    '.bbr .bb-web-code code{display:block;min-width:max-content;color:inherit;background:transparent;font-family:inherit;padding:0;counter-reset:bbln;}',
+    '.bbr .bb-web-code .bb-ln{display:block;position:relative;min-height:1.6em;padding-left:2.9em;}',
+    '.bbr .bb-web-code .bb-ln::before{counter-increment:bbln;content:counter(bbln);position:absolute;left:0;width:2.1em;text-align:right;color:#75715e;opacity:.75;-webkit-user-select:none;user-select:none;}',
+    '.bbr .bb-web-code .bb-ln:only-child{padding-left:6px;}',
+    '.bbr .bb-web-code .bb-ln:only-child::before{display:none;}',
+    '.bbr .bb-tk-com{color:#75715e;font-style:italic;}',
+    '.bbr .bb-tk-str{color:#e6db74;}',
+    '.bbr .bb-tk-num,.bbr .bb-tk-lit{color:#ae81ff;}',
+    '.bbr .bb-tk-kw{color:#f92672;}',
+    '.bbr .bb-tk-fn{color:#a6e22e;}',
+    '.bbr .bb-tk-type{color:#66d9ef;font-style:italic;}',
+    '.bbr .bb-web-code-head{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 10px;background:#1e1f1c;border-bottom:1px solid #141512;color:#a59f85;font-size:11px;letter-spacing:.02em;}',
+    '.bbr .bb-web-code-dots{display:inline-flex;gap:5px;}',
+    '.bbr .bb-web-code-dots i{width:9px;height:9px;border-radius:999px;background:#ff5f57;}',
+    '.bbr .bb-web-code-dots i:nth-child(2){background:#febc2e;}',
+    '.bbr .bb-web-code-dots i:nth-child(3){background:#28c840;}',
+    '.bbr .bb-web-code-lang{flex:1;min-width:0;font-family:var(--bb-mono);text-transform:lowercase;}',
+    '.bbr .bb-web-code-copy{display:inline-flex;align-items:center;gap:4px;color:#cfcfc2;font-size:11px;padding:2px 8px;border-radius:6px;text-transform:none;}',
     '.bbr .bb-web-code-copy:hover:not(:disabled){background:rgba(255,255,255,.08);}',
     '.bbr .bb-web-table-wrap{overflow-x:auto;margin:8px 0;}',
     '.bbr .bb-web-table{width:100%;border-collapse:collapse;font-size:12px;}',
@@ -1446,7 +1531,7 @@
     /* page compact (container narrower than 760px, set via ResizeObserver) */
     '.bbr.bb-web-compact .bb-web-page-side{position:absolute;top:0;bottom:0;left:0;z-index:5;width:min(288px,86%);transform:translateX(-102%);transition:transform 260ms var(--bb-spring);box-shadow:none;}',
     '.bbr.bb-web-compact .bb-web-page.is-drawer .bb-web-page-side{transform:none;}',
-    '.bbr.bb-web-compact .bb-web-page.is-drawer .bb-web-page-backdrop{display:block;position:absolute;inset:0;z-index:4;background:rgba(20,10,30,.25);animation:bb-web-fade 200ms ease;}',
+    '.bbr.bb-web-compact .bb-web-page.is-drawer .bb-web-page-backdrop{display:block;position:absolute;inset:0;z-index:4;background:rgba(8,14,30,.25);animation:bb-web-fade 200ms ease;}',
     '.bbr.bb-web-compact .bb-web-page-menu,.bbr.bb-web-compact .bb-web-page-close{display:grid;}',
     '.bbr.bb-web-compact .bb-web-page-top{padding-left:10px;}',
     '.bbr.bb-web-compact .bb-web-page .bb-web-transcript{padding:10px 12px 12px;}',
@@ -1533,7 +1618,7 @@
     width: 360,
     height: 560,
     defaultOpen: false,
-    launcher: { type: 'button', text: 'Chat', gifUrl: null },
+    launcher: { type: 'auto', text: '', gifUrl: null },
     theme: { mode: 'light', primary: null, panel: null, ink: null, radius: null, fontFamily: null },
     branding: { botName: 'Brainbox AI', title: null, subtitle: 'Typically replies in seconds', logoUrl: null, botAvatarUrl: null },
     welcomeMessages: ["I'm {{botName}}. Ask me anything and I'll answer in seconds."],
@@ -2062,7 +2147,7 @@
       // Clear previously applied theme overrides (setTheme / dark switch), then re-apply.
       (this._themeKeys || []).forEach(function (k) { root.style.removeProperty(k); });
       if (t.primary) Object.assign(vars, accentVars(String(t.primary), dark));
-      // panel / ink are light-mode surface overrides; dark mode keeps the aubergine palette.
+      // panel / ink are light-mode surface overrides; dark mode keeps the navy palette.
       if (!dark && t.panel) vars['--bb-panel'] = t.panel;
       if (!dark && t.ink) vars['--bb-ink'] = t.ink;
       this._themeKeys = Object.keys(vars);
@@ -2075,7 +2160,7 @@
 
     /* ---------------- internals: DOM builders ---------------- */
 
-    /** Brand mark: customer logoUrl/botAvatarUrl image, or the purple "omago" orb (CSS, follows the theme color). */
+    /** Brand mark: customer logoUrl/botAvatarUrl image, or the blue "omago" orb (CSS, follows the theme color). */
     _mark(cls, url) {
       var el = h('span', { class: cls + ' bb-web-orb' + (url ? ' has-image' : ''), 'aria-hidden': 'true' });
       if (url) {
@@ -2159,8 +2244,11 @@
       if (!btn) return;
       var cfg = this._cfg;
       var open = this._st.open;
+      var text = String(cfg.launcher.text || '').trim();
       var type = cfg.launcher.type;
-      var text = cfg.launcher.text || 'Chat';
+      // 'auto' (default): icon only until a launcher text is configured.
+      if (type === 'auto' || !type) type = text ? 'button' : 'icon';
+      if (type === 'button' && !text) text = 'Chat';
       var unread = this._st.unread;
       var state = (open ? 'o' : 'c') + type + unread + (this._mode === 'sidebar' && open ? 's' : '');
       if (btn._bbState === state) return;
@@ -2183,10 +2271,10 @@
       } else if (type === 'gif' && cfg.launcher.gifUrl) {
         btn.appendChild(h('img', { src: cfg.launcher.gifUrl, alt: '' }));
       } else if (type === 'button') {
-        btn.appendChild(icon('chat', 22, 1.9));
+        btn.appendChild(icon('aichat', 22, 1.9));
         btn.appendChild(h('span', { text: text }));
       } else {
-        btn.appendChild(icon('chat', 26, 2));
+        btn.appendChild(icon('aichat', 28, 1.9));
       }
       if (!open && unread > 0) btn.appendChild(h('span', { class: 'bb-web-badge', 'aria-hidden': 'true', text: unread > 9 ? '9+' : String(unread) }));
     }
@@ -2537,14 +2625,14 @@
     _buildWelcome() {
       var self = this;
       var cfg = this._cfg;
-      var now = Date.now();
-      // omago intro: bot orb + "name · time" line + intro bubbles + quick-action pills
-      var copy = h('div', { class: 'bb-web-intro-copy' }, [
-        h('div', { class: 'bb-web-author', role: 'heading', 'aria-level': '2' }, [h('span', { text: this._botName() }), h('time', { datetime: new Date(now).toISOString(), text: formatClock(now, cfg.locale) })])
+      // Centred start screen: orb, bot name, welcome lines, quick-action pills.
+      var start = h('div', { class: 'bb-web-welcome bb-web-start' }, [
+        this._mark('bb-web-start-logo', this._botAvatarUrl()),
+        h('h2', { class: 'bb-web-start-title', text: this._botName() })
       ]);
       cfg.welcomeMessages.forEach(function (line) {
         var text = self._interpolate(line);
-        if (text) copy.appendChild(h('p', { class: 'bb-web-intro-bubble', text: text }));
+        if (text) start.appendChild(h('p', { class: 'bb-web-start-text', text: text }));
       });
       var items = this._quickActionItems();
       if (items.length) {
@@ -2554,9 +2642,9 @@
           chip.addEventListener('click', function () { self.send(item.prompt); });
           chips.appendChild(chip);
         });
-        copy.appendChild(chips);
+        start.appendChild(chips);
       }
-      return h('div', { class: 'bb-web-welcome bb-web-intro' }, [this._mark('bb-web-av', this._botAvatarUrl()), copy]);
+      return start;
     }
 
     _buildMessage(m) {
@@ -3401,7 +3489,7 @@
       position: String(o.position || '').indexOf('left') !== -1 ? 'bottom-left' : 'bottom-right',
       width: toNumber(o.width, 380),
       height: toNumber(o.height, 600),
-      launcher: { type: o.launcherType === 'icon' || o.launcherType === 'gif' ? o.launcherType : 'button', text: o.buttonText || 'Chat', gifUrl: o.launcherGifUrl || null },
+      launcher: { type: o.launcherType === 'icon' || o.launcherType === 'gif' ? o.launcherType : (o.buttonText ? 'button' : 'auto'), text: o.buttonText || '', gifUrl: o.launcherGifUrl || null },
       theme: {},
       branding: {},
       placeholder: o.placeholder || 'Message',

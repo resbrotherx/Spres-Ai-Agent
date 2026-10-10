@@ -1,54 +1,13 @@
 'use client';
 import { memo, useInsertionEffect, useLayoutEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/prism-light.js';
-import langJs from 'react-syntax-highlighter/dist/esm/languages/prism/javascript.js';
-import langTs from 'react-syntax-highlighter/dist/esm/languages/prism/typescript.js';
-import langJsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx.js';
-import langTsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx.js';
-import langPy from 'react-syntax-highlighter/dist/esm/languages/prism/python.js';
-import langBash from 'react-syntax-highlighter/dist/esm/languages/prism/bash.js';
-import langJson from 'react-syntax-highlighter/dist/esm/languages/prism/json.js';
-import langSql from 'react-syntax-highlighter/dist/esm/languages/prism/sql.js';
-import langMarkup from 'react-syntax-highlighter/dist/esm/languages/prism/markup.js';
-import langCss from 'react-syntax-highlighter/dist/esm/languages/prism/css.js';
-
-/* ------------------------------------------------------------------ */
-/* Highlighter: PrismLight + a handful of languages (small bundle)     */
-/* ------------------------------------------------------------------ */
-
-let registered = false;
-function registerLanguages() {
-  if (registered) return;
-  registered = true;
-  const reg = (SyntaxHighlighter as any).registerLanguage;
-  if (typeof reg !== 'function') return;
-  reg('javascript', langJs);
-  reg('typescript', langTs);
-  reg('jsx', langJsx);
-  reg('tsx', langTsx);
-  reg('python', langPy);
-  reg('bash', langBash);
-  reg('json', langJson);
-  reg('sql', langSql);
-  reg('markup', langMarkup);
-  reg('css', langCss);
-}
-
-const LANG_ALIASES: Record<string, string> = {
-  js: 'javascript', javascript: 'javascript', mjs: 'javascript', cjs: 'javascript', node: 'javascript',
-  ts: 'typescript', typescript: 'typescript', jsx: 'jsx', tsx: 'tsx',
-  py: 'python', python: 'python', python3: 'python',
-  sh: 'bash', bash: 'bash', shell: 'bash', zsh: 'bash', console: 'bash', shellscript: 'bash',
-  json: 'json', jsonc: 'json', sql: 'sql', postgres: 'sql', postgresql: 'sql', mysql: 'sql', sqlite: 'sql',
-  html: 'markup', xml: 'markup', svg: 'markup', markup: 'markup', vue: 'markup', css: 'css', scss: 'css'
-};
+import { EditorDots, HighlightedCode, useSublimeStyles } from './design/code';
 
 /* ------------------------------------------------------------------ */
 /* Styles (token-aware, injected once)                                 */
 /* ------------------------------------------------------------------ */
 
-const STYLE_ID = 'bb-md-styles-v2';
+const STYLE_ID = 'bb-md-styles-v3';
 const MD_CSS = `
 .bb-md { font-size: inherit; line-height: 1.45; overflow-wrap: anywhere; }
 .bb-md > :first-child { margin-top: 0; }
@@ -70,27 +29,6 @@ const MD_CSS = `
 .bb-md th, .bb-md td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--bb-separator, rgba(60,60,67,0.12)); vertical-align: top; }
 .bb-md th { font-weight: 600; color: var(--bb-secondary, #6E6E73); }
 .bb-md tr:last-child td { border-bottom: 0; }
-.bb-code { margin: 8px 0; border-radius: 10px; overflow: hidden; background: var(--bb-surface2, #FBFBFD); border: 1px solid var(--bb-separator, rgba(60,60,67,0.12)); color: var(--bb-label, #1D1D1F); }
-.bb-code-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 4px 4px 12px; border-bottom: 1px solid var(--bb-separator, rgba(60,60,67,0.12)); font-size: 11px; font-weight: 500; color: var(--bb-tertiary, #86868B); letter-spacing: .02em; }
-.bb-code-copy { appearance: none; border: 0; background: transparent; color: var(--bb-secondary, #6E6E73); font: inherit; font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
-.bb-code-copy:hover { background: var(--bb-fill, rgba(120,120,128,0.08)); color: var(--bb-label, #1D1D1F); }
-.bb-code pre { margin: 0 !important; padding: 10px 12px !important; overflow-x: auto; background: transparent !important; font-family: var(--bb-mono, "SF Mono", ui-monospace, Menlo, Consolas, monospace); font-size: 13px; line-height: 1.5; white-space: pre; }
-.bb-code pre code { font-family: inherit; font-size: inherit; background: none; }
-.bb-code .token.comment, .bb-code .token.prolog, .bb-code .token.doctype, .bb-code .token.cdata { color: #8E8E93; font-style: italic; }
-.bb-code .token.keyword, .bb-code .token.atrule, .bb-code .token.important, .bb-code .token.selector { color: #AD3DA4; }
-.bb-code .token.string, .bb-code .token.char, .bb-code .token.attr-value, .bb-code .token.regex, .bb-code .token.inserted { color: #C41A16; }
-.bb-code .token.number, .bb-code .token.boolean, .bb-code .token.constant, .bb-code .token.symbol { color: #1C00CF; }
-.bb-code .token.function, .bb-code .token.class-name, .bb-code .token.builtin { color: #3E6D74; }
-.bb-code .token.tag, .bb-code .token.property, .bb-code .token.attr-name { color: #0E66A8; }
-.bb-code .token.operator, .bb-code .token.punctuation { color: #6E6E73; }
-.bb-code .token.deleted { color: #D70015; }
-.bb-c[data-theme="dark"] .bb-code { background: #232325; }
-.bb-c[data-theme="dark"] .bb-code .token.keyword, .bb-c[data-theme="dark"] .bb-code .token.atrule, .bb-c[data-theme="dark"] .bb-code .token.selector { color: #FF7AB2; }
-.bb-c[data-theme="dark"] .bb-code .token.string, .bb-c[data-theme="dark"] .bb-code .token.attr-value, .bb-c[data-theme="dark"] .bb-code .token.regex { color: #FF8170; }
-.bb-c[data-theme="dark"] .bb-code .token.number, .bb-c[data-theme="dark"] .bb-code .token.boolean, .bb-c[data-theme="dark"] .bb-code .token.constant { color: #D9C97C; }
-.bb-c[data-theme="dark"] .bb-code .token.function, .bb-c[data-theme="dark"] .bb-code .token.class-name, .bb-c[data-theme="dark"] .bb-code .token.builtin { color: #67B7A4; }
-.bb-c[data-theme="dark"] .bb-code .token.tag, .bb-c[data-theme="dark"] .bb-code .token.property, .bb-c[data-theme="dark"] .bb-code .token.attr-name { color: #6BDFFF; }
-.bb-c[data-theme="dark"] .bb-code .token.comment { color: #7F8C98; }
 `;
 
 const useIsoEffect: typeof useInsertionEffect =
@@ -113,8 +51,7 @@ function useMdStyles() {
 function CodeBlock({ language, code }: { language?: string; code: string }) {
   const [copied, setCopied] = useState(false);
   const lang = (language || '').toLowerCase();
-  const prismLang = LANG_ALIASES[lang];
-  registerLanguages();
+  useSublimeStyles();
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(code);
@@ -125,22 +62,17 @@ function CodeBlock({ language, code }: { language?: string; code: string }) {
     }
   };
   return (
-    <div className="bb-code">
-      <div className="bb-code-head">
-        <span>{lang || 'code'}</span>
-        <button className="bb-code-copy" type="button" onClick={copy} aria-label={copied ? 'Copied' : 'Copy code'}>
+    <div className="bb-code bb-sublime">
+      <div className="bb-sublime-head">
+        <EditorDots />
+        <span className="bb-sublime-title">{lang || 'code'}</span>
+        <button className={`bb-sublime-copy${copied ? ' is-copied' : ''}`} type="button" onClick={copy} aria-label={copied ? 'Copied' : 'Copy code'}>
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      {prismLang ? (
-        <SyntaxHighlighter language={prismLang} useInlineStyles={false} PreTag="pre" CodeTag="code">
-          {code}
-        </SyntaxHighlighter>
-      ) : (
-        <pre>
-          <code>{code}</code>
-        </pre>
-      )}
+      <pre>
+        <HighlightedCode code={code} lang={lang} />
+      </pre>
     </div>
   );
 }

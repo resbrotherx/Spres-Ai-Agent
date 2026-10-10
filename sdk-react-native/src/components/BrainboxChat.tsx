@@ -48,7 +48,7 @@ export interface BrainboxBranding {
   title?: string;
   /** Header subtitle next to the green status dot (default 'Online'). */
   subtitle?: string;
-  /** Custom image for the header and bot avatar instead of the purple orb. */
+  /** Custom image for the header and bot avatar instead of the blue orb. */
   logoUrl?: string;
   /** Welcome heading (default 'Hi {{name}}'). */
   greeting?: string;
@@ -245,7 +245,7 @@ function FooterButton({
   );
 }
 
-/** Omago pill: purple text, hairline purple border, translucent white fill, 32pt tall. */
+/** Omago pill: accent text, hairline accent border, translucent white fill, 32pt tall. */
 function Pill({
   label, onPress, t, icon, hint, stretch
 }: { label: string; onPress: () => void; t: BrainboxTokens; icon?: BrainboxIconName; hint?: string; stretch?: boolean }) {
@@ -524,19 +524,19 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
 
   const botAvatar = <BrainboxLogo size={34} logoUrl={branding.logoUrl} />;
 
+  // Centred start screen: orb, bot name, greeting + welcome lines, quick-action pills.
   const welcomeView = (
-    <ScrollView contentContainerStyle={styles.messages} keyboardShouldPersistTaps="handled">
-      <View style={[styles.msgRow, { marginTop: 12 }]}>
-        <View style={styles.avatarSlot}>{botAvatar}</View>
-        <View style={[styles.msgCol, { alignItems: 'flex-start' }]}>
-          <Text style={[ty.meta, styles.meta, { color: t.label }]} numberOfLines={1}>{botName}</Text>
-          {[greeting, ...welcome].map((w, i) => (
-            <View key={i} style={[styles.bubble, styles.botBubble, { backgroundColor: t.botBubble, marginTop: i ? 4 : 0 }]}>
-              <Text style={[i === 0 ? ty.bodyStrong : ty.body, { color: i === 0 ? t.label : t.botText }]}>{w}</Text>
-            </View>
-          ))}
-          {quickActions.length ? (
-            <View style={styles.pills}>
+    <ScrollView contentContainerStyle={[styles.messages, styles.start]} keyboardShouldPersistTaps="handled">
+      <View style={styles.startInner}>
+        <BrainboxLogo size={64} logoUrl={branding.logoUrl} />
+        <Text style={[ty.title3, styles.startTitle, { color: t.label }]} numberOfLines={2}>{botName}</Text>
+        {[greeting, ...welcome].map((w, i) => (
+          <Text key={i} style={[i === 0 ? ty.bodyStrong : ty.body, styles.startText, { color: i === 0 ? t.label : t.secondary }]}>
+            {w}
+          </Text>
+        ))}
+        {quickActions.length ? (
+            <View style={[styles.pills, styles.startPills]}>
               {quickActions.map((qa, i) => {
                 const a = typeof qa === 'string' ? { title: qa } : qa;
                 return (
@@ -551,8 +551,7 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
                 );
               })}
             </View>
-          ) : null}
-        </View>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -837,6 +836,11 @@ const styles = StyleSheet.create({
   tool: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
   historyPill: { height: 34, borderRadius: 17, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center' },
   pills: { flexDirection: 'column', alignItems: 'flex-start', gap: 8, marginTop: 10 },
+  start: { justifyContent: 'center' },
+  startInner: { alignItems: 'center', paddingHorizontal: 18, paddingVertical: 24 },
+  startTitle: { marginTop: 14, marginBottom: 6, textAlign: 'center' },
+  startText: { textAlign: 'center', maxWidth: 290, marginTop: 4 },
+  startPills: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', marginTop: 18 },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',

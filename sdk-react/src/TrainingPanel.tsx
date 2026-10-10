@@ -4,6 +4,7 @@ import type { CSSProperties, DragEvent, KeyboardEvent, ReactNode } from 'react';
 import { useBrainboxTraining } from './useBrainboxTraining';
 import { toBrainboxError } from './brainbox-sdk';
 import { BrainboxLogo } from './design/Logo';
+import { EditorDots, HighlightedCode, useSublimeStyles } from './design/code';
 import { CHAT_CSS, CHAT_STYLE_ID, ToastStack, injectStyle, useResolvedMode, useToasts } from './chatUi';
 import type { ToastTone } from './chatUi';
 import { playSound } from './design/sounds';
@@ -629,11 +630,6 @@ select.bb-train-input option { background: var(--bb-train-card); color: var(--bb
 .bb-train-step-title { margin: 3px 0 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
 .bb-train-step-text { margin: 0; color: var(--bb-train-muted); font-size: 13px; line-height: 1.5; }
 .bb-train-step-text strong { color: var(--bb-train-text); font-weight: 600; }
-.bb-train-code { border: 1px solid var(--bb-train-border); border-radius: 10px; background: var(--bb-train-soft); overflow: hidden; min-width: 0; }
-.bb-train-code-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 4px 4px 12px; border-bottom: 1px solid var(--bb-train-border); min-height: 38px; }
-.bb-train-code-title { font-size: 12.5px; font-weight: 500; color: var(--bb-train-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bb-train-code pre { margin: 0; padding: 12px 14px; overflow-x: auto; font-family: var(--bb-mono); font-size: 12.5px; line-height: 1.6; white-space: pre; color: var(--bb-train-text); tab-size: 2; }
-.bb-train-code pre:focus-visible { outline: none; box-shadow: inset var(--bb-ring); }
 .bb-train-copy.is-copied { color: var(--bb-success-text); }
 .bb-train-root[data-theme="dark"] .bb-train-copy.is-copied { color: #30D158; }
 .bb-train-samples { display: flex; flex-direction: column; gap: 12px; }
@@ -698,7 +694,6 @@ a.bb-train-btn:focus-visible, .bb-train-sdk a:focus-visible { outline: none; box
   .bb-train-step { grid-template-columns: 24px minmax(0, 1fr); gap: 10px; }
   .bb-train-step-num { width: 24px; height: 24px; font-size: 12px; }
   .bb-train-step-title { margin-top: 1px; }
-  .bb-train-code pre { padding: 10px 12px; font-size: 12px; }
   .bb-train-sdk-actions .bb-train-btn { flex: 1 1 100%; }
 }
 `;
@@ -2206,6 +2201,15 @@ function useCopy(announce: Announce): [string | null, (id: string, text: string,
   return [copied, copy];
 }
 
+/** Language used for colouring a sample, from its id (e.g. "python-install", "node-file"). */
+function codeLang(id: string): string {
+  if (/install|curl/.test(id)) return 'bash';
+  if (id.startsWith('python')) return 'python';
+  if (id.startsWith('react')) return 'tsx';
+  if (id.startsWith('node')) return 'js';
+  return '';
+}
+
 function CodeBlock({
   id,
   title,
@@ -2219,13 +2223,15 @@ function CodeBlock({
   copied: boolean;
   onCopy: (id: string, text: string, label: string) => void;
 }) {
+  useSublimeStyles();
   return (
-    <div className="bb-train-code">
-      <div className="bb-train-code-head">
-        <span className="bb-train-code-title">{title}</span>
+    <div className="bb-train-code bb-sublime">
+      <div className="bb-sublime-head">
+        <EditorDots />
+        <span className="bb-sublime-title">{title}</span>
         <button
           type="button"
-          className={`bb-train-btn bb-train-btn-ghost bb-train-btn-sm bb-train-copy${copied ? ' is-copied' : ''}`}
+          className={`bb-sublime-copy bb-train-copy${copied ? ' is-copied' : ''}`}
           onClick={() => onCopy(id, code, title)}
           aria-label={copied ? `Copied: ${title}` : `Copy code: ${title}`}
           data-copy-id={id}
@@ -2235,7 +2241,7 @@ function CodeBlock({
         </button>
       </div>
       <pre tabIndex={0} role="region" aria-label={`${title} code`}>
-        <code>{code}</code>
+        <HighlightedCode code={code} lang={codeLang(id)} />
       </pre>
     </div>
   );
@@ -2595,7 +2601,7 @@ function SdkTab({
             ) : (
               <p className="bb-train-step-text">
                 In the staff dashboard open <strong>Settings → API keys → Create → Secret</strong>. Copy the{' '}
-                <code>sk_live_…</code> key once (it isn’t shown again) and keep it in an environment variable such as{' '}
+                <code>sk_live_…</code> key (admins can show it again later with “Show”) and keep it in an environment variable such as{' '}
                 <code>BRAINBOX_SECRET_KEY</code> on your server. <strong>Never put it in a browser or mobile app.</strong>
               </p>
             )}

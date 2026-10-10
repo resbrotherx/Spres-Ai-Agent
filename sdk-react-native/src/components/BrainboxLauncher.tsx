@@ -16,8 +16,8 @@ import { BrainboxIcon } from './Icon';
 import { EASE_SHEET, useReducedMotion } from './motion';
 
 export type BrainboxPosition = 'bottom-right' | 'bottom-left';
-/** 'button' (default): purple pill with a chat icon and label. 'icon': round purple button. */
-export type BrainboxLauncherVariant = 'button' | 'icon';
+/** 'auto' (default): round icon until a `text` is set, then a pill. 'button': pill with icon + label. 'icon': round button. */
+export type BrainboxLauncherVariant = 'auto' | 'button' | 'icon';
 
 export interface BrainboxLauncherProps {
   onPress: () => void;
@@ -26,11 +26,11 @@ export interface BrainboxLauncherProps {
   position?: BrainboxPosition;
   /** Distance from the screen corner (default {x: 20, y: 28}). */
   offset?: { x?: number; y?: number };
-  /** Diameter of the 'icon' launcher (default 56). The 'button' pill is 46pt tall. */
+  /** Diameter of the round launcher (default 60). The pill is 46pt tall. */
   size?: number;
-  /** 'button' (default, omago pill) or 'icon' (round). */
+  /** 'auto' (default), 'button' (pill) or 'icon' (round). */
   variant?: BrainboxLauncherVariant;
-  /** Pill label (default 'Chat'). */
+  /** Launcher label. Empty (default) = icon-only launcher. */
   text?: string;
   theme?: BrainboxThemeOptions;
   accessibilityLabel?: string;
@@ -39,9 +39,9 @@ export interface BrainboxLauncherProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** Floating omago launcher: a purple gradient "Chat" pill (or a round icon) with an unread badge. No shadow. */
+/** Floating omago launcher: a round blue gradient button with a chat icon (or a pill once a text is set), unread badge. No shadow. */
 export function BrainboxLauncher({
-  onPress, unread = 0, position = 'bottom-right', offset, size = 56, variant = 'button', text = 'Chat', theme,
+  onPress, unread = 0, position = 'bottom-right', offset, size = 60, variant = 'auto', text = '', theme,
   accessibilityLabel, hidden = false, style
 }: BrainboxLauncherProps) {
   const t = useBrainboxTheme(theme);
@@ -57,7 +57,8 @@ export function BrainboxLauncher({
   const x = offset?.x ?? 20;
   const y = offset?.y ?? 28;
   const label = accessibilityLabel || (unread ? `Open chat, ${unread} unread` : 'Open chat');
-  const pill = variant !== 'icon';
+  const label2 = (text || '').trim();
+  const pill = variant === 'button' || (variant === 'auto' && !!label2);
   const h = pill ? 46 : size;
   return (
     <Animated.View
@@ -77,15 +78,15 @@ export function BrainboxLauncher({
         onPressIn={() => pressTo(0.94)}
         onPressOut={() => pressTo(1)}
         style={[
-          pill ? styles.pill : { width: size, height: size, alignItems: 'center', justifyContent: 'center' },
+          pill ? styles.pill : { width: size, height: size, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 3, borderColor: 'rgba(255,255,255,0.7)' },
           { borderRadius: h / 2, backgroundColor: t.accent }
         ]}
       >
-        {pill ? <BrainboxGradientFill light={t.accentLight} mid={t.accent} deep={t.accentDeep} /> : null}
-        <BrainboxIcon name="message" size={pill ? 22 : Math.round(size * 0.46)} color={t.onAccent} strokeWidth={2} />
-        {pill && text ? (
+        <BrainboxGradientFill light={t.accentLight} mid={t.accent} deep={t.accentDeep} />
+        <BrainboxIcon name="aichat" size={pill ? 22 : Math.round(size * 0.47)} color={t.onAccent} strokeWidth={1.9} />
+        {pill ? (
           <Text style={[styles.pillText, { color: t.onAccent }, t.fontFamily ? { fontFamily: t.fontFamily } : null]} numberOfLines={1}>
-            {text}
+            {label2 || 'Chat'}
           </Text>
         ) : null}
       </Pressable>
@@ -108,7 +109,7 @@ export interface BrainboxModalProps {
 }
 
 /**
- * Presents the chat with a slide-up spring. Phones (< 576pt wide): full-screen lavender sheet with a 22pt
+ * Presents the chat with a slide-up spring. Phones (< 576pt wide): full-screen frosted sheet with a 22pt
  * top radius. Tablets: a 380×600 floating omago window (radius 22, 2pt frosted border, no shadow).
  */
 export function BrainboxModal({ visible, onClose, position = 'bottom-right', theme, children }: BrainboxModalProps) {

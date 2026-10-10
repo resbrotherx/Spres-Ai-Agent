@@ -20,22 +20,22 @@ export interface BrainboxLogoProps {
   style?: StyleProp<ViewStyle>;
   /** Show a custom image instead of the Brainbox mark. */
   logoUrl?: string;
-  /** 'orb' (default): the omago purple orb. 'cube': the classic Brainbox cube mark. */
+  /** 'orb' (default): the omago blue orb. 'cube': the classic Brainbox cube mark. */
   variant?: 'orb' | 'cube';
-  /** Override the orb gradient stops (default #d987ff -> #b334ff -> #8e31dc). */
+  /** Override the orb gradient stops (default #9dbcff -> #2f6bff -> #1d3fae). */
   colors?: BrainboxOrbColors;
 }
 
 /**
- * The omago orb: a radial purple gradient (#d987ff -> #b334ff -> #8e31dc, soft rim), a white highlight
+ * The omago orb: a radial blue gradient (#9dbcff -> #2f6bff -> #1d3fae, soft rim), a white highlight
  * and the white speaker glyph, on a 64×64 viewBox.
  */
 export function BrainboxOrb({ size = 38, colors }: { size?: number; colors?: BrainboxOrbColors }) {
   const g = useGradientId('bbOrbG');
   const c = useGradientId('bbOrbC');
-  const core = colors?.core || '#d987ff';
-  const mid = colors?.mid || '#b334ff';
-  const rim = colors?.rim || '#8e31dc';
+  const core = colors?.core || '#9dbcff';
+  const mid = colors?.mid || '#2f6bff';
+  const rim = colors?.rim || '#1d3fae';
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
@@ -57,7 +57,7 @@ export function BrainboxOrb({ size = 38, colors }: { size?: number; colors?: Bra
   );
 }
 
-/** The Brainbox logo: the purple orb by default (or the classic cube, or your own image). */
+/** The Brainbox logo: the blue orb by default (or the classic cube, or your own image). */
 export function BrainboxLogo({ size = 38, style, logoUrl, variant = 'orb', colors }: BrainboxLogoProps) {
   const id = useGradientId('bbLogoG');
   if (logoUrl) {
@@ -81,8 +81,8 @@ export function BrainboxLogo({ size = 38, style, logoUrl, variant = 'orb', color
       <Svg width={size} height={size} viewBox="0 0 64 64">
         <Defs>
           <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor="#d987ff" />
-            <Stop offset="1" stopColor="#8e31dc" />
+            <Stop offset="0" stopColor="#9dbcff" />
+            <Stop offset="1" stopColor="#1d3fae" />
           </LinearGradient>
         </Defs>
         <Rect width="64" height="64" rx="15" fill={`url(#${id})`} />
@@ -148,7 +148,7 @@ export function BrainboxPanelBackground({ from, to, glow }: { from: string; to: 
 }
 
 /** Round launcher mark: the orb-style accent circle with a white chat glyph. */
-export function BrainboxLauncherMark({ size = 56, from = '#d987ff', to = '#8e31dc' }: { size?: number; from?: string; to?: string }) {
+export function BrainboxLauncherMark({ size = 56, from = '#9dbcff', to = '#1d3fae' }: { size?: number; from?: string; to?: string }) {
   const id = useGradientId('bbLaunchG');
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">

@@ -20,7 +20,8 @@ export type BrainboxIconName =
   | 'file'
   | 'search'
   | 'paperclip'
-  | 'send';
+  | 'send'
+  | 'aichat';
 
 const PATHS: Record<BrainboxIconName, string[]> = {
   newChat: [
@@ -49,6 +50,7 @@ const PATHS: Record<BrainboxIconName, string[]> = {
   alert: ['M12 8v4', 'M12 16h.01'],
   refresh: ['M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8', 'M21 3v5h-5'],
   message: ['M7.9 20A9 9 0 1 0 4 16.1L2 22Z'],
+  aichat: ['M21 11.5a8.5 8.5 0 0 1-12.2 7.7L3 21l1.8-5.4A8.5 8.5 0 1 1 21 11.5Z'],
   file: ['M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z', 'M14 2v4a2 2 0 0 0 2 2h4', 'M16 13H8', 'M16 17H8'],
   search: ['m21 21-4.3-4.3'],
   paperclip: ['m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48'],
@@ -79,6 +81,7 @@ export function BrainboxIcon({ name, size = 20, color, strokeWidth = 1.75, fille
       {name === 'copy' && <Rect x="8" y="8" width="14" height="14" rx="2" {...common} />}
       {name === 'alert' && <Circle cx="12" cy="12" r="10" {...common} />}
       {name === 'search' && <Circle cx="11" cy="11" r="8" {...common} />}
+      {name === 'aichat' && <Path d="M12 6.9l1.15 2.75L15.9 10.8l-2.75 1.15L12 14.7l-1.15-2.75L8.1 10.8l2.75-1.15Z" fill={color} />}
       {PATHS[name].map((d, i) => (
         <Path
           key={i}

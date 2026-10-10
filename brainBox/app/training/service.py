@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app.db.models import Document, ProcessingTask, TrainingSource
 from app.db.session import SessionLocal
@@ -135,8 +135,13 @@ def _finish(db, source_id: str, task_id: str, status: str, error: Optional[str],
         if synced:
             source.last_synced_at = _now()
         # The source may have been relabelled (PATCH) while this job ran: keep docs in step.
-        db.query(Document).filter(Document.source_id == source_id).update(
-            {Document.audience: source.audience}, synchronize_session=False)
+        # Legacy sources (audience NULL) keep their per-chunk labels; staff decisions always stay.
+        if source.audience is not None:
+            db.query(Document).filter(
+                Document.source_id == source_id,
+                or_(Document.audience_origin.is_(None), Document.audience_origin != "staff"),
+            ).update({Document.audience: source.audience, Document.audience_origin: "source"},
+                     synchronize_session=False)
     else:
         # source was deleted while this job ran: don't leave orphaned chunks behind
         db.query(Document).filter(Document.source_id == source_id).delete(synchronize_session=False)

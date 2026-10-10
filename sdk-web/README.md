@@ -265,6 +265,14 @@ Brainbox.init({ apiUrl: url, apiKey: key, tenantId: tenant,
 
 v1 widgets keep their pill launcher (`launcherType` defaults to `'button'` there) and their `primaryColor`.
 
+### Upgrading to 2.3
+
+- **Default colour is now blue** (`#2563eb` on a `#f3f6fd` panel). Pass `theme: { primary, panel }` to use your brand colours.
+- **Icon-only launcher by default:** `launcher.type` defaults to `'auto'` — a round button with a chat icon until you set
+  `launcher.text`, then a pill with that text. `type: 'button'` / `'icon'` / `'gif'` still force a style.
+- **Centred start screen:** orb, bot name, welcome lines and quick-action pills in the middle of the window.
+- **Code blocks** look like a code editor (Sublime/Monokai colours, line numbers, window dots, Copy).
+
 ### Upgrading to 2.2
 
 No API changes. The default design is the original pop-up again (lavender glass, purple orb, `#b93fff`,

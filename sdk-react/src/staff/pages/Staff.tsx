@@ -19,7 +19,7 @@ import {
   useStaff
 } from '../ui';
 import { ADMIN_MIN_PASSWORD, errMsg, fmtDateTime, relTime, ROLE_INFO, useAsync } from '../util';
-import { AccessChoice, AccessResult, AccessStatusPill, PlatformBadge, SetPasswordModal } from '../access';
+import { AccessChoice, AccessResult, AccessStatusPill, PlatformBadge, SetPasswordModal, ShareButtons } from '../access';
 import type { AccessMode } from '../access';
 
 function staffStatus(u: StaffUser): 'active' | 'invited' | 'disabled' {
@@ -47,6 +47,11 @@ function InviteLinkResult({ email, url, sent }: { email: string; url: string; se
           <CopyButton text={url} label="Copy link" variant={sent ? 'secondary' : 'primary'} />
         </div>
       </div>
+      <ShareButtons
+        to={email}
+        subject="You're invited to the Brainbox dashboard"
+        body={`Hi,\n\nYou've been invited to the Brainbox staff dashboard. Open this link to choose your password (valid for 7 days):\n\n${url}`}
+      />
     </div>
   );
 }

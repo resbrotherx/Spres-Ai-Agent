@@ -89,6 +89,8 @@ def detect_gap(
 ) -> Tuple[Optional[str], Optional[float]]:
     """(reason or None, best distance)."""
     best = best_distance(search_results)
+    if (reasoning or "").startswith("Small talk"):
+        return None, best  # greetings / thanks are not knowledge gaps
     lowered = (answer or "").lower()
     if (reasoning or "").lower().startswith("llm unavailable") or any(m in lowered for m in _UNAVAILABLE_MARKERS):
         return "llm_unavailable", best

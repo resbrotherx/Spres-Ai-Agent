@@ -21,7 +21,8 @@ import {
   useStaff
 } from '../ui';
 import { errMsg, fmtDateTime, relTime, useAsync } from '../util';
-import { KeyTypeLegend, RawKeyModal } from '../access';
+import { KeyTypeLegend, RawKeyModal, RevealKeyModal } from '../access';
+import { EditorDots, HighlightedCode, useSublimeStyles } from '../../design/code';
 
 type TabKey = 'general' | 'alerts' | 'widget' | 'keys' | 'install';
 
@@ -129,6 +130,7 @@ function KeysTab() {
   const [confirm, setConfirm] = useState<{ id: string | number; action: 'roll' | 'revoke' } | null>(null);
   const [busy, setBusy] = useState<string | number | null>(null);
   const [rolled, setRolled] = useState<{ key: ApiKeyInfo; raw_key: string; old: string } | null>(null);
+  const [showing, setShowing] = useState<ApiKeyInfo | null>(null);
 
   if (!can('admin')) return <Alert tone="info">Only admins and owners can view and manage API keys.</Alert>;
 
@@ -166,7 +168,7 @@ function KeysTab() {
         <div className="bb-staff-card-head" style={{ paddingBottom: 14 }}>
           <div>
             <h3>API keys</h3>
-            <p>Publishable keys (pk_live_…) are the client key for browsers and apps — chat only. Secret keys (sk_live_…) can train and must stay on servers. Full keys are shown only once; roll a key to replace it.</p>
+            <p>Publishable keys (pk_live_…) are the client key for browsers and apps — chat only. Secret keys (sk_live_…) can train and must stay on servers. Admins can show, copy, share or email a full key at any time with “Show”.</p>
           </div>
           <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
             Create key
@@ -236,6 +238,9 @@ function KeysTab() {
                             </span>
                           ) : (
                             <span style={{ display: 'inline-flex', gap: 6 }}>
+                              <Button size="sm" variant="ghost" icon="eye" onClick={() => setShowing(k)} title={k.can_reveal === false ? 'Created before keys could be shown again — roll it to get a viewable key' : 'Show, copy, share or email the full key'}>
+                                Show
+                              </Button>
                               <Button size="sm" variant="ghost" icon="refresh" onClick={() => setConfirm({ id: k.id, action: 'roll' })} title="Create a replacement key and revoke this one">
                                 Roll
                               </Button>
@@ -259,6 +264,17 @@ function KeysTab() {
         ) : null}
       </section>
       {creating ? <CreateKeyModal onClose={() => setCreating(false)} onCreated={(k) => setData((list) => [k, ...(list || [])])} /> : null}
+      {showing ? (
+        <RevealKeyModal
+          keyInfo={showing}
+          reveal={() => client.revealKey(showing.id)}
+          onClose={() => setShowing(null)}
+          onRoll={() => {
+            setConfirm({ id: showing.id, action: 'roll' });
+            setShowing(null);
+          }}
+        />
+      ) : null}
       {rolled ? (
         <RawKeyModal
           title="Key rolled — copy the new key"
@@ -307,7 +323,7 @@ function CreateKeyModal({ onClose, onCreated }: { onClose: () => void; onCreated
 
   if (raw) {
     return (
-      <Modal title="Copy your new key" description="This is the only time the full key is shown." onClose={onClose} footer={<Button variant="primary" onClick={onClose}>I’ve saved it</Button>}>
+      <Modal title="Copy your new key" description="Copy it, share it or email it — admins can show it again later." onClose={onClose} footer={<Button variant="primary" onClick={onClose}>I’ve saved it</Button>}>
         <Alert tone="warn">
           Store it somewhere safe now. {raw.key.key_type === 'secret' ? 'Never put a secret key in browser code or a public repository.' : 'Publishable keys can only chat — they’re safe to embed in your website.'}
         </Alert>
@@ -373,13 +389,18 @@ function CreateKeyModal({ onClose, onCreated }: { onClose: () => void; onCreated
 /* Install / embed                                                     */
 /* ------------------------------------------------------------------ */
 
-function CodeBlock({ code, label }: { code: string; label: string }) {
+function CodeBlock({ code, label, lang }: { code: string; label: string; lang?: string }) {
+  useSublimeStyles();
   return (
-    <div className="bb-staff-code-wrap">
-      <pre className="bb-staff-code" aria-label={label}>
-        {code}
+    <div className="bb-sublime bb-staff-sublime">
+      <div className="bb-sublime-head">
+        <EditorDots />
+        <span className="bb-sublime-title">{label}</span>
+        <CopyButton text={code} variant="ghost" />
+      </div>
+      <pre aria-label={label} tabIndex={0}>
+        <HighlightedCode code={code} lang={lang} />
       </pre>
-      <CopyButton text={code} />
     </div>
   );
 }
@@ -484,13 +505,13 @@ export function SupportChat() {
           {tab === 'html' ? (
             <div className="bb-staff-stack" style={{ gap: 12 }}>
               <p className="bb-staff-hint">Paste before the closing &lt;/body&gt; tag. The settings below mirror your Chat widget tab.</p>
-              <CodeBlock code={html} label="HTML snippet" />
+              <CodeBlock code={html} label="HTML snippet" lang="html" />
             </div>
           ) : null}
           {tab === 'react' ? (
             <div className="bb-staff-stack" style={{ gap: 12 }}>
               <p className="bb-staff-hint">Render the widget anywhere in your React app.</p>
-              <CodeBlock code={react} label="React snippet" />
+              <CodeBlock code={react} label="React snippet" lang="tsx" />
             </div>
           ) : null}
           {tab === 'odoo' ? (

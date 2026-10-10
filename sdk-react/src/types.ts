@@ -87,11 +87,11 @@ export interface ChatPerson {
 
 export interface CustomizationProps {
   // Colors
-  /** Accent color: user bubbles, send button, focus rings. ChatWidget default #b93fff (omago purple); ChatPanel default #0071E3. */
+  /** Accent color: user bubbles, send button, focus rings. ChatWidget default #2563eb (blue); ChatPanel default #0071E3. */
   primaryColor?: string;
   /** Second brand color. ChatWidget: text/ink colour in light mode (default #08080a). ChatPanel: end of the brand gradient. */
   accentColor?: string;
-  /** Window / page surface color (ChatWidget light-mode default #fbf1ff). */
+  /** Window / page surface color (ChatWidget light-mode default #f3f6fd). */
   backgroundColor?: string;
   /** CSS border of the floating window. */
   border?: string;
@@ -146,9 +146,10 @@ export type ChatWidgetPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 
 export interface ChatWidgetProps extends CustomizationProps {
   sdk: BrainboxReactSDK;
   position?: ChatWidgetPosition;
-  /** 'button' (default) = purple pill with `buttonText`, 'icon' = 56px circle, 'gif' = `launcherGifUrl` image. */
-  launcherType?: 'icon' | 'button' | 'gif';
+  /** 'auto' (default) = round icon until `buttonText` is set, then a pill with the text; 'button' = pill, 'icon' = 60px circle, 'gif' = `launcherGifUrl` image. */
+  launcherType?: 'auto' | 'icon' | 'button' | 'gif';
   launcherGifUrl?: string;
+  /** Launcher text. Empty (default) = icon-only launcher. */
   buttonText?: string;
   /** Window width (default 360px). */
   width?: string;

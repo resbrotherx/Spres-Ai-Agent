@@ -211,6 +211,7 @@ def graph_state(turn: ChatTurn) -> Dict[str, Any]:
         # log_node filters retrieval by the audiences this role may read.
         "user_id": turn.user_id,
         "user_role": turn.retrieval_role,
+        "small_talk": None,
     }
 
 
@@ -280,7 +281,8 @@ def finish_fresh(db: Session, turn: ChatTurn, background_tasks: BackgroundTasks,
         "gap_reason": gap_reason,
         "best_distance": best,
     }
-    if not is_invalid_cached_response(cache_data["response"]):
+    # Small talk depends on the time of day ("good morning"), so it is never cached.
+    if not is_invalid_cached_response(cache_data["response"]) and not nodes.is_small_talk_reasoning(reasoning):
         set_cache(turn.cache_k, cache_data, ttl=3600)
 
     return _finish_turn(
@@ -361,7 +363,10 @@ def _answer_events(turn: ChatTurn):
     if prompt is None:
         yield ("instant", nodes.no_context_response(), nodes.NO_CONTEXT_REASONING)
         return
-    yield from nodes.stream_answer(prompt)
+    for event in nodes.stream_answer(prompt):
+        if event[0] == "end" and state.get("small_talk"):
+            event = ("end", event[1], nodes.SMALL_TALK_REASONING)
+        yield event
 
 
 async def _stream_turn(turn: ChatTurn, background_tasks: BackgroundTasks):

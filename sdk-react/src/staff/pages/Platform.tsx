@@ -15,6 +15,7 @@ import {
   PlatformBadge,
   RawKeyList,
   RawKeyModal,
+  RevealKeyModal,
   SecretField,
   SetPasswordModal
 } from '../access';
@@ -469,6 +470,7 @@ function KeysTable({ keys, showCompany, onChange }: { keys: PlatformApiKey[]; sh
   const [confirm, setConfirm] = useState<{ id: string | number; action: 'roll' | 'revoke' } | null>(null);
   const [busy, setBusy] = useState<string | number | null>(null);
   const [rolled, setRolled] = useState<{ key: PlatformApiKey; raw_key: string; oldName: string } | null>(null);
+  const [showing, setShowing] = useState<PlatformApiKey | null>(null);
 
   const roll = async (k: PlatformApiKey) => {
     setBusy(k.id);
@@ -565,6 +567,9 @@ function KeysTable({ keys, showCompany, onChange }: { keys: PlatformApiKey[]; sh
                     </span>
                   ) : (
                     <span style={{ display: 'inline-flex', gap: 6 }}>
+                      <Button size="sm" variant="ghost" icon="eye" onClick={() => setShowing(k)} title="Show, copy, share or email the full key">
+                        Show
+                      </Button>
                       <Button size="sm" variant="ghost" icon="refresh" onClick={() => setConfirm({ id: k.id, action: 'roll' })}>
                         Roll
                       </Button>
@@ -579,6 +584,17 @@ function KeysTable({ keys, showCompany, onChange }: { keys: PlatformApiKey[]; sh
           </tbody>
         </table>
       </div>
+      {showing ? (
+        <RevealKeyModal
+          keyInfo={showing}
+          reveal={() => client.revealPlatformKey(showing.id)}
+          onClose={() => setShowing(null)}
+          onRoll={() => {
+            setConfirm({ id: showing.id, action: 'roll' });
+            setShowing(null);
+          }}
+        />
+      ) : null}
       {rolled ? (
         <RawKeyModal
           title="Key rolled — copy the new key"

@@ -28,6 +28,13 @@ import type {
   GapListResponse,
   InviteStaffPayload,
   InviteStaffResponse,
+  KnowledgeAudience,
+  KnowledgeDoc,
+  KnowledgeLabelJob,
+  KnowledgeListParams,
+  KnowledgeListResponse,
+  MessageListParams,
+  MessageListResponse,
   KnowledgeGap,
   NotificationListResponse,
   OkResponse,
@@ -316,6 +323,52 @@ export class BrainboxStaffClient {
     return this.call({ method: 'GET', url: `/api/reports/conversations/${this.seg(sessionId)}` });
   }
 
+  /* ------------------------------- knowledge / messages ------------------------------- */
+
+  private clean(params: object): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') out[k] = v;
+    });
+    return out;
+  }
+
+  /** Knowledge chunks with their audience labels ("who may see this"). */
+  listKnowledge(params: KnowledgeListParams = {}): Promise<KnowledgeListResponse> {
+    return this.call({ method: 'GET', url: '/api/knowledge/documents', params: this.clean(params) });
+  }
+
+  getKnowledge(id: number): Promise<KnowledgeDoc> {
+    return this.call({ method: 'GET', url: `/api/knowledge/documents/${this.seg(id)}` });
+  }
+
+  /** Set who may see one chunk (trainer+). Staff labels are never changed automatically. */
+  setKnowledgeAudience(id: number, audience: KnowledgeAudience): Promise<KnowledgeDoc> {
+    return this.call({ method: 'PATCH', url: `/api/knowledge/documents/${this.seg(id)}`, data: { audience } });
+  }
+
+  bulkKnowledgeAudience(ids: number[], audience: KnowledgeAudience): Promise<{ ok: boolean; updated: number }> {
+    return this.call({ method: 'POST', url: '/api/knowledge/documents/bulk', data: { ids, audience } });
+  }
+
+  knowledgeLabelStatus(): Promise<{ job: KnowledgeLabelJob; pending: number }> {
+    return this.call({ method: 'GET', url: '/api/knowledge/label' });
+  }
+
+  /** Label chunks automatically with rules + the local model (admin+). */
+  startKnowledgeLabelling(scope: 'unlabelled' | 'auto' = 'unlabelled', useAi = true): Promise<{ job: KnowledgeLabelJob }> {
+    return this.call({ method: 'POST', url: '/api/knowledge/label', data: { scope, use_ai: useAi } });
+  }
+
+  resetKnowledgeLabels(): Promise<{ ok: boolean; reset: number }> {
+    return this.call({ method: 'POST', url: '/api/knowledge/label/reset' });
+  }
+
+  /** Every chat message with the role of the person in that conversation. */
+  listMessages(params: MessageListParams = {}): Promise<MessageListResponse> {
+    return this.call({ method: 'GET', url: '/api/knowledge/messages', params: this.clean(params) });
+  }
+
   /* ------------------------------- settings ------------------------------- */
 
   getSettings(): Promise<TenantSettings> {
@@ -344,6 +397,11 @@ export class BrainboxStaffClient {
 
   revokeKey(id: string | number): Promise<{ revoked: boolean }> {
     return this.call({ method: 'DELETE', url: `/api/keys/${this.seg(id)}` });
+  }
+
+  /** The full key again, to copy or share (admin+; logged). */
+  revealKey(id: string | number): Promise<{ key: ApiKeyInfo; raw_key: string }> {
+    return this.call({ method: 'GET', url: `/api/keys/${this.seg(id)}/reveal` });
   }
 
   /** Replace a key: a new one is created (returned once) and the old one revoked. */
@@ -410,6 +468,10 @@ export class BrainboxStaffClient {
 
   createPlatformKey(payload: PlatformCreateKeyPayload): Promise<{ key: PlatformApiKey; raw_key: string }> {
     return this.call({ method: 'POST', url: '/api/platform/keys', data: payload });
+  }
+
+  revealPlatformKey(id: string | number): Promise<{ key: PlatformApiKey; raw_key: string }> {
+    return this.call({ method: 'GET', url: `/api/platform/keys/${this.seg(id)}/reveal` });
   }
 
   rollPlatformKey(id: string | number): Promise<RollApiKeyResponse<PlatformApiKey>> {

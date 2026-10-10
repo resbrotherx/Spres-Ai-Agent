@@ -5,6 +5,7 @@ import type { BrainboxTokens } from '../theme';
 import { typo } from '../theme';
 import { BrainboxClipboard, copyText } from '../clipboard';
 import { BrainboxIcon } from './Icon';
+import { SUBLIME, highlightLines } from '../highlight';
 
 export interface MarkdownProps {
   text: string;
@@ -72,17 +73,28 @@ function renderInline(nodes: MdInline[], p: MarkdownProps, keyPrefix: string): R
   });
 }
 
+/** Sublime-style (Monokai) code block: window dots, language, copy, line numbers, syntax colours. */
 function CodeBlock({ lang, code, p }: { lang: string; code: string; p: MarkdownProps }) {
   const [copied, setCopied] = useState(false);
   const t = p.tokens;
+  const lines = useMemo(() => highlightLines(code, lang), [code, lang]);
+  const numbered = lines.length > 1;
+  const mono = { fontFamily: t.mono, fontSize: 12.5, lineHeight: 20 };
   return (
-    <View style={[styles.code, { backgroundColor: t.surface2, borderColor: t.separator }]}>
-      <View style={[styles.codeHeader, { borderBottomColor: t.separator }]}>
-        <Text style={[typo(t).caption, { color: t.tertiary }]}>{lang || 'code'}</Text>
+    <View style={[styles.code, { backgroundColor: SUBLIME.bg, borderColor: SUBLIME.line }]}>
+      <View style={[styles.codeHeader, { backgroundColor: SUBLIME.head, borderBottomColor: SUBLIME.line }]}>
+        <View style={styles.dots}>
+          {SUBLIME.dots.map((c) => (
+            <View key={c} style={[styles.dot, { backgroundColor: c }]} />
+          ))}
+        </View>
+        <Text style={[typo(t).caption, styles.codeLang, { color: SUBLIME.label, fontFamily: t.mono }]} numberOfLines={1}>
+          {lang || 'code'}
+        </Text>
         {p.clipboard ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Copy code"
+            accessibilityLabel={copied ? 'Copied' : 'Copy code'}
             hitSlop={8}
             onPress={async () => {
               if (await copyText(p.clipboard!, code)) {
@@ -91,14 +103,35 @@ function CodeBlock({ lang, code, p }: { lang: string; code: string; p: MarkdownP
               }
             }}
           >
-            <BrainboxIcon name={copied ? 'check' : 'copy'} size={14} color={t.tertiary} />
+            <BrainboxIcon name={copied ? 'check' : 'copy'} size={14} color={copied ? SUBLIME.fn : SUBLIME.copy} />
           </Pressable>
         ) : null}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.codeBody}>
-        <Text selectable style={{ fontFamily: t.mono, fontSize: 13, lineHeight: 19, color: t.label }}>
-          {code}
-        </Text>
+        <View>
+          {lines.map((line, i) => (
+            <View key={i} style={styles.codeLine}>
+              {numbered ? (
+                <Text style={[mono, styles.gutter, { color: SUBLIME.gutter }]} accessibilityElementsHidden importantForAccessibility="no">
+                  {i + 1}
+                </Text>
+              ) : null}
+              <Text selectable style={[mono, { color: SUBLIME.text }]}>
+                {line.length
+                  ? line.map(([cls, text], j) =>
+                      cls ? (
+                        <Text key={j} style={{ color: SUBLIME[cls], fontStyle: cls === 'com' || cls === 'type' ? 'italic' : 'normal' }}>
+                          {text}
+                        </Text>
+                      ) : (
+                        text
+                      )
+                    )
+                  : ' '}
+              </Text>
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </View>
   );
@@ -198,16 +231,21 @@ export function Markdown(p: MarkdownProps) {
 }
 
 const styles = StyleSheet.create({
-  code: { borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  code: { borderRadius: 10, borderWidth: 1, overflow: 'hidden', marginVertical: 4 },
   codeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderBottomWidth: StyleSheet.hairlineWidth
+    paddingVertical: 7,
+    borderBottomWidth: 1
   },
-  codeBody: { padding: 10 },
+  dots: { flexDirection: 'row', gap: 5 },
+  dot: { width: 9, height: 9, borderRadius: 5 },
+  codeLang: { flex: 1 },
+  codeBody: { paddingVertical: 10, paddingRight: 14, paddingLeft: 8 },
+  codeLine: { flexDirection: 'row' },
+  gutter: { minWidth: 22, marginRight: 12, textAlign: 'right', opacity: 0.85 },
   li: { flexDirection: 'row' },
   bullet: { minWidth: 18, paddingRight: 4 },
   table: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, overflow: 'hidden' },

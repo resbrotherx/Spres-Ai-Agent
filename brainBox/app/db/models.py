@@ -21,6 +21,9 @@ class Document(Base):
     # Who may retrieve this chunk: public | customer | vendor | internal | admin.
     # NULL = legacy document, treated as settings.LEGACY_DOC_AUDIENCE.
     audience = Column(String, index=True, nullable=True)
+    # How the audience was decided: source (training source) | auto (labeller) | staff (dashboard).
+    audience_origin = Column(String, nullable=True)
+    audience_reason = Column(String, nullable=True)  # short explanation of an automatic label
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -69,6 +72,9 @@ class APIKey(Base):
     # NULL (keys created before key types existed) is treated as publishable.
     key_type = Column(String, nullable=True)
     key_prefix = Column(String, nullable=True)  # first characters of the raw key, for display only
+    # Encrypted copy so an admin can reveal/share the key later (app/secretbox.py). NULL for keys
+    # created before this existed: those can only be rolled.
+    key_encrypted = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, index=True)
     last_used = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -67,6 +67,8 @@ class Settings:
 
     VECTOR_DIM = 768
 
+    # Encrypts the copy of each API key that admins can reveal later (defaults to JWT_SECRET_KEY).
+    KEY_ENCRYPTION_SECRET = (os.getenv("KEY_ENCRYPTION_SECRET") or "").strip() or None
     JWT_SECRET_KEY = os.getenv(
         "JWT_SECRET_KEY",
         "your-secret-key-change-in-production"
@@ -98,6 +100,13 @@ class Settings:
 
     # Audience assumed for documents ingested before audiences existed (documents.audience IS NULL).
     LEGACY_DOC_AUDIENCE = os.getenv("LEGACY_DOC_AUDIENCE", "public").strip().lower() or "public"
+    # Label those legacy documents automatically (rules + the local model) once after startup.
+    # Time zone the assistant uses for "good morning" and "what time is it".
+    ASSISTANT_TIMEZONE = os.getenv("ASSISTANT_TIMEZONE", "Africa/Lagos")
+    KNOWLEDGE_AUTO_LABEL = os.getenv("KNOWLEDGE_AUTO_LABEL", "true").lower() not in ("0", "false", "no", "off")
+    KNOWLEDGE_LABEL_USE_AI = os.getenv("KNOWLEDGE_LABEL_USE_AI", "true").lower() not in ("0", "false", "no", "off")
+    # Pause between AI-labelled chunks so live chats get the model in between.
+    KNOWLEDGE_LABEL_PAUSE_S = float(os.getenv("KNOWLEDGE_LABEL_PAUSE_S", "0.5") or 0.5)
 
     # --- Staff dashboard ---------------------------------------------------------------------
     # Staff JWTs are signed with JWT_SECRET_KEY (HS256); a placeholder secret logs a loud warning.

@@ -547,6 +547,21 @@ def create_key(payload: KeyCreate, auth: AuthContext = Depends(require_platform_
     return {"key": _key_out(record, _names(db, [tenant_id])), "raw_key": raw}
 
 
+@router.get("/keys/{key_id}/reveal")
+def reveal_key(key_id: int, auth: AuthContext = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    """The full key of any tenant, to copy or share again (every reveal is logged)."""
+    record = db.query(APIKey).filter(APIKey.id == key_id).first()
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=NOT_FOUND_KEY)
+    raw = apikeys.reveal_key(record)
+    if raw is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="This key was created before keys could be shown again. Roll it to get a "
+                                   "new key you can view and share (the old one stops working).")
+    logger.info(f"Platform: key revealed id={record.id} tenant={record.tenant_id} by={_actor(auth)}")
+    return {"key": _key_out(record, _names(db, [record.tenant_id])), "raw_key": raw}
+
+
 @router.post("/keys/{key_id}/roll")
 def roll_key(key_id: int, auth: AuthContext = Depends(require_platform_admin), db: Session = Depends(get_db)):
     try:

@@ -309,6 +309,8 @@ export interface ApiKeyInfo {
   last_used: string | null;
   expires_at: string | null;
   expired?: boolean;
+  /** An admin can show the full key again (keys created before this feature: roll first). */
+  can_reveal?: boolean;
 }
 
 export interface CreateApiKeyPayload {
@@ -520,6 +522,90 @@ export interface LiveOverviewEvent {
   open_gaps: number;
 }
 
+/* ------------------------------- knowledge (Messages page) ------------------------------- */
+
+export type KnowledgeAudience = 'public' | 'customer' | 'vendor' | 'internal' | 'admin';
+/** How a label was decided: training source, automatic labeller, or a staff member. */
+export type KnowledgeOrigin = 'source' | 'auto' | 'staff';
+
+export interface KnowledgeDoc {
+  id: number;
+  content: string;
+  length: number;
+  source_type: string;
+  source_id: string | null;
+  source_name: string | null;
+  file_path: string | null;
+  audience: KnowledgeAudience | null;
+  effective_audience: KnowledgeAudience;
+  origin: KnowledgeOrigin | null;
+  reason: string | null;
+  created_at: string;
+}
+
+export interface KnowledgeLabelJob {
+  state: 'idle' | 'running' | 'done' | 'failed';
+  scope?: 'unlabelled' | 'auto';
+  use_ai?: boolean;
+  done?: number;
+  total?: number;
+  counts?: Partial<Record<KnowledgeAudience, number>>;
+  started_at?: string;
+  finished_at?: string | null;
+  started_by?: string | null;
+  error?: string | null;
+}
+
+export interface KnowledgeListParams {
+  audience?: KnowledgeAudience | 'unlabelled' | '';
+  origin?: KnowledgeOrigin | '';
+  source_id?: string;
+  q?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface KnowledgeListResponse {
+  items: KnowledgeDoc[];
+  total: number;
+  page: number;
+  page_size: number;
+  counts: Record<KnowledgeAudience | 'unlabelled', number>;
+  origin_counts: Record<string, number>;
+  legacy_audience: KnowledgeAudience;
+  job: KnowledgeLabelJob;
+}
+
+export interface ChatMessageRecord {
+  id: number;
+  session_id: string;
+  sender: 'user' | 'assistant' | string;
+  content: string;
+  created_at: string;
+  conversation_title: string | null;
+  user_name: string | null;
+  user_id: string | null;
+  user_role: string | null;
+  /** false = sent before roles were recorded (treated as public). */
+  role_recorded: boolean;
+}
+
+export interface MessageListParams {
+  role?: string;
+  sender?: 'user' | 'assistant' | '';
+  q?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface MessageListResponse {
+  items: ChatMessageRecord[];
+  total: number;
+  page: number;
+  page_size: number;
+  role_counts: Record<string, number>;
+}
+
 export interface LiveEventMap {
   hello: { user_id: string | number; tenant_id: string; server_time: string };
   notification: StaffNotification;
@@ -529,6 +615,8 @@ export interface LiveEventMap {
   staff: { action: 'created' | 'updated' | 'deleted'; user: StaffUser };
   keys: { action: 'created' | 'rolled' | 'revoked'; key: ApiKeyInfo };
   overview: LiveOverviewEvent;
+  /** Automatic knowledge labelling progress (Messages page). */
+  knowledge: { action: 'started' | 'progress' | 'finished'; job: KnowledgeLabelJob };
   /** Client-side: polling fallback asks pages to refresh silently (every 30 s). */
   poll: { at: number };
   /** Client-side: stream (re)connected after a gap — refetch anything that may have missed events. */

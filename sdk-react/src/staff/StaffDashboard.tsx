@@ -18,6 +18,7 @@ import { OverviewPage } from './pages/Overview';
 import { GapsPage } from './pages/Gaps';
 import { ConversationDetailPage, ConversationsPage } from './pages/Conversations';
 import { StaffPage } from './pages/Staff';
+import { MessagesPage } from './pages/Messages';
 import { SettingsPage } from './pages/Settings';
 import { AccountPage, NotificationsPage, TrainingPage } from './pages/Account';
 
@@ -27,6 +28,7 @@ const TITLES: Record<string, string> = {
   overview: 'Overview',
   gaps: 'Knowledge gaps',
   conversations: 'Conversations',
+  messages: 'Messages',
   training: 'Training',
   staff: 'Staff',
   settings: 'Settings',
@@ -491,6 +493,7 @@ export function StaffDashboard({
     { key: 'overview', label: 'Overview', icon: 'overview' },
     { key: 'gaps', label: 'Knowledge gaps', icon: 'gaps', badge: openGaps, alert: !!openGaps },
     { key: 'conversations', label: 'Conversations', icon: 'chat' },
+    { key: 'messages', label: 'Messages', icon: 'database' },
     { key: 'training', label: 'Training', icon: 'training' },
     { key: 'notifications', label: 'Notifications', icon: 'bell', badge: unread || null },
     { key: 'staff', label: 'Staff', icon: 'staff' },
@@ -521,6 +524,9 @@ export function StaffDashboard({
       } else {
         page = <ConversationsPage />;
       }
+      break;
+    case 'messages':
+      page = <MessagesPage />;
       break;
     case 'training':
       page = <TrainingPage />;

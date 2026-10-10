@@ -98,8 +98,10 @@ class KeyCreatePayload(BaseModel):
 
 def _key_out(record: APIKey) -> Dict[str, Any]:
     d = apikeys.key_to_dict(record)
-    return {k: d[k] for k in ("id", "name", "key_type", "key_prefix", "is_active", "created_at",
-                              "last_used", "expires_at", "expired")}
+    out = {k: d[k] for k in ("id", "name", "key_type", "key_prefix", "is_active", "created_at",
+                             "last_used", "expires_at", "expired")}
+    out["can_reveal"] = d["can_reveal"]
+    return out
 
 
 @router.get("/keys")
@@ -130,6 +132,21 @@ def revoke_key(key_id: int, auth: AuthContext = Depends(require_staff("admin")),
         publish_key(revoked, "revoked")
     logger.info(f"API key revoked from dashboard: id={key_id} tenant={auth.tenant_id} by={auth.staff_user_id}")
     return {"revoked": True}
+
+
+@router.get("/keys/{key_id}/reveal")
+def reveal_key(key_id: int, auth: AuthContext = Depends(require_staff("admin")), db: Session = Depends(get_db)):
+    """The full key, so an admin can copy or share it again (admin+; every reveal is logged)."""
+    record = db.query(APIKey).filter(APIKey.id == key_id, APIKey.tenant_id == auth.tenant_id).first()
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")
+    raw = apikeys.reveal_key(record)
+    if raw is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="This key was created before keys could be shown again. Roll it to get a "
+                                   "new key you can view and share (the old one stops working).")
+    logger.info(f"API key revealed from dashboard: id={record.id} tenant={record.tenant_id} by={auth.staff_user_id}")
+    return {"key": _key_out(record), "raw_key": raw}
 
 
 @router.post("/keys/{key_id}/roll")

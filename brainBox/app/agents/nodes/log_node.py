@@ -1,3 +1,6 @@
+import re
+from datetime import datetime, timezone
+
 from app.agents.tools.vector_search import semantic_search
 from app.agents.state import AgentState
 from app.utils.logging import logger
@@ -7,9 +10,85 @@ def router_node(state: AgentState) -> AgentState:
     logger.info(f"Router node - Processing question: {state['question']}")
     return state
 
+# ---------------------------------------------------------------------------------------------
+# Small talk: greetings, thanks, "how are you", "who are you", "what time is it". Answered
+# conversationally without a knowledge search (faster, and never logged as a knowledge gap).
+# ---------------------------------------------------------------------------------------------
+SMALL_TALK_REASONING = "Small talk: answered conversationally without knowledge search"
+_SMALL_TALK = re.compile(
+    r"^(?:hi+|hello+|hey+|hiya|yo|howdy|greetings|good\s+(?:morning|afternoon|evening|day|night)|morning|evening"
+    r"|thanks?(?:\s+you)?|thank\s+you|thx|ty|cheers|ok(?:ay)?|cool|great|nice|awesome|perfect|bye|goodbye"
+    r"|see\s+you(?:\s+later)?|good\s*bye|how\s+are\s+(?:you|u)(?:\s+doing)?|how(?:'s|\s+is)\s+it\s+going"
+    r"|how\s+(?:is|was)\s+your\s+day|what'?s\s+up|sup|who\s+are\s+you|what\s+are\s+you"
+    r"|what(?:'s|\s+is)\s+your\s+name|what\s+can\s+you\s+do|how\s+can\s+you\s+help(?:\s+me)?"
+    r"|what\s+time\s+is\s+it|what(?:'s|\s+is)\s+the\s+time|what\s+day\s+is\s+(?:it|today)"
+    r"|what(?:'s|\s+is)\s+(?:the|today'?s)\s+date|nice\s+to\s+meet\s+you|are\s+you\s+(?:there|a\s+bot|human))\b",
+    re.IGNORECASE,
+)
+_FILLER = {"there", "team", "bot", "assistant", "sir", "madam", "ma", "friend", "again", "so", "much", "a", "lot",
+           "you", "u", "all", "everyone", "today", "now", "please", "pls", "very", "dear", "brainbox", "ai", "and",
+           "to", "the", "for", "your", "it", "oh", "ah", "well", "guys", "man", "bro", "mate", "o"}
+
+
+def is_small_talk(question: str) -> bool:
+    """True for a greeting / thanks / "how are you" style message with nothing else in it."""
+    q = re.sub(r"[^\w\s']", " ", (question or "").lower())
+    q = re.sub(r"\s+", " ", q).strip()
+    if not q or len(q.split()) > 9:
+        return False
+    rest = q
+    for _ in range(4):  # "hi, good morning, how are you"
+        m = _SMALL_TALK.match(rest)
+        if not m:
+            break
+        rest = rest[m.end():].strip()
+        while rest.split() and rest.split()[0] in _FILLER and not _SMALL_TALK.match(rest):
+            rest = " ".join(rest.split()[1:])
+    if rest == q:
+        return False
+    return all(w in _FILLER for w in rest.split())
+
+
+# Words that make a question about *this company* (its offer, policies or someone's account).
+# Without matching knowledge such questions get the safe "don't know" reply instead of a guess.
+_COMPANY_SPECIFIC = re.compile(
+    r"\b(?:you|your|yours|we|our|ours|us|company|business|shop|store|price|prices|pricing|cost|fee|fees|plan|plans"
+    r"|order|orders|account|invoice|invoices|bill|billing|refund|delivery|shipping|ship|policy|policies|hours|open"
+    r"|contact|support|subscription|discount|warranty|return|returns|staff|branch|office|location|address|phone"
+    r"|email|sell|stock|available|availability|meter|tariff|balance|payment|pay|customer|vendor|supplier)\b",
+    re.IGNORECASE,
+)
+
+
+def is_general_question(question: str) -> bool:
+    """True when the question is general knowledge (definitions, how-tos, code, maths), so the
+    model may answer from what it knows even with no matching company knowledge."""
+    return not _COMPANY_SPECIFIC.search(question or "")
+
+
+def is_small_talk_reasoning(reasoning) -> bool:
+    return (reasoning or "").startswith("Small talk")
+
+
+def _now_text() -> str:
+    from app.config import settings
+    now = datetime.now(timezone.utc)
+    try:
+        from zoneinfo import ZoneInfo
+        now = now.astimezone(ZoneInfo(settings.ASSISTANT_TIMEZONE))
+    except Exception:  # unknown zone: stay on UTC
+        pass
+    part = "morning" if 5 <= now.hour < 12 else "afternoon" if 12 <= now.hour < 17 else "evening" if 17 <= now.hour < 22 else "night"
+    return f"{now.strftime('%A %d %B %Y, %H:%M')} ({part}, {now.tzname() or 'UTC'})"
+
+
 def log_node(state: AgentState) -> AgentState:
     question = state["question"]
     tenant_id = state["tenant_id"]
+
+    if is_small_talk(question):
+        logger.info("Log node - small talk, skipping knowledge search")
+        return {**state, "small_talk": True, "context": [], "search_results": []}
 
     logger.info(f"Log node - Searching for: {question}")
 
@@ -84,19 +163,40 @@ def build_prompt(state: AgentState):
         blocks.append(f"[{i + 1}] ({label})\n{chunk[:MAX_CHUNK_CHARS]}")
     question = state["question"]
 
-    # Nothing in the knowledge base this user may see: don't let the model guess (small local
-    # models invent answers from thin air).
+    if state.get("small_talk"):
+        return f"""You are a warm, professional AI assistant for a company. It is now {_now_text()}.
+Reply naturally to the user's message in one or two short sentences: greet back using the right
+time of day, say how you are, explain what you can help with, or give the time/date if asked.
+Offer to help with their questions. Do not invent company facts.
+
+User: {question}
+Assistant:"""
+
+    rules = f"""- Company-specific facts (our products, prices, policies, staff, accounts, orders) must come ONLY from the context.
+  If the context doesn't contain them, reply: "{UNKNOWN_ANSWER_PREFIX}." plus one short polite sentence.
+- General questions (definitions, how-tos, writing, maths, code) may be answered from your own knowledge.
+- Format with Markdown: numbered steps for instructions, a table for comparisons or lists of records,
+  and fenced code blocks with the language name (```python) for any code.
+- Be concise. Never reveal names, contact details or account details of other customers."""
+
+    # Nothing in the knowledge base this user may see: general questions can still be answered
+    # from the model's own knowledge; company-specific ones get the instant "don't know" reply
+    # (small local models invent company facts from thin air) and become a knowledge gap.
     if not blocks:
-        return None
+        if not is_general_question(question):
+            return None
+        return f"""You are a helpful AI assistant for a company. It is now {_now_text()}.
+{rules}
+
+Question: {question}
+Answer:"""
 
     context = "\n\n".join(blocks)
 
-    return f"""You are a friendly customer-support assistant. Answer using ONLY the context below
-(past support tickets with our team's response, documents, records).
-- If the context doesn't answer the question, reply: "{UNKNOWN_ANSWER_PREFIX}." plus one short polite sentence.
+    return f"""You are a friendly customer-support assistant. It is now {_now_text()}.
+Use the context below (past support tickets with our team's response, documents, records).
+{rules}
 - If a past ticket matches, reuse the response our team gave.
-- Keep it short: at most 4 sentences or a few bullet steps.
-- Never reveal names, contact details or account details of other customers.
 
 Context:
 {context}
@@ -168,6 +268,8 @@ def response_node(state: AgentState) -> AgentState:
         return {**state, "response": no_context_response(), "reasoning": NO_CONTEXT_REASONING}
 
     response, reasoning = generate_answer(prompt)
+    if state.get("small_talk") and reasoning != LLM_FALLBACK_REASONING:
+        reasoning = SMALL_TALK_REASONING
     return {
         **state,
         "response": response.strip(),

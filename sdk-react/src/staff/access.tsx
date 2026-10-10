@@ -1,10 +1,10 @@
 /* Shared pieces for account access & API keys: invite-or-password choice, password generator,
  * show-once secrets, key-type legend and pills, set-password modal. */
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Icon } from './icons';
 import type { ApiKeyInfo, StaffUser } from './types';
-import { Alert, Button, CopyButton, Field, Modal, PasswordInput, StatusPill } from './ui';
+import { Alert, Button, CopyButton, Field, Modal, PasswordInput, StatusPill, useStaff } from './ui';
 import { ADMIN_MIN_PASSWORD, errMsg, generatePassword } from './util';
 
 /* ------------------------------------------------------------------ */
@@ -108,6 +108,69 @@ export function NeverShownNote({ what = 'keys' }: { what?: 'keys' | 'passwords' 
 /* Show-once secrets                                                   */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Share / email                                                       */
+/* ------------------------------------------------------------------ */
+
+/** The dashboard address (for "sign in at …" messages). */
+export function dashboardUrl(): string {
+  if (typeof window === 'undefined') return '';
+  return `${window.location.origin}${window.location.pathname}`;
+}
+
+/**
+ * "Share" (the device share sheet, or copy when there is none) and "Email" (opens the user's mail
+ * app with the message filled in — works without email set up on the server).
+ */
+export function ShareButtons({ subject, body, to, size = 'sm' }: { subject: string; body: string; to?: string; size?: 'sm' }) {
+  const ctx = useStaff();
+  const [shared, setShared] = useState(false);
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const share = async () => {
+    try {
+      if (canShare) {
+        await navigator.share({ title: subject, text: body });
+        return;
+      }
+      await navigator.clipboard.writeText(body);
+      setShared(true);
+      ctx.toast('Message copied — paste it into WhatsApp, Slack or any chat', 'success');
+      setTimeout(() => setShared(false), 1800);
+    } catch {
+      /* share sheet dismissed */
+    }
+  };
+  const mailto = `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  return (
+    <span className="bb-staff-share">
+      <Button size={size} variant="secondary" icon={shared ? 'check' : 'send'} onClick={() => void share()}>
+        {shared ? 'Copied' : 'Share'}
+      </Button>
+      <a className="bb-staff-btn bb-staff-btn-secondary bb-staff-btn-sm" href={mailto} target="_blank" rel="noreferrer">
+        <Icon name="mail" size={15} />
+        Email
+      </a>
+    </span>
+  );
+}
+
+/** Ready-to-send text for an API key. */
+export function keyShareText(key: Pick<ApiKeyInfo, 'name' | 'key_type'>, raw: string): { subject: string; body: string } {
+  const secret = key.key_type === 'secret';
+  return {
+    subject: `Brainbox ${secret ? 'secret' : 'publishable'} key: ${key.name}`,
+    body: [
+      `Here is the Brainbox ${secret ? 'SECRET' : 'publishable'} API key "${key.name}":`,
+      '',
+      raw,
+      '',
+      secret
+        ? 'Use it only on servers (Odoo settings, Python/Node SDK, training scripts). Keep it private — never put it in a website or app.'
+        : 'Use it in the website or app chat widget (apiKey option). It can only chat, so it is safe in browser code.'
+    ].join('\n')
+  };
+}
+
 export function SecretField({ label, value, copyLabel = 'Copy', primary }: { label: ReactNode; value: string; copyLabel?: string; primary?: boolean }) {
   return (
     <div className="bb-staff-field">
@@ -125,33 +188,101 @@ export function RawKeyList({ keys }: { keys: { key: Pick<ApiKeyInfo, 'name' | 'k
   const hasSecret = keys.some((k) => k.key.key_type === 'secret');
   return (
     <div className="bb-staff-stack" style={{ gap: 12 }}>
-      <Alert tone="warn">
-        <b>Copy {keys.length > 1 ? 'these keys' : 'this key'} now — {keys.length > 1 ? 'they' : 'it'} won’t be shown again.</b> Only a hash is stored.
+      <Alert tone="info">
+        <b>Copy or share {keys.length > 1 ? 'these keys' : 'this key'}.</b> Admins can show {keys.length > 1 ? 'them' : 'it'} again later under Settings → API keys.
         {hasSecret ? ' Never put a secret key in browser code, an app or a public repository.' : ''}
       </Alert>
-      {keys.map((k) => (
-        <SecretField
-          key={k.raw_key}
-          label={
-            <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-              <KeyTypePill type={k.key.key_type} /> {k.key.name}
-            </span>
-          }
-          value={k.raw_key}
-          primary
-        />
-      ))}
+      {keys.map((k) => {
+        const msg = keyShareText(k.key, k.raw_key);
+        return (
+          <div key={k.raw_key} className="bb-staff-stack" style={{ gap: 6 }}>
+            <SecretField
+              label={
+                <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                  <KeyTypePill type={k.key.key_type} /> {k.key.name}
+                </span>
+              }
+              value={k.raw_key}
+              primary
+            />
+            <ShareButtons subject={msg.subject} body={msg.body} />
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 export function RawKeyModal({ title = 'Copy your new key', result, onClose, note }: { title?: string; result: { key: ApiKeyInfo; raw_key: string }; onClose: () => void; note?: ReactNode }) {
   return (
-    <Modal title={title} description="This is the only time the full key is shown." onClose={onClose} footer={<Button variant="primary" onClick={onClose}>I’ve saved it</Button>}>
+    <Modal title={title} description="Copy it, share it or email it to whoever needs it." onClose={onClose} footer={<Button variant="primary" onClick={onClose}>Done</Button>}>
       <div className="bb-staff-stack" style={{ gap: 12 }}>
         {note}
         <RawKeyList keys={[{ key: result.key, raw_key: result.raw_key }]} />
       </div>
+    </Modal>
+  );
+}
+
+/**
+ * "Show key": fetches the full key (admins only; every reveal is logged on the server).
+ * Keys created before keys were stored encrypted can't be shown — offer to roll them instead.
+ */
+export function RevealKeyModal({ keyInfo, reveal, onClose, onRoll }: {
+  keyInfo: ApiKeyInfo;
+  reveal: () => Promise<{ raw_key: string }>;
+  onClose: () => void;
+  onRoll?: () => void;
+}) {
+  const [raw, setRaw] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    reveal()
+      .then((r) => alive && setRaw(r.raw_key))
+      .catch((e) => alive && setError(errMsg(e)));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const msg = raw ? keyShareText(keyInfo, raw) : null;
+  return (
+    <Modal
+      title={keyInfo.name}
+      description={keyInfo.key_type === 'secret' ? 'Secret key — servers only. Share it privately.' : 'Publishable key — safe for websites and apps.'}
+      onClose={onClose}
+      footer={
+        <>
+          {error && onRoll ? (
+            <Button variant="secondary" icon="refresh" onClick={onRoll}>
+              Roll key
+            </Button>
+          ) : null}
+          <Button variant="primary" onClick={onClose}>
+            Done
+          </Button>
+        </>
+      }
+    >
+      {error ? (
+        <Alert tone="warn">{error}</Alert>
+      ) : raw && msg ? (
+        <div className="bb-staff-stack" style={{ gap: 10 }}>
+          <SecretField
+            label={
+              <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                <KeyTypePill type={keyInfo.key_type} /> Full key
+              </span>
+            }
+            value={raw}
+            primary
+          />
+          <ShareButtons subject={msg.subject} body={msg.body} />
+        </div>
+      ) : (
+        <p className="bb-staff-muted">Loading…</p>
+      )}
     </Modal>
   );
 }
@@ -246,6 +377,11 @@ export function AccessResult({ email, inviteUrl, emailSent, password }: { email:
           </Alert>
           <SecretField label="Sign-in email" value={email} />
           <SecretField label="Temporary password" value={password} copyLabel="Copy password" primary />
+          <ShareButtons
+            to={email}
+            subject="Your Brainbox dashboard login"
+            body={`Hi,\n\nYou now have access to the Brainbox staff dashboard.\n\nSign in at: ${dashboardUrl()}\nEmail: ${email}\nTemporary password: ${password}\n\nYou'll be asked to choose your own password when you first sign in.`}
+          />
         </>
       ) : inviteUrl ? (
         <>
@@ -259,6 +395,11 @@ export function AccessResult({ email, inviteUrl, emailSent, password }: { email:
             </Alert>
           )}
           <SecretField label="Invite link" value={inviteUrl} copyLabel="Copy link" primary={!emailSent} />
+          <ShareButtons
+            to={email}
+            subject="You're invited to the Brainbox dashboard"
+            body={`Hi,\n\nYou've been invited to the Brainbox staff dashboard. Open this link to choose your password (valid for 7 days):\n\n${inviteUrl}`}
+          />
         </>
       ) : null}
     </div>

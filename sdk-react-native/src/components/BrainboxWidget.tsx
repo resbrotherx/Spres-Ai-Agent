@@ -17,7 +17,7 @@ export interface BrainboxWidgetProps extends Omit<BrainboxChatProps, 'onClose' |
   /** Show the floating launcher (default true). Set false to open from your own button via the ref. */
   launcher?: boolean;
   launcherLabel?: string;
-  /** 'button' (default): purple "Chat" pill. 'icon': round purple button. */
+  /** 'auto' (default): round icon until `launcherText` is set, then a pill. 'button': pill. 'icon': round button. */
   launcherVariant?: BrainboxLauncherVariant;
   /** Text on the 'button' launcher (default 'Chat'). */
   launcherText?: string;

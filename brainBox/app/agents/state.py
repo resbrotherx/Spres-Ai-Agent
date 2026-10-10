@@ -11,3 +11,5 @@ class AgentState(TypedDict):
     # keys are always "public"); log_node filters retrieval by the audiences it may read.
     user_id: Optional[str]
     user_role: Optional[str]
+    # Greeting / thanks / "what time is it": answered conversationally, no knowledge search.
+    small_talk: Optional[bool]

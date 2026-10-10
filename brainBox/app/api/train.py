@@ -329,7 +329,8 @@ def update_source(
         relabelled = db.query(Document).filter(
             Document.source_id == source.source_id,
             Document.tenant_id == tenant_id,
-        ).update({Document.audience: payload.audience}, synchronize_session=False)
+        ).update({Document.audience: payload.audience, Document.audience_origin: "source",
+                  Document.audience_reason: None}, synchronize_session=False)
     _commit(db)
     db.refresh(source)
     if payload.audience is not None:

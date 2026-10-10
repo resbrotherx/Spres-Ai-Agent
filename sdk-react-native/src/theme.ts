@@ -4,7 +4,7 @@ import { Platform, useColorScheme } from 'react-native';
 export type BrainboxThemeMode = 'light' | 'dark' | 'auto';
 
 export interface BrainboxThemeOptions {
-  /** Brand colour (default omago purple #b93fff): user bubbles, send button, launcher, pills, links. */
+  /** Brand colour (default blue #2563eb): user bubbles, send button, launcher, pills, links. */
   primary?: string;
   /** 'light' (default, lavender glass), 'dark' (deep aubergine) or 'auto' (follows the device setting). */
   mode?: BrainboxThemeMode;
@@ -14,7 +14,7 @@ export interface BrainboxThemeOptions {
 
 export interface BrainboxTokens {
   dark: boolean;
-  /** Window / panel colour (omago lavender #fbf1ff). */
+  /** Window / panel colour (omago lavender #f3f6fd). */
   panel: string;
   /** Body gradient (top -> bottom) drawn behind the transcript. */
   bodyFrom: string;
@@ -75,46 +75,46 @@ export interface BrainboxTokens {
   mono: string;
 }
 
-/** "omago": lavender frosted glass (the original Brainbox pop-up design). */
+/** "omago": frosted glass with a blue accent (the Brainbox pop-up design). */
 const LIGHT: Omit<BrainboxTokens, 'fontFamily' | 'mono'> = {
   dark: false,
-  panel: '#fbf1ff',
-  bodyFrom: '#fffaff',
-  bodyTo: '#f9e6ff',
+  panel: '#f3f6fd',
+  bodyFrom: '#fbfcff',
+  bodyTo: '#e0e9fd',
   bodyGlow: 'rgba(255,255,255,0.7)',
   headerBg: 'rgba(255,255,255,0.36)',
   headerBorder: 'rgba(255,255,255,0.88)',
   frameBorder: 'rgba(255,255,255,0.82)',
-  bg: '#fbf1ff',
+  bg: '#f3f6fd',
   surface: '#FFFFFF',
   surface2: 'rgba(255,255,255,0.6)',
-  fill: 'rgba(185,63,255,0.08)',
-  fillStrong: 'rgba(185,63,255,0.14)',
+  fill: 'rgba(37,99,235,0.08)',
+  fillStrong: 'rgba(37,99,235,0.14)',
   label: '#08080a',
   secondary: 'rgba(9,9,12,0.54)',
   tertiary: 'rgba(12,12,16,0.45)',
   quaternary: 'rgba(12,12,16,0.28)',
-  separator: 'rgba(185,63,255,0.12)',
-  separatorStrong: 'rgba(185,63,255,0.2)',
-  accent: '#b93fff',
-  accentPressed: '#a531e6',
-  accentTint: 'rgba(185,63,255,0.10)',
-  accentLight: '#efc3ff',
-  accentDeep: '#8120d2',
+  separator: 'rgba(37,99,235,0.12)',
+  separatorStrong: 'rgba(37,99,235,0.2)',
+  accent: '#2563eb',
+  accentPressed: '#1e4fd0',
+  accentTint: 'rgba(37,99,235,0.10)',
+  accentLight: '#9dbcff',
+  accentDeep: '#1d3fae',
   onAccent: '#FFFFFF',
   botBubble: 'rgba(255,255,255,0.94)',
   botText: 'rgba(12,12,16,0.72)',
   pillBg: 'rgba(255,255,255,0.23)',
-  pillBorder: 'rgba(185,63,255,0.18)',
-  pillText: '#b93fff',
+  pillBorder: 'rgba(37,99,235,0.18)',
+  pillText: '#2563eb',
   composerBg: 'rgba(255,255,255,0.18)',
   composerBorder: 'rgba(255,255,255,0.86)',
   toolBg: 'rgba(255,255,255,0.25)',
   closeBg: '#08080a',
   closeIcon: '#FFFFFF',
-  orbCore: '#d987ff',
-  orbMid: '#b334ff',
-  orbRim: '#8e31dc',
+  orbCore: '#9dbcff',
+  orbMid: '#2f6bff',
+  orbRim: '#1d3fae',
   success: '#34C759',
   successText: '#248A3D',
   successTint: 'rgba(52,199,89,0.12)',
@@ -122,44 +122,44 @@ const LIGHT: Omit<BrainboxTokens, 'fontFamily' | 'mono'> = {
   dangerText: '#D70015',
   dangerTint: 'rgba(255,59,48,0.10)',
   warning: '#FF9F0A',
-  gradientFrom: '#d987ff',
-  gradientTo: '#8e31dc',
-  backdrop: 'rgba(26,16,34,0.25)'
+  gradientFrom: '#9dbcff',
+  gradientTo: '#1d3fae',
+  backdrop: 'rgba(8,14,30,0.25)'
 };
 
-/** Dark omago: deep aubergine with lavender accents. */
+/** Dark omago: deep navy with soft blue accents. */
 const DARK: Omit<BrainboxTokens, 'fontFamily' | 'mono'> = {
   ...LIGHT,
   dark: true,
-  panel: '#1a1022',
-  bodyFrom: '#21142b',
-  bodyTo: '#160d1d',
-  bodyGlow: 'rgba(217,135,255,0.08)',
+  panel: '#0e1526',
+  bodyFrom: '#14203a',
+  bodyTo: '#0b1322',
+  bodyGlow: 'rgba(143,179,255,0.08)',
   headerBg: 'rgba(255,255,255,0.05)',
-  headerBorder: 'rgba(217,135,255,0.16)',
-  frameBorder: 'rgba(217,135,255,0.24)',
-  bg: '#1a1022',
-  surface: '#24172e',
+  headerBorder: 'rgba(143,179,255,0.16)',
+  frameBorder: 'rgba(143,179,255,0.24)',
+  bg: '#0e1526',
+  surface: '#151f37',
   surface2: 'rgba(255,255,255,0.05)',
-  fill: 'rgba(217,135,255,0.10)',
-  fillStrong: 'rgba(217,135,255,0.18)',
-  label: '#f6ecff',
-  secondary: 'rgba(246,236,255,0.6)',
-  tertiary: 'rgba(246,236,255,0.45)',
-  quaternary: 'rgba(246,236,255,0.28)',
-  separator: 'rgba(217,135,255,0.14)',
-  separatorStrong: 'rgba(217,135,255,0.24)',
-  accentTint: 'rgba(185,63,255,0.2)',
-  botBubble: '#2a1b36',
-  botText: 'rgba(246,236,255,0.88)',
+  fill: 'rgba(143,179,255,0.10)',
+  fillStrong: 'rgba(143,179,255,0.18)',
+  label: '#eef3fc',
+  secondary: 'rgba(238,243,252,0.6)',
+  tertiary: 'rgba(238,243,252,0.45)',
+  quaternary: 'rgba(238,243,252,0.28)',
+  separator: 'rgba(143,179,255,0.14)',
+  separatorStrong: 'rgba(143,179,255,0.24)',
+  accentTint: 'rgba(37,99,235,0.2)',
+  botBubble: '#1a2540',
+  botText: 'rgba(238,243,252,0.88)',
   pillBg: 'rgba(255,255,255,0.05)',
-  pillBorder: 'rgba(217,135,255,0.28)',
-  pillText: '#e0a8ff',
+  pillBorder: 'rgba(143,179,255,0.28)',
+  pillText: '#a9c4ff',
   composerBg: 'rgba(255,255,255,0.05)',
-  composerBorder: 'rgba(217,135,255,0.22)',
+  composerBorder: 'rgba(143,179,255,0.22)',
   toolBg: 'rgba(255,255,255,0.08)',
-  closeBg: '#f6ecff',
-  closeIcon: '#1a1022',
+  closeBg: '#eef3fc',
+  closeIcon: '#0e1526',
   successText: '#30D158',
   dangerText: '#FF6B6B',
   dangerTint: 'rgba(255,69,58,0.16)',

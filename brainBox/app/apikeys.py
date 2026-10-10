@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.db.models import APIKey
+from app import secretbox
 from app.utils.hashing import create_hash
 
 KEY_TYPES = ("publishable", "secret")
@@ -96,6 +97,7 @@ def create_key(
         name=(name or "").strip() or f"{key_type} key for {tenant_id}",
         key_type=key_type,
         key_prefix=display_prefix(raw_key),
+        key_encrypted=secretbox.encrypt(raw_key),
         is_active=True,
         expires_at=_aware(expires_at),
     )
@@ -181,4 +183,12 @@ def key_to_dict(record: APIKey) -> Dict[str, Any]:
         "created_at": record.created_at,
         "expires_at": record.expires_at,
         "last_used": record.last_used,
+        # True when an admin can reveal the full key again (stored encrypted).
+        "can_reveal": bool(getattr(record, "key_encrypted", None)),
     }
+
+
+def reveal_key(record: APIKey) -> Optional[str]:
+    """The full key for an admin to copy/share, or None when no readable copy exists
+    (created before keys were stored encrypted, or the encryption secret changed)."""
+    return secretbox.decrypt(record.key_encrypted)

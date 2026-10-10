@@ -71,6 +71,11 @@ Styles are injected at runtime (once per component type), so there is no CSS fil
 
 ## Floating widget — `ChatWidget`
 
+> **1.3.0:** blue default colour (`#2563eb`), icon-only launcher until `buttonText` is set (`launcherType: 'auto'`),
+> centred start screen, Sublime-style code blocks everywhere (chat answers, training SDK tab, dashboard snippets), and a new
+> staff **Messages** page (what the AI knows and who may see it, plus every chat message with the sender's role). Admins
+> can show, copy, share and email API keys again.
+
 > **1.2.1:** the widget is back to the original **omago** pop-up design (lavender frosted glass, purple orb logo,
 > purple “Chat” launcher pill), now flat — no box shadows on the window, launcher, popovers or toasts — and it keeps
 > every 1.2.0 feature (streaming, Stop, sounds, toasts, feedback, sources, unread badge, history, dark mode).
