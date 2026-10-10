@@ -137,6 +137,8 @@ export function useBrainboxChat(client: BrainboxClient, options: UseBrainboxChat
   const sendingRef = useRef(false);
   const lastFailed = useRef<{ question: string; userId: string } | null>(null);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Streamed text of the current run that may not have been flushed into `messages` yet. */
+  const pendingRef = useRef<{ id: string; text: string } | null>(null);
 
   const key = useMemo(
     () => `${storageKey}:${client.tenantId || 'default'}:${client.user.id || 'anon'}:session`,
@@ -203,6 +205,7 @@ export function useBrainboxChat(client: BrainboxClient, options: UseBrainboxChat
     (question: string, userId: string): Promise<BrainboxChatResponse | null> => {
       const runId = ++runRef.current;
       const assistantId = uid('a');
+      pendingRef.current = null;
       sendingRef.current = true;
       setSending(true);
       setStreamingText('');
@@ -233,6 +236,7 @@ export function useBrainboxChat(client: BrainboxClient, options: UseBrainboxChat
         onToken: (_delta, full) => {
           if (!live()) return;
           acc = full;
+          pendingRef.current = { id: assistantId, text: full };
           if (!flushTimer.current) flushTimer.current = setTimeout(flush, 32);
         },
         onDone: (res) => {
@@ -302,9 +306,14 @@ export function useBrainboxChat(client: BrainboxClient, options: UseBrainboxChat
     if (!h) return;
     runRef.current++;
     h.abort();
-    // Keep partial text as a stopped answer; drop an empty placeholder.
+    if (flushTimer.current) clearTimeout(flushTimer.current);
+    flushTimer.current = null;
+    // Keep partial text (including tokens not yet flushed) as a stopped answer; drop an empty placeholder.
+    const pending = pendingRef.current;
+    pendingRef.current = null;
     setMessages((list) =>
       list
+        .map((m) => (pending && m.id === pending.id && m.status === 'streaming' ? { ...m, text: pending.text || m.text } : m))
         .filter((m) => !(m.role === 'assistant' && m.status === 'streaming' && !m.text))
         .map((m) =>
           m.status === 'streaming' ? { ...m, status: 'stopped' as const } : m.status === 'sending' ? { ...m, status: 'done' as const } : m

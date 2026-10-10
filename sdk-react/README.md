@@ -31,12 +31,12 @@ The SDK provides client-side chat components. Your app must be served to users i
 ## What it includes
 
 - `BrainboxReactSDK` class for API calls, including **real token streaming** (`streamChat`)
-- `ChatWidget` — floating assistant (launcher + window, full-screen sheet on phones)
+- `ChatWidget` — floating assistant in the lavender frosted-glass “omago” design (launcher pill + window)
 - `ChatPanel` — full-page chat with a sessions sidebar, search and an empty state with prompt cards
 - `TrainingPanel` — upload / connect / paste training data and manage sources
 - `useBrainboxChat` hook — streaming chat state for custom UIs
 - `MessageContent`, `TypingIndicator`, `BrainboxLogo`, `playSound` building blocks
-- One Apple-style design system (light / dark / auto, UI sounds, reduced-motion aware, accessible)
+- Light / dark / auto modes, UI sounds, reduced-motion aware, accessible
 
 ## Quick Start
 
@@ -71,36 +71,45 @@ Styles are injected at runtime (once per component type), so there is no CSS fil
 
 ## Floating widget — `ChatWidget`
 
+> **1.2.1:** the widget is back to the original **omago** pop-up design (lavender frosted glass, purple orb logo,
+> purple “Chat” launcher pill), now flat — no box shadows on the window, launcher, popovers or toasts — and it keeps
+> every 1.2.0 feature (streaming, Stop, sounds, toasts, feedback, sources, unread badge, history, dark mode).
+> `ChatPanel` keeps its 1.2.0 look.
+
 ```tsx
 <ChatWidget
   sdk={sdk}
   position="bottom-right"          // bottom-left | top-right | top-left | center
-  mode="auto"                      // 'light' (default) | 'dark' | 'auto' (follows the OS)
+  mode="auto"                      // 'light' (default) | 'dark' (deep aubergine) | 'auto' (follows the OS)
   sounds                           // send / receive / error tones (default true, users can mute in the header)
-  primaryColor="#0071E3"           // accent: user bubbles, send button, focus ring
-  accentColor="#5E5CE6"            // second stop of the launcher gradient
-  launcherType="icon"              // 'icon' (default gradient circle) | 'button' (pill + buttonText) | 'gif' (launcherGifUrl)
+  primaryColor="#b93fff"           // default omago purple: user bubbles, send button, launcher, pills
+  accentColor="#08080a"            // ink (text) colour in light mode
+  backgroundColor="#fbf1ff"        // window colour in light mode
+  launcherType="button"            // 'button' (default purple pill + buttonText) | 'icon' (56px circle) | 'gif' (launcherGifUrl)
   buttonText="Chat"
   companyName="Acme Support"       // header title
   companyDescription="Typically replies in seconds"
-  logoUrl="/logo.png"              // header + welcome logo (defaults to the Brainbox mark)
+  logoUrl="/logo.png"              // header + assistant avatar (defaults to the purple orb)
   avatarGifUrl="/bot.gif"          // assistant avatar
-  user={{ name: 'Sarah Connor' }}  // personalises the greeting
+  user={{ name: 'Sarah Connor' }}  // personalises the greeting and the user avatar initials
   placeholder="Ask a question…"
-  width="380px" height="600px"     // default 380×600
-  showFileUpload showImageUpload   // composer attachments (default off in the widget)
-  showVoiceInput                   // Chat / Voice mode switch
+  width="360px" height="540px"     // default 360×540, radius 22px, 2px white border
+  showFileUpload                   // paperclip in the composer (default on in the widget)
+  showImageUpload                  // image button (default off)
+  showVoiceInput                   // Chat / Voice switch above the composer (default on in the widget)
   showExportButton                 // export the conversation as JSON
   showFeedback                     // 👍/👎 under answers (default true)
   onOpenChange={(open) => {}}
 />
 ```
 
-What you get: header with logo, online status and icon buttons (new chat, history, mute, expand, close); grouped
-messages with day separators and hover timestamps; streaming text with a caret and a **Stop** button; copy and 👍/👎 on
-every answer (sent to `/api/chat/feedback` with the stored `message_id`; 👎 becomes a knowledge gap for staff); a
-"Sources" disclosure when the answer used the knowledge base; toasts; an unread badge on the launcher when a reply
-arrives while the window is closed; Escape to close; full-screen sheet under 576 px.
+What you get: frosted header with the orb logo, title, status line and icon buttons (new chat, mute, expand) plus
+the black close button; messages grouped by sender with avatar, name and time, and day separators; streaming text
+with a caret and a **Stop** button; copy and 👍/👎 on every answer (sent to `/api/chat/feedback` with the stored
+`message_id`; 👎 becomes a knowledge gap for staff); a "Sources" disclosure when the answer used the knowledge base;
+welcome bubbles with quick-action pills; a composer with attach, emoji and a **History** pill (previous
+conversations, searchable); toasts; an unread badge on the launcher when a reply arrives while the window is closed;
+Escape to close; the window fills the screen (12 px inset) under 576 px.
 
 Copy can be customised with `data` / `manualData`:
 
@@ -111,7 +120,7 @@ Copy can be customised with `data` / `manualData`:
     greeting: 'Hi {{name}} 👋',
     introMessages: ['I can answer questions about billing and your account.'],
     quickActions: ['Where is my invoice?', { label: 'Talk to a human', prompt: 'I want to talk to support', icon: 'help' }],
-    composer: { placeholder: 'Type a message…' }
+    composer: { placeholder: 'Type a message…', searchLabel: 'History' }
   }}
 />
 ```
@@ -143,8 +152,8 @@ The panel fills its parent (`height` prop, default `100%`). The sidebar lists se
 |---|---|---|
 | `mode` | all | `'light'` (default), `'dark'`, `'auto'` |
 | `sounds` | all | UI sounds, default `true` (Web Audio, no files; muted while the tab is hidden) |
-| `primaryColor` / `accentColor` / `backgroundColor` | all | accent, gradient end, surface |
-| `border`, `borderRadius` | widget | window border / radius (default 18px) |
+| `primaryColor` / `accentColor` / `backgroundColor` | all | widget: purple, ink, window (defaults `#b93fff` / `#08080a` / `#fbf1ff`); panel: accent, gradient end, surface |
+| `border`, `borderRadius` | widget | window border / radius (default `2px solid rgba(255,255,255,.82)` / `22px`) |
 | `position`, `launcherType`, `launcherGifUrl`, `buttonText`, `width`, `height`, `defaultOpen`, `onOpenChange`, `zIndex` | widget | |
 | `logoUrl`, `logoText`, `companyName`, `companyDescription`, `headerText`, `avatarGifUrl`, `user`, `bot` | all | branding |
 | `placeholder`, `newChatButtonText`, `searchPlaceholder`, `sidebarTitle` | all / panel | copy |
@@ -152,7 +161,7 @@ The panel fills its parent (`height` prop, default `100%`). The sidebar lists se
 | `initialSessionId` | all | open this session on mount |
 | `persistSession` | all | remember the last session per API URL + tenant + user in `localStorage` (default `true`) |
 | `data` / `manualData` | all | copy overrides (see above) |
-| `design` | — | deprecated, ignored (there is one design) |
+| `design` | — | deprecated, ignored (the widget always uses the omago design) |
 
 ## Platform compatibility
 

@@ -1,7 +1,14 @@
 # Brainbox for React Native (`spres-react-native`) v2
 
 The Brainbox AI assistant for iOS and Android apps. It looks and behaves like the web (`spres-web`) and React SDKs:
-same design system, logo, chat flow and options.
+same chat flow and options, in the original **omago** pop-up design: lavender frosted glass, a purple orb
+logo, and no shadows.
+
+> **2.0.1:** the components use the omago design again (lavender panel `#fbf1ff`, purple `#b93fff`, ink
+> `#08080a`, a 2pt frosted border, radius 22, flat with no shadows or elevation). The bot avatar is now the purple
+> orb, and the launcher is a purple "Chat" pill by default (`launcherVariant="icon"` gives a round button).
+> New chat and History moved to the composer bar, and the header has a black close circle. The API is unchanged,
+> with three additions: `onAttach`, `launcherVariant` and `launcherText`.
 
 - **`BrainboxWidget`**: a floating launcher with an unread badge. It opens a chat sheet with a slide-up spring.
 - **`BrainboxChat`**: a full-screen chat view for a tab or stack screen.
@@ -102,10 +109,10 @@ See [`example/App.tsx`](example/App.tsx) for both patterns.
 | `headers` | `{}` | Extra headers on every request. |
 | `timeout` | `200000` | Request timeout in ms. Answers can take about 3 minutes. |
 | `streaming` | `true` | Streams answers token by token. If streaming isn't available, it falls back to `POST /api/chat`. |
-| `theme` | `{ mode: 'light' }` | `{ primary, mode: 'light' \| 'dark' \| 'auto', fontFamily }`. `primary` overrides the accent colour. `auto` follows the device appearance. |
-| `branding` | `{ botName: 'Brainbox AI' }` | `{ botName, title, subtitle, logoUrl, greeting }`. `title` defaults to `botName`, `subtitle` to "Online". `logoUrl` replaces the logo in the header and avatars. `greeting` defaults to `'Hi {{name}}'`. |
+| `theme` | `{ primary: '#b93fff', mode: 'light' }` | `{ primary, mode: 'light' \| 'dark' \| 'auto', fontFamily }`. `primary` recolours the user bubbles, send button, launcher, pills and links. `dark` is deep aubergine. `auto` follows the device appearance. |
+| `branding` | `{ botName: 'Brainbox AI' }` | `{ botName, title, subtitle, logoUrl, greeting }`. `title` defaults to `botName`, `subtitle` to "Online". `logoUrl` replaces the purple orb in the header and avatars. `greeting` defaults to `'Hi {{name}}'`. |
 | `welcomeMessages` | `["I'm {{botName}}. How can I help you today?"]` | Text under the welcome greeting. `{{name}}` and `{{botName}}` are replaced. |
-| `quickActions` | `[]` | Strings, or `{ title, description, prompt, icon }`. Shown as chips on the welcome screen; tapping one sends it. |
+| `quickActions` | `[]` | Strings, or `{ title, description, prompt, icon }`. Shown as purple pills under the welcome message; tapping one sends it. |
 | `placeholder` | `'Message…'` | Composer placeholder. |
 | `haptics` | `true` | Tiny haptics on send, reply and error. Pass `false` to turn them off, or a function `(type) => void` to use `expo-haptics` (see below). |
 | `features` | all `true` | `{ history, newChat, feedback, copy, sources }` |
@@ -115,7 +122,8 @@ See [`example/App.tsx`](example/App.tsx) for both patterns.
 | `persistSession` | `true` | Reopen the last conversation on mount. |
 | `initialSessionId` | – | Open this conversation instead. |
 | `onEvent` | – | `(name, detail) => void` for `message`, `response`, `error`, `session`, `feedback`, `upload`, `fallback`, `open` and `close`. |
-| `onClose` | – | `BrainboxChat` only. Shows a close button in the header. |
+| `onClose` | – | `BrainboxChat` only. Shows the black close circle in the header. |
+| `onAttach` | – | Shows a paperclip button in the composer and calls this when it is tapped. Wire it to your file picker. Hidden when not set. |
 | `safeArea` / `keyboardVerticalOffset` / `style` | `true` / `0` / – | Layout controls for `BrainboxChat`. |
 
 These props apply to `BrainboxWidget` only:
@@ -127,16 +135,21 @@ These props apply to `BrainboxWidget` only:
 | `defaultOpen` | `false` | Open on first render. |
 | `open` / `onOpenChange` | – | Controlled open state. |
 | `launcher` | `true` | Set to `false` to hide the floating button and open the widget from the ref. |
+| `launcherVariant` | `'button'` | `'button'`: a purple gradient pill with a chat icon and label. `'icon'`: a 56pt round purple button. |
+| `launcherText` | `'Chat'` | Label on the `'button'` launcher. |
 
-On phones the widget opens a full-screen sheet with a 12pt top radius. On screens 576pt or wider it opens a
-380×600 floating window in the launcher's corner. When a reply arrives while the widget is closed, the launcher
+On phones the widget opens a full-screen lavender sheet with a 22pt top radius. On screens 576pt or wider it opens a
+380×600 floating window (radius 22, 2pt frosted white border, no shadow) in the launcher's corner. When a reply arrives while the widget is closed, the launcher
 shows an unread badge.
 
 ## What users get
 
-- A header with the Brainbox logo, the title, a green status dot, and buttons for new chat, history and close.
-- Message bubbles grouped by sender, with day separators ("Today", "Yesterday") and timestamps at the end of each
-  group.
+- A translucent header with the 38pt purple orb, a bold title, a status subtitle and a black close circle.
+- Message rows with 34pt avatars (the orb for the bot, the user's photo or initial) and a name and time line.
+  Bot bubbles are white and user bubbles are purple. Rows are grouped by sender, with day separators
+  ("Today", "Yesterday").
+- A frosted composer card with the optional paperclip, a new chat button, a **History** pill and a purple gradient
+  send circle.
 - Streaming answers with a blinking caret, and typing dots until the first token arrives. A stop button replaces
   send while an answer is being written.
 - Under each answer: copy, 👍/👎 (sent to `POST /api/chat/feedback`; a 👎 is reported to staff as a knowledge gap),
@@ -154,11 +167,12 @@ shows an unread badge.
 <BrainboxChat theme={{ primary: '#0F9D76', mode: 'auto' }} ... />
 ```
 
-The design tokens follow the shared Brainbox design system. The light palette is `#F5F5F7` / `#FFFFFF` with
-label `#1D1D1F` and accent `#0071E3`. The dark palette is `#000` / `#1C1C1E` with accent `#0A84FF`. Text uses the
-system font (SF Pro on iOS, Roboto on Android) at weights 400, 500 and 600. Shadows are minimal: only the launcher
-and the floating window have one. To build your own UI on the same tokens, use
-`useBrainboxTheme(theme)`, `<BrainboxLogo size={32} />` and `<BrainboxIcon name="history" color="..." />`.
+The default theme is **omago**. The light palette has a lavender panel `#fbf1ff`, a body gradient from `#fffaff`
+to `#f9e6ff`, a header of 36% white over the panel, primary `#b93fff` and ink `#08080a`. The dark palette
+(`mode: 'dark'`, or `'auto'` on a dark device) uses a deep aubergine panel `#1a1022` with lavender accents. Titles
+and author lines are bold (800). Nothing has a shadow or Android elevation. To build your own UI on the same tokens, use
+`useBrainboxTheme(theme)`, `<BrainboxLogo size={38} />` (the purple orb; `variant="cube"` gives the classic mark),
+`<BrainboxOrb />` and `<BrainboxIcon name="history" color="..." />`.
 
 ### Haptics
 

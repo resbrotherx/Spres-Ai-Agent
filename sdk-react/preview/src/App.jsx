@@ -5,9 +5,9 @@ import { API_URL, API_KEY, TENANT_ID } from './config';
 const sdk = new BrainboxReactSDK(API_URL, API_KEY, TENANT_ID);
 
 const PARAMS = new URLSearchParams(window.location.search);
-// ?theme=dark|auto|light to preview the color modes; ?launcher=button|gif|icon for the widget launcher.
+// ?theme=dark|auto|light to preview the color modes; ?launcher=icon|gif to change the widget launcher (default: button pill).
 const THEME = PARAMS.get('theme') || 'light';
-const LAUNCHER = PARAMS.get('launcher') || 'icon';
+const LAUNCHER = PARAMS.get('launcher') || undefined;
 
 const demoPageStyles = `
 .preview-demo { min-height: calc(100vh - 53px); box-sizing: border-box; padding: 64px 24px; background: #F5F5F7; color: #1D1D1F;
@@ -29,7 +29,7 @@ function ChatDemo() {
         <h1>ChatWidget</h1>
         <p>The floating assistant lives in the bottom-right corner. Answers stream in token by token.</p>
         <p>
-          Try <code>?theme=dark</code>, <code>?theme=auto</code> or <code>?launcher=button</code>.
+          Try <code>?theme=dark</code>, <code>?theme=auto</code> or <code>?launcher=icon</code>.
         </p>
       </div>
       <ChatWidget

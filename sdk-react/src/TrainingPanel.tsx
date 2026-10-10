@@ -29,14 +29,31 @@ const STYLE_ID = 'bb-train-styles-v2';
 /** Screen-reader announcement; a tone also raises a toast + sound. */
 type Announce = (msg: string, tone?: ToastTone, title?: string) => void;
 
-type TabKey = 'upload' | 'api' | 'text';
+type TabKey = 'upload' | 'api' | 'text' | 'sdk';
 type KindFilter = 'all' | 'file' | 'api' | 'text';
 
 const TABS: { key: TabKey; label: string; icon: IconName }[] = [
   { key: 'upload', label: 'Upload files', icon: 'upload' },
   { key: 'api', label: 'Connect API', icon: 'plug' },
-  { key: 'text', label: 'Paste text', icon: 'type' }
+  { key: 'text', label: 'Paste text', icon: 'type' },
+  { key: 'sdk', label: 'SDK', icon: 'code' }
 ];
+
+/** Version of the downloadable Python / Node training SDKs (package `spres-ai`). */
+export const TRAINING_SDK_VERSION = '1.1.0';
+const DEFAULT_API_URL = 'https://port.smartpowerbilling.com';
+
+/** Extra TrainingPanel props for the "SDK" tab (all optional). */
+export interface TrainingPanelSdkTabProps {
+  /** Brainbox API base URL used in the code samples. Defaults to `sdk.getApiUrl()`. */
+  apiUrl?: string;
+  /** Link to the page where staff create API keys (e.g. the dashboard's Settings → API keys). */
+  keysHref?: string;
+  /** Override the SDK download links (default `${apiUrl}/sdk/downloads/...`). */
+  downloads?: { python?: string; node?: string };
+}
+
+export type TrainingPanelAllProps = TrainingPanelProps & TrainingPanelSdkTabProps;
 
 function fileExtension(name?: string | null): string {
   if (!name) return '';
@@ -114,7 +131,14 @@ type IconName =
   | 'clock'
   | 'sparkles'
   | 'loader'
-  | 'info';
+  | 'info'
+  | 'code'
+  | 'copy'
+  | 'download'
+  | 'share'
+  | 'key'
+  | 'link'
+  | 'book';
 
 function Icon({ name, size = 18, strokeWidth = 1.9 }: { name: IconName; size?: number; strokeWidth?: number }) {
   const paths: Record<IconName, ReactNode> = {
@@ -229,6 +253,44 @@ function Icon({ name, size = 18, strokeWidth = 1.9 }: { name: IconName; size?: n
       <>
         <circle cx="12" cy="12" r="9" />
         <path d="M12 16v-4M12 8h.01" />
+      </>
+    ),
+    code: <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />,
+    copy: (
+      <>
+        <rect x="9" y="9" width="13" height="13" rx="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </>
+    ),
+    download: (
+      <>
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <path d="m7 10 5 5 5-5M12 15V3" />
+      </>
+    ),
+    share: (
+      <>
+        <circle cx="18" cy="5" r="3" />
+        <circle cx="6" cy="12" r="3" />
+        <circle cx="18" cy="19" r="3" />
+        <path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4" />
+      </>
+    ),
+    key: (
+      <>
+        <circle cx="7.5" cy="15.5" r="5.5" />
+        <path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3" />
+      </>
+    ),
+    link: (
+      <>
+        <path d="M15 3h6v6M10 14 21 3" />
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      </>
+    ),
+    book: (
+      <>
+        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
       </>
     )
   };
@@ -546,6 +608,42 @@ select.bb-train-input option { background: var(--bb-train-card); color: var(--bb
 .bb-train-toasts { position: fixed; top: 16px; right: 16px; width: min(380px, calc(100vw - 32px)); z-index: 10000; pointer-events: none; }
 .bb-train-toasts .bb-c-toasts.is-top { top: 0; right: 0; width: 100%; }
 
+/* SDK tab */
+.bb-train-sdk { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.bb-train-sdk-intro { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.bb-train-sdk-intro > div { min-width: 0; flex: 1 1 280px; }
+.bb-train-sdk-lang { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.bb-train-sdk-lang .bb-train-seg { flex-wrap: wrap; max-width: 100%; }
+.bb-train-seg button[aria-checked="true"] { background: var(--bb-train-card); color: var(--bb-train-text); box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 0 0 .5px rgba(0,0,0,.04); }
+.bb-train-root[data-theme="dark"] .bb-train-seg button[aria-checked="true"] { background: #3A3A3C; }
+.bb-train-seg button:hover { color: var(--bb-train-text); }
+.bb-train-ids { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.bb-train-id { background: var(--bb-train-card); border: 1px solid var(--bb-train-border); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; line-height: 1.45; min-width: 0; color: var(--bb-train-muted); }
+.bb-train-id strong { display: block; color: var(--bb-train-text); font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.bb-train-sdk code, .bb-train-id code { font-family: var(--bb-mono); font-size: 12px; background: var(--bb-fill); padding: 1px 5px; border-radius: 5px; color: var(--bb-train-text); overflow-wrap: anywhere; }
+.bb-train-sdk pre code { font: inherit; background: none; padding: 0; border-radius: 0; overflow-wrap: normal; white-space: inherit; }
+.bb-train-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 22px; }
+.bb-train-step { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; }
+.bb-train-step-num { width: 28px; height: 28px; border-radius: 999px; background: var(--bb-accent-tint); color: var(--bb-train-accent); display: grid; place-items: center; font-weight: 600; font-size: 13px; font-variant-numeric: tabular-nums; }
+.bb-train-step-body { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.bb-train-step-title { margin: 3px 0 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.bb-train-step-text { margin: 0; color: var(--bb-train-muted); font-size: 13px; line-height: 1.5; }
+.bb-train-step-text strong { color: var(--bb-train-text); font-weight: 600; }
+.bb-train-code { border: 1px solid var(--bb-train-border); border-radius: 10px; background: var(--bb-train-soft); overflow: hidden; min-width: 0; }
+.bb-train-code-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 4px 4px 12px; border-bottom: 1px solid var(--bb-train-border); min-height: 38px; }
+.bb-train-code-title { font-size: 12.5px; font-weight: 500; color: var(--bb-train-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bb-train-code pre { margin: 0; padding: 12px 14px; overflow-x: auto; font-family: var(--bb-mono); font-size: 12.5px; line-height: 1.6; white-space: pre; color: var(--bb-train-text); tab-size: 2; }
+.bb-train-code pre:focus-visible { outline: none; box-shadow: inset var(--bb-ring); }
+.bb-train-copy.is-copied { color: var(--bb-success-text); }
+.bb-train-root[data-theme="dark"] .bb-train-copy.is-copied { color: #30D158; }
+.bb-train-samples { display: flex; flex-direction: column; gap: 12px; }
+.bb-train-sdk-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+a.bb-train-btn { text-decoration: none; }
+a.bb-train-btn:focus-visible, .bb-train-sdk a:focus-visible { outline: none; box-shadow: var(--bb-ring); border-radius: 8px; }
+.bb-train-sdk a.bb-train-inline-link { color: var(--bb-train-accent); font-weight: 500; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.bb-train-sdk a.bb-train-inline-link:hover { text-decoration: underline; }
+.bb-train-sdk-note { font-size: 12px; color: var(--bb-train-muted); margin: 0; }
+
 .bb-train-spin { animation: bb-train-rotate .8s linear infinite; }
 @keyframes bb-train-rotate { to { transform: rotate(360deg); } }
 @keyframes bb-train-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
@@ -582,6 +680,7 @@ select.bb-train-input option { background: var(--bb-train-card); color: var(--bb
   .bb-train-search .bb-train-input { width: 100%; }
   .bb-train-btn, .bb-train-icon-btn { min-height: 36px; }
   .bb-train-toasts { top: 8px; right: 8px; left: 8px; width: auto; }
+  .bb-train-ids { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 480px) {
   .bb-train-title { font-size: 24px; }
@@ -593,8 +692,14 @@ select.bb-train-input option { background: var(--bb-train-card); color: var(--bb
   .bb-train-kv-row .bb-train-icon-btn { grid-row: 1 / span 2; grid-column: 2; }
   .bb-train-tabs { width: 100%; }
   .bb-train-tab { flex: 1; justify-content: center; padding: 0 6px; gap: 5px; font-size: 12px; }
+  .bb-train-tab svg { display: none; }
   .bb-train-seg { width: 100%; order: 3; }
   .bb-train-seg button { flex: 1; }
+  .bb-train-step { grid-template-columns: 24px minmax(0, 1fr); gap: 10px; }
+  .bb-train-step-num { width: 24px; height: 24px; font-size: 12px; }
+  .bb-train-step-title { margin-top: 1px; }
+  .bb-train-code pre { padding: 10px 12px; font-size: 12px; }
+  .bb-train-sdk-actions .bb-train-btn { flex: 1 1 100%; }
 }
 `;
 
@@ -2024,6 +2129,557 @@ function SourcesList({
 }
 
 /* ------------------------------------------------------------------ */
+/* SDK tab: train from your own code                                   */
+/* ------------------------------------------------------------------ */
+
+type SdkLang = 'python' | 'node' | 'curl' | 'react';
+type SampleKey = 'upload' | 'records' | 'api' | 'status' | 'audience';
+
+const SDK_LANGS: { key: SdkLang; label: string }[] = [
+  { key: 'python', label: 'Python' },
+  { key: 'node', label: 'Node.js' },
+  { key: 'curl', label: 'cURL' },
+  { key: 'react', label: 'React' }
+];
+
+const SAMPLE_TITLES: Record<SampleKey, string> = {
+  upload: 'Upload a PDF / XML file',
+  records: 'Send text or database records in a loop',
+  api: 'Connect a support-tickets API',
+  status: 'Check status and list sources',
+  audience: 'Set who may see it (audience)'
+};
+const SAMPLE_ORDER: SampleKey[] = ['upload', 'records', 'api', 'status', 'audience'];
+
+/** Copy text to the clipboard; falls back to a hidden textarea. Never throws. */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fall through to the legacy path */
+  }
+  try {
+    if (typeof document === 'undefined') return false;
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function useCopy(announce: Announce): [string | null, (id: string, text: string, label: string) => void] {
+  const [copied, setCopied] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    []
+  );
+  const copy = useCallback(
+    (id: string, text: string, label: string) => {
+      void copyText(text).then((ok) => {
+        if (ok) {
+          setCopied(id);
+          announce(`${label} copied to the clipboard.`);
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(() => setCopied(null), 2000);
+        } else {
+          announce(`Couldn’t copy ${label.toLowerCase()}. Select the text and copy it manually.`, 'error', 'Copy failed');
+        }
+      });
+    },
+    [announce]
+  );
+  return [copied, copy];
+}
+
+function CodeBlock({
+  id,
+  title,
+  code,
+  copied,
+  onCopy
+}: {
+  id: string;
+  title: string;
+  code: string;
+  copied: boolean;
+  onCopy: (id: string, text: string, label: string) => void;
+}) {
+  return (
+    <div className="bb-train-code">
+      <div className="bb-train-code-head">
+        <span className="bb-train-code-title">{title}</span>
+        <button
+          type="button"
+          className={`bb-train-btn bb-train-btn-ghost bb-train-btn-sm bb-train-copy${copied ? ' is-copied' : ''}`}
+          onClick={() => onCopy(id, code, title)}
+          aria-label={copied ? `Copied: ${title}` : `Copy code: ${title}`}
+          data-copy-id={id}
+        >
+          <Icon name={copied ? 'check' : 'copy'} size={14} />
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <pre tabIndex={0} role="region" aria-label={`${title} code`}>
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+function sdkSamples(lang: SdkLang, api: string): { install: string; installNote: string; samples: Record<SampleKey, string> } {
+  const fill = (s: string) => s.replace(/__API__/g, api).replace(/^\n/, '');
+  const fillAll = (rec: Record<SampleKey, string>) => {
+    const out = {} as Record<SampleKey, string>;
+    SAMPLE_ORDER.forEach((k) => {
+      out[k] = fill(rec[k]);
+    });
+    return out;
+  };
+
+  if (lang === 'python') {
+    const setup = `import os
+from brainbox_sdk import BrainboxPythonSDK
+
+sdk = BrainboxPythonSDK(
+    api_url="__API__",
+    api_key=os.environ["BRAINBOX_SECRET_KEY"],  # sk_live_... (server only)
+)
+`;
+    return {
+      install: `pip install __API__/sdk/downloads/spres_ai-${TRAINING_SDK_VERSION}-py3-none-any.whl`.replace(/__API__/g, api),
+      installNote: 'Python 3.8+. Once published to PyPI this becomes simply: pip install spres-ai',
+      samples: fillAll({
+        upload: `${setup}
+# PDF, XML, DOCX, TXT, CSV, JSON (max 25 MB)
+job = sdk.train_file("employee-handbook.pdf", name="Employee handbook", audience="internal")
+sdk.wait_for_task(job["task_id"])  # polls until completed / failed`,
+        records: `${setup}
+# Any database works: sqlite3, psycopg, mysql, SQLAlchemy...
+for row in db.execute("SELECT id, question, answer FROM faq"):
+    sdk.train_text(
+        f"Q: {row.question}\\nA: {row.answer}",
+        name=f"FAQ #{row.id}",
+        audience="customer",
+    )`,
+        api: `config = dict(
+    url="https://helpdesk.example.com/api/tickets",
+    headers={"Authorization": "Bearer YOUR_HELPDESK_TOKEN"},
+    data_path="data.tickets",               # where the list of tickets is in the JSON
+    source_type="support_tickets",
+    mapping={"question_field": "subject", "answer_field": "resolution"},
+    pagination={"type": "page", "page_param": "page", "max_pages": 10},
+)
+preview = sdk.test_api_source(**config)    # dry run, nothing is saved
+if preview["ok"]:
+    job = sdk.add_api_source(name="Helpdesk tickets", audience="internal", **config)`,
+        status: `print(sdk.get_ingest_status(job["task_id"]))  # queued / processing / completed / failed
+
+result = sdk.list_sources()
+print(result["totals"])                         # {'sources': 4, 'documents': 230}
+for s in result["sources"]:
+    print(s["source_id"], s["name"], s["status"], s["audience"])
+
+sdk.sync_source(source_id)    # re-fetch an API source now
+sdk.delete_source(source_id)  # forget everything it taught`,
+        audience: `# public | customer | vendor | internal (default) | admin
+sdk.train_text("Support is open 8am-6pm, Monday to Friday.", name="Opening hours", audience="public")
+
+# Relabel an existing source: applies to all of its documents at once
+sdk.update_source(source_id, audience="customer")`
+      })
+    };
+  }
+
+  if (lang === 'node') {
+    const setup = `const { BrainboxNodeSDK } = require('spres-ai');
+
+const sdk = new BrainboxNodeSDK({
+  apiUrl: '__API__',
+  apiKey: process.env.BRAINBOX_SECRET_KEY, // sk_live_... (server only)
+});
+`;
+    return {
+      install: `npm install __API__/sdk/downloads/spres-ai-${TRAINING_SDK_VERSION}.tgz`.replace(/__API__/g, api),
+      installNote: 'Node 14+ (18+ recommended), TypeScript types included. Once published to npm: npm install spres-ai',
+      samples: fillAll({
+        upload: `${setup}
+// PDF, XML, DOCX, TXT, CSV, JSON (max 25 MB)
+const job = await sdk.trainFile('./employee-handbook.pdf', { name: 'Employee handbook', audience: 'internal' });
+await sdk.waitForTask(job.task_id); // polls until completed / failed`,
+        records: `${setup}
+// Any database works: pg, mysql2, prisma, mongoose...
+const { rows } = await db.query('SELECT id, question, answer FROM faq');
+for (const row of rows) {
+  await sdk.trainText(\`Q: \${row.question}\\nA: \${row.answer}\`, {
+    name: \`FAQ #\${row.id}\`,
+    audience: 'customer',
+  });
+}`,
+        api: `const config = {
+  url: 'https://helpdesk.example.com/api/tickets',
+  headers: { Authorization: 'Bearer YOUR_HELPDESK_TOKEN' },
+  data_path: 'data.tickets', // where the list of tickets is in the JSON
+  source_type: 'support_tickets',
+  mapping: { question_field: 'subject', answer_field: 'resolution' },
+  pagination: { type: 'page', page_param: 'page', max_pages: 10 },
+};
+const preview = await sdk.testApiSource(config); // dry run, nothing is saved
+if (preview.ok) {
+  const job = await sdk.addApiSource({ ...config, name: 'Helpdesk tickets', audience: 'internal' });
+}`,
+        status: `console.log(await sdk.getIngestStatus(job.task_id)); // queued / processing / completed / failed
+
+const { sources, totals } = await sdk.listSources();
+console.log(totals); // { sources: 4, documents: 230 }
+sources.forEach((s) => console.log(s.source_id, s.name, s.status, s.audience));
+
+await sdk.syncSource(sourceId);   // re-fetch an API source now
+await sdk.deleteSource(sourceId); // forget everything it taught`,
+        audience: `// public | customer | vendor | internal (default) | admin
+await sdk.trainText('Support is open 8am-6pm, Monday to Friday.', { name: 'Opening hours', audience: 'public' });
+
+// Relabel an existing source: applies to all of its documents at once
+await sdk.updateSource(sourceId, { audience: 'customer' });`
+      })
+    };
+  }
+
+  if (lang === 'curl') {
+    const auth = `-H "X-API-Key: $BRAINBOX_SECRET_KEY"`;
+    return {
+      install: `export BRAINBOX_SECRET_KEY=sk_live_your_secret_key`,
+      installNote:
+        'Nothing to install: curl ships with macOS, Linux and Windows 10+. In PowerShell use $env:BRAINBOX_SECRET_KEY="sk_live_..." and curl.exe.',
+      samples: fillAll({
+        upload: `curl -X POST __API__/api/train/file \\
+  ${auth} \\
+  -F "file=@employee-handbook.pdf" \\
+  -F "name=Employee handbook" \\
+  -F "audience=internal"
+# -> {"source": {...}, "task_id": "..."}`,
+        records: `# One record
+curl -X POST __API__/api/train/text \\
+  ${auth} -H "Content-Type: application/json" \\
+  -d '{"name": "Refund policy", "content": "Refunds are processed within 14 days.", "audience": "customer"}'
+
+# Every row of a CSV export (needs jq)
+while IFS=, read -r id question answer; do
+  jq -n --arg n "FAQ #$id" --arg c "Q: $question A: $answer" \\
+    '{name: $n, content: $c, audience: "customer"}' |
+  curl -s -X POST __API__/api/train/text \\
+    ${auth} -H "Content-Type: application/json" -d @-
+done < faq.csv`,
+        api: `curl -X POST __API__/api/train/api-source \\
+  ${auth} -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Helpdesk tickets",
+    "url": "https://helpdesk.example.com/api/tickets",
+    "headers": {"Authorization": "Bearer YOUR_HELPDESK_TOKEN"},
+    "data_path": "data.tickets",
+    "source_type": "support_tickets",
+    "mapping": {"question_field": "subject", "answer_field": "resolution"},
+    "pagination": {"type": "page", "page_param": "page", "max_pages": 10},
+    "audience": "internal"
+  }'
+# Dry run first (nothing saved): POST the same body to /api/train/api-source/test`,
+        status: `curl ${auth} __API__/api/ingest/status/TASK_ID
+curl ${auth} __API__/api/train/sources
+curl -X POST ${auth} __API__/api/train/sources/SOURCE_ID/sync
+curl -X DELETE ${auth} __API__/api/train/sources/SOURCE_ID`,
+        audience: `# public | customer | vendor | internal (default) | admin
+curl -X PATCH __API__/api/train/sources/SOURCE_ID \\
+  ${auth} -H "Content-Type: application/json" \\
+  -d '{"audience": "customer"}'`
+      })
+    };
+  }
+
+  // React: browser upload via TrainingPanel, signed in as staff (never a secret key in a browser).
+  const setup = `import { BrainboxReactSDK } from 'spres-react';
+
+// Staff-only admin page: authenticate with the signed-in staff member's
+// login token, never with a secret key (anything in a browser is public).
+const sdk = new BrainboxReactSDK('__API__', () => getStaffToken());
+`;
+  return {
+    install: 'npm install spres-react',
+    installNote: 'React 18+. Use it in a staff-only admin page; for servers and scripts use the Python or Node.js SDK.',
+    samples: fillAll({
+      upload: `import { BrainboxReactSDK, TrainingPanel } from 'spres-react';
+
+const sdk = new BrainboxReactSDK('__API__', () => getStaffToken());
+
+// Drag-and-drop uploads, API connections, text and this SDK guide in one panel
+export function TrainPage() {
+  return <TrainingPanel sdk={sdk} mode="auto" keysHref="/settings/api-keys" />;
+}
+
+// Or upload a File yourself (e.g. from an <input type="file">):
+const job = await sdk.trainFile(file, { name: file.name, audience: 'internal' });`,
+      records: `${setup}
+for (const row of rows) {
+  await sdk.trainText(\`FAQ #\${row.id}\`, \`Q: \${row.question}\\nA: \${row.answer}\`, 'customer');
+}`,
+      api: `${setup}
+const config = {
+  url: 'https://helpdesk.example.com/api/tickets',
+  headers: { Authorization: 'Bearer YOUR_HELPDESK_TOKEN' },
+  data_path: 'data.tickets',
+  source_type: 'support_tickets' as const,
+  mapping: { question_field: 'subject', answer_field: 'resolution' },
+};
+const preview = await sdk.testApiSource(config); // dry run
+if (preview.ok) await sdk.addApiSource({ ...config, name: 'Helpdesk tickets', audience: 'internal' });`,
+      status: `import { useBrainboxTraining } from 'spres-react';
+
+function SourcesSummary() {
+  const { sources, totals, loading } = useBrainboxTraining(sdk); // polls while training runs
+  if (loading) return <p>Loading…</p>;
+  return <p>{totals.sources} sources, {totals.documents} chunks, {sources.filter((s) => s.status === 'processing').length} training</p>;
+}
+
+// One task: await sdk.getIngestStatus(taskId)`,
+      audience: `// public | customer | vendor | internal (default) | admin
+await sdk.trainText('Opening hours', 'Support is open 8am-6pm, Monday to Friday.', 'public');
+await sdk.updateSource(sourceId, { audience: 'customer' });`
+    })
+  };
+}
+
+function SdkTab({
+  apiUrl,
+  keysHref,
+  downloads,
+  announce
+}: {
+  apiUrl: string;
+  keysHref?: string;
+  downloads: { python: string; node: string };
+  announce: Announce;
+}) {
+  const [lang, setLang] = useState<SdkLang>('python');
+  const [copied, copy] = useCopy(announce);
+  const uid = useId();
+  const { install, installNote, samples } = useMemo(() => sdkSamples(lang, apiUrl), [lang, apiUrl]);
+  const docsUrl = `${apiUrl}/docs`;
+  const langLabel = SDK_LANGS.find((l) => l.key === lang)?.label || lang;
+
+  const installLink = lang === 'python' ? downloads.python : lang === 'node' ? downloads.node : lang === 'curl' ? docsUrl : install;
+  const shareText = [
+    'Train Brainbox from your own code',
+    `Python:  pip install ${downloads.python}`,
+    `Node.js: npm install ${downloads.node}`,
+    `API docs: ${docsUrl}`,
+    'Use a secret key (sk_live_...) from Staff dashboard > Settings > API keys. Never put it in a browser or app.'
+  ].join('\n');
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+  const share = async () => {
+    if (canShare) {
+      try {
+        await navigator.share({ title: 'Brainbox SDK', text: shareText, url: docsUrl });
+        return;
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+      }
+    }
+    copy('share', shareText, 'SDK instructions');
+  };
+
+  const onLangKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const idx = SDK_LANGS.findIndex((l) => l.key === lang);
+    let next = idx;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (idx + 1) % SDK_LANGS.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (idx - 1 + SDK_LANGS.length) % SDK_LANGS.length;
+    else return;
+    e.preventDefault();
+    setLang(SDK_LANGS[next].key);
+    const btn = e.currentTarget.querySelectorAll<HTMLButtonElement>('button')[next];
+    btn?.focus();
+  };
+
+  return (
+    <div className="bb-train-sdk">
+      <div className="bb-train-sdk-intro">
+        <div>
+          <h2 className="bb-train-section-title">Train from your own code</h2>
+          <p className="bb-train-section-sub">
+            Train from your own servers, scripts and databases — data goes straight to your Brainbox and is learned by
+            its own AI.
+          </p>
+        </div>
+        <div className="bb-train-sdk-lang">
+          <span className="bb-train-label" id={`${uid}-lang`}>
+            Language
+          </span>
+          <div className="bb-train-seg" role="radiogroup" aria-labelledby={`${uid}-lang`} onKeyDown={onLangKeyDown}>
+            {SDK_LANGS.map((l) => (
+              <button
+                key={l.key}
+                type="button"
+                role="radio"
+                aria-checked={lang === l.key}
+                tabIndex={lang === l.key ? 0 : -1}
+                onClick={() => setLang(l.key)}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="bb-train-banner is-info" role="note" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+          <Icon name="info" size={16} /> Three identifiers, three jobs
+        </div>
+        <div className="bb-train-ids">
+          <div className="bb-train-id">
+            <strong>Tenant ID</strong>
+            Which company’s knowledge base. Not a password — and optional here, the key already decides it.
+          </div>
+          <div className="bb-train-id">
+            <strong>
+              Publishable key <code>pk_</code>
+            </strong>
+            Websites and apps — chat only. Safe in a browser, cannot train.
+          </div>
+          <div className="bb-train-id">
+            <strong>
+              Secret key <code>sk_</code>
+            </strong>
+            Servers, scripts and training. Keep it private.
+          </div>
+        </div>
+      </div>
+
+      <ol className="bb-train-steps" aria-label={`${langLabel} setup steps`}>
+        <li className="bb-train-step">
+          <span className="bb-train-step-num" aria-hidden="true">
+            1
+          </span>
+          <div className="bb-train-step-body">
+            <h3 className="bb-train-step-title">{lang === 'curl' ? 'Set your key' : 'Install'}</h3>
+            <p className="bb-train-step-text">{installNote}</p>
+            <CodeBlock id={`install-${lang}`} title={lang === 'curl' ? 'Terminal' : 'Install command'} code={install} copied={copied === `install-${lang}`} onCopy={copy} />
+          </div>
+        </li>
+
+        <li className="bb-train-step">
+          <span className="bb-train-step-num" aria-hidden="true">
+            2
+          </span>
+          <div className="bb-train-step-body">
+            <h3 className="bb-train-step-title">{lang === 'react' ? 'Sign in as staff (no secret key)' : 'Get a secret key'}</h3>
+            {lang === 'react' ? (
+              <p className="bb-train-step-text">
+                A browser can’t keep secrets, so the React panel authenticates with the <strong>signed-in staff member’s token</strong>{' '}
+                (the staff dashboard does this for you). <strong>Never put a secret key in a browser or mobile app.</strong> To train
+                from your own backend instead, use the Python or Node.js SDK with a secret key.
+              </p>
+            ) : (
+              <p className="bb-train-step-text">
+                In the staff dashboard open <strong>Settings → API keys → Create → Secret</strong>. Copy the{' '}
+                <code>sk_live_…</code> key once (it isn’t shown again) and keep it in an environment variable such as{' '}
+                <code>BRAINBOX_SECRET_KEY</code> on your server. <strong>Never put it in a browser or mobile app.</strong>
+              </p>
+            )}
+            {keysHref ? (
+              <p className="bb-train-step-text">
+                <a className="bb-train-inline-link" href={keysHref}>
+                  <Icon name="key" size={14} /> Open API keys
+                </a>
+              </p>
+            ) : null}
+          </div>
+        </li>
+
+        <li className="bb-train-step">
+          <span className="bb-train-step-num" aria-hidden="true">
+            3
+          </span>
+          <div className="bb-train-step-body">
+            <h3 className="bb-train-step-title">Send your data</h3>
+            <p className="bb-train-step-text">
+              Copy a sample — <code>{apiUrl}</code> is already filled in. Training runs in the background; new sources appear in the
+              list below.
+            </p>
+            <div className="bb-train-samples">
+              {SAMPLE_ORDER.map((k) => (
+                <CodeBlock
+                  key={`${lang}-${k}`}
+                  id={`${lang}-${k}`}
+                  title={SAMPLE_TITLES[k]}
+                  code={samples[k]}
+                  copied={copied === `${lang}-${k}`}
+                  onCopy={copy}
+                />
+              ))}
+            </div>
+          </div>
+        </li>
+
+        <li className="bb-train-step">
+          <span className="bb-train-step-num" aria-hidden="true">
+            4
+          </span>
+          <div className="bb-train-step-body">
+            <h3 className="bb-train-step-title">Download &amp; share</h3>
+            <div className="bb-train-sdk-actions">
+              <a className="bb-train-btn bb-train-btn-primary" href={downloads.python} download>
+                <Icon name="download" size={16} /> Download Python SDK (.whl)
+              </a>
+              <a className="bb-train-btn bb-train-btn-ghost" href={downloads.node} download>
+                <Icon name="download" size={16} /> Download Node SDK (.tgz)
+              </a>
+              <button
+                type="button"
+                className={`bb-train-btn bb-train-btn-ghost bb-train-copy${copied === 'install-link' ? ' is-copied' : ''}`}
+                onClick={() => copy('install-link', installLink, `${langLabel} install link`)}
+              >
+                <Icon name={copied === 'install-link' ? 'check' : 'link'} size={16} />
+                {copied === 'install-link' ? 'Copied' : 'Copy install link'}
+              </button>
+              <button
+                type="button"
+                className={`bb-train-btn bb-train-btn-ghost bb-train-copy${copied === 'share' ? ' is-copied' : ''}`}
+                onClick={() => void share()}
+              >
+                <Icon name={copied === 'share' ? 'check' : 'share'} size={16} />
+                {copied === 'share' ? 'Copied' : canShare ? 'Share' : 'Copy instructions'}
+              </button>
+              <a className="bb-train-btn bb-train-btn-ghost" href={docsUrl} target="_blank" rel="noopener noreferrer">
+                <Icon name="book" size={16} /> API docs
+                <span className="bb-train-sr"> (opens in a new tab)</span>
+              </a>
+            </div>
+            <p className="bb-train-sdk-note">
+              Version {TRAINING_SDK_VERSION} · Python 3.8+ · Node 14+. Audiences: public, customer, vendor, internal (default),
+              admin.
+            </p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* TrainingPanel                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -2039,8 +2695,11 @@ export function TrainingPanel({
   readOnly = false,
   mode = 'light',
   sounds = true,
-  toasts: showToasts = true
-}: TrainingPanelProps) {
+  toasts: showToasts = true,
+  apiUrl: apiUrlProp,
+  keysHref,
+  downloads: downloadsProp
+}: TrainingPanelAllProps) {
   useInjectedStyles();
   const theme = useResolvedMode(mode);
   const toastApi = useToasts();
@@ -2054,8 +2713,27 @@ export function TrainingPanel({
   const [liveMessage, setLiveMessage] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [errorDismissed, setErrorDismissed] = useState(false);
-  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ upload: null, api: null, text: null });
+  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ upload: null, api: null, text: null, sdk: null });
   const uid = useId();
+
+  // Base URL for the SDK tab's samples and download links.
+  const sdkApiUrl = useMemo(() => {
+    let fromSdk = '';
+    try {
+      const getter = (sdk as { getApiUrl?: () => string } | null | undefined)?.getApiUrl;
+      fromSdk = typeof getter === 'function' ? getter.call(sdk) || '' : '';
+    } catch {
+      fromSdk = '';
+    }
+    return (apiUrlProp || fromSdk || DEFAULT_API_URL).replace(/\/+$/, '');
+  }, [apiUrlProp, sdk]);
+  const sdkDownloads = useMemo(
+    () => ({
+      python: downloadsProp?.python || `${sdkApiUrl}/sdk/downloads/spres_ai-${TRAINING_SDK_VERSION}-py3-none-any.whl`,
+      node: downloadsProp?.node || `${sdkApiUrl}/sdk/downloads/spres-ai-${TRAINING_SDK_VERSION}.tgz`
+    }),
+    [downloadsProp?.python, downloadsProp?.node, sdkApiUrl]
+  );
 
   const announce = useCallback<Announce>(
     (msg, tone, title) => {
@@ -2248,6 +2926,9 @@ export function TrainingPanel({
                 <ApiTab testApiSource={training.testApiSource} addApiSource={training.addApiSource} announce={announce} />
               ) : null}
               {t.key === 'text' ? <TextTab trainText={training.trainText} announce={announce} /> : null}
+              {t.key === 'sdk' ? (
+                <SdkTab apiUrl={sdkApiUrl} keysHref={keysHref} downloads={sdkDownloads} announce={announce} />
+              ) : null}
             </div>
           ))}
         </section>

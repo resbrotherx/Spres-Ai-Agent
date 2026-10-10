@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
+  Image,
   Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -32,7 +33,7 @@ import { BrainboxHaptics, triggerHaptic } from '../haptics';
 import { BrainboxClipboard, copyText, resolveClipboard } from '../clipboard';
 import { safeHref } from '../markdown';
 import { BrainboxIcon, BrainboxIconName } from './Icon';
-import { BrainboxLogo } from './Logo';
+import { BrainboxGradientFill, BrainboxLogo, BrainboxPanelBackground } from './Logo';
 import { Markdown } from './Markdown';
 import { Appear, Caret, EASE_SHEET, TypingDots, useReducedMotion } from './motion';
 
@@ -47,7 +48,7 @@ export interface BrainboxBranding {
   title?: string;
   /** Header subtitle next to the green status dot (default 'Online'). */
   subtitle?: string;
-  /** Custom image for the header and bot avatar instead of the Brainbox logo. */
+  /** Custom image for the header and bot avatar instead of the purple orb. */
   logoUrl?: string;
   /** Welcome heading (default 'Hi {{name}}'). */
   greeting?: string;
@@ -93,8 +94,10 @@ export interface BrainboxAppearanceProps {
   features?: BrainboxFeatures;
   /** Clipboard for the copy buttons (e.g. expo-clipboard). Default: RN core Clipboard if present; `null` hides copy. */
   clipboard?: BrainboxClipboard | null;
-  /** Shows a close button in the header. */
+  /** Shows the black close circle in the header. */
   onClose?: () => void;
+  /** Shows the paperclip button in the composer and calls this when tapped (wire it to your file picker). */
+  onAttach?: () => void;
   /** Wrap in SafeAreaView (default true). */
   safeArea?: boolean;
   keyboardVerticalOffset?: number;
@@ -206,21 +209,22 @@ function sourceTitle(s: BrainboxSearchResult, i: number): string {
 /* Small pieces                                                        */
 /* ------------------------------------------------------------------ */
 
-function IconButton({
+/** 34pt round translucent tool button (composer bar). */
+function ToolButton({
   icon, label, onPress, t, active
 }: { icon: BrainboxIconName; label: string; onPress: () => void; t: BrainboxTokens; active?: boolean }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      hitSlop={6}
+      hitSlop={4}
       onPress={onPress}
       style={({ pressed }) => [
-        styles.iconBtn,
-        { backgroundColor: pressed || active ? t.fill : 'transparent', transform: [{ scale: pressed ? 0.97 : 1 }] }
+        styles.tool,
+        { backgroundColor: pressed || active ? t.fillStrong : t.toolBg, transform: [{ scale: pressed ? 0.96 : 1 }] }
       ]}
     >
-      <BrainboxIcon name={icon} size={20} color={active ? t.accent : t.secondary} />
+      <BrainboxIcon name={icon} size={20} strokeWidth={1.8} color={active ? t.accent : t.label} />
     </Pressable>
   );
 }
@@ -238,6 +242,48 @@ function FooterButton({
     >
       <BrainboxIcon name={icon} size={15} color={color} filled={filled} />
     </Pressable>
+  );
+}
+
+/** Omago pill: purple text, hairline purple border, translucent white fill, 32pt tall. */
+function Pill({
+  label, onPress, t, icon, hint, stretch
+}: { label: string; onPress: () => void; t: BrainboxTokens; icon?: BrainboxIconName; hint?: string; stretch?: boolean }) {
+  const ty = typo(t);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityHint={hint}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.pill,
+        stretch ? { alignSelf: 'stretch' } : null,
+        { borderColor: t.pillBorder, backgroundColor: pressed ? t.fillStrong : t.pillBg, transform: [{ scale: pressed ? 0.97 : 1 }] }
+      ]}
+    >
+      {icon ? <BrainboxIcon name={icon} size={14} color={t.pillText} /> : null}
+      <Text style={[ty.pill, { color: t.pillText, marginLeft: icon ? 6 : 0, flexShrink: 1 }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function UserAvatar({ user, t, size = 34 }: { user?: BrainboxUser; t: BrainboxTokens; size?: number }) {
+  if (user?.avatarUrl) {
+    return (
+      <Image
+        source={{ uri: user.avatarUrl }}
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+        accessibilityIgnoresInvertColors
+      />
+    );
+  }
+  const initial = ((user?.name || '').trim()[0] || 'Y').toUpperCase();
+  return (
+    <View style={[styles.userAvatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: t.accentTint }]}>
+      <Text style={[typo(t).meta, { color: t.pillText }]}>{initial}</Text>
+    </View>
   );
 }
 
@@ -260,7 +306,7 @@ function Sources({ results, t }: { results: BrainboxSearchResult[]; t: BrainboxT
         </Text>
       </Pressable>
       {open ? (
-        <View style={[styles.sources, { borderColor: t.separator, backgroundColor: t.surface2 }]}>
+        <View style={[styles.sources, { borderColor: t.pillBorder, backgroundColor: t.botBubble }]}>
           {list.map((s, i) => {
             const md = (s.metadata || {}) as Record<string, any>;
             const href = safeHref(String(s.url || md.url || ''));
@@ -319,14 +365,15 @@ function HistorySheet({
     : { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] };
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: t.surface }, animStyle]} accessibilityViewIsModal>
-      <View style={[styles.sheetHeader, { borderBottomColor: t.separator }]}>
-        <Text style={[ty.headline, { color: t.label }]} accessibilityRole="header">Conversations</Text>
+    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: t.panel }, animStyle]} accessibilityViewIsModal>
+      <BrainboxPanelBackground from={t.bodyFrom} to={t.bodyTo} glow={t.bodyGlow} />
+      <View style={styles.sheetHeader}>
+        <Text style={[ty.title, { color: t.label }]} accessibilityRole="header">Conversations</Text>
         <Pressable accessibilityRole="button" onPress={onClose} hitSlop={8}>
-          <Text style={[ty.body, { color: t.accent, fontWeight: '500' }]}>Done</Text>
+          <Text style={[ty.pill, { color: t.pillText }]}>Done</Text>
         </Pressable>
       </View>
-      <View style={[styles.search, { backgroundColor: t.fill }]}>
+      <View style={[styles.search, { backgroundColor: t.pillBg, borderColor: t.pillBorder }]}>
         <BrainboxIcon name="search" size={16} color={t.tertiary} />
         <TextInput
           value={q}
@@ -336,16 +383,16 @@ function HistorySheet({
           style={[ty.body, styles.searchInput, { color: t.label }]}
           returnKeyType="search"
           accessibilityLabel="Search conversations"
+          keyboardAppearance={t.dark ? 'dark' : 'light'}
+          selectionColor={t.accent}
         />
       </View>
       {chat.sessionsLoading && !chat.sessions ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={t.tertiary} />
+        <ActivityIndicator style={{ marginTop: 24 }} color={t.accent} />
       ) : sections.length === 0 ? (
         <View style={styles.empty}>
-          <View style={[styles.emptyIcon, { backgroundColor: t.accentTint }]}>
-            <BrainboxIcon name="message" size={32} color={t.accent} />
-          </View>
-          <Text style={[ty.headline, { color: t.label, marginTop: 14 }]}>
+          <BrainboxLogo size={56} />
+          <Text style={[ty.title, { color: t.label, marginTop: 14 }]}>
             {q ? 'No matches' : 'No conversations yet'}
           </Text>
           <Text style={[ty.footnote, { color: t.secondary, marginTop: 4, textAlign: 'center' }]}>
@@ -357,28 +404,32 @@ function HistorySheet({
           sections={sections}
           keyExtractor={(s) => s.session_id}
           stickySectionHeadersEnabled={false}
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={{ paddingBottom: 24, paddingHorizontal: 12 }}
           renderSectionHeader={({ section }) => (
-            <Text style={[ty.caption2, styles.sectionLabel, { color: t.secondary }]}>{section.title.toUpperCase()}</Text>
+            <Text style={[ty.metaTime, styles.sectionLabel, { color: t.tertiary }]}>{section.title.toUpperCase()}</Text>
           )}
           renderItem={({ item }) => {
             const active = item.session_id === chat.sessionId;
             return (
               <Pressable
                 accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 onPress={() => {
                   chat.loadSession(item.session_id);
                   onClose();
                 }}
                 style={({ pressed }) => [
                   styles.sessionRow,
-                  { backgroundColor: active ? t.accentTint : pressed ? t.fill : 'transparent' }
+                  {
+                    borderColor: active ? t.accent : t.pillBorder,
+                    backgroundColor: active ? t.accentTint : pressed ? t.fillStrong : t.pillBg
+                  }
                 ]}
               >
-                <Text numberOfLines={1} style={[ty.body, { color: t.label, flex: 1 }]}>
+                <Text numberOfLines={1} style={[ty.pill, { color: active ? t.pillText : t.label, flex: 1 }]}>
                   {item.title || 'Untitled conversation'}
                 </Text>
-                <Text style={[ty.caption, { color: t.tertiary, marginLeft: 8 }]}>
+                <Text style={[ty.metaTime, { color: t.tertiary, marginLeft: 8 }]}>
                   {timeLabel(parseServerTime(item.created_at))}
                 </Text>
               </Pressable>
@@ -394,11 +445,11 @@ function HistorySheet({
 /* View                                                                */
 /* ------------------------------------------------------------------ */
 
-/** The chat UI driven by a `useBrainboxChat` controller. */
+/** The omago chat UI driven by a `useBrainboxChat` controller. */
 export function BrainboxChatView(props: BrainboxChatViewProps) {
   const {
     chat, user, branding = {}, welcomeMessages, quickActions = [], placeholder = 'Message…',
-    haptics = true, features = {}, onClose, safeArea = true, keyboardVerticalOffset = 0, style
+    haptics = true, features = {}, onClose, onAttach, safeArea = true, keyboardVerticalOffset = 0, style
   } = props;
   const t = useBrainboxTheme(props.theme);
   const ty = typo(t);
@@ -417,6 +468,7 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
 
   const botName = branding.botName || 'Brainbox AI';
   const firstName = (user?.name || '').trim().split(/\s+/)[0] || 'there';
+  const userName = (user?.name || '').trim() || 'You';
   const vars = { name: firstName, botName };
   const greeting = fill(branding.greeting || 'Hi {{name}}', vars);
   const welcome = (welcomeMessages && welcomeMessages.length ? welcomeMessages : ["I'm {{botName}}. How can I help you today?"]).map(
@@ -431,6 +483,7 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
       if (!q || chat.sending) return;
       nearBottom.current = true;
       if (text === undefined) setDraft('');
+      setHistoryOpen(false);
       chat.send(q);
     },
     [draft, chat]
@@ -442,60 +495,65 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
   };
 
   const header = (
-    <View style={[styles.header, { borderBottomColor: t.separator, backgroundColor: t.surface }]}>
-      <BrainboxLogo size={32} logoUrl={branding.logoUrl} />
+    <View style={[styles.header, { borderBottomColor: t.headerBorder, backgroundColor: t.headerBg }]}>
+      <BrainboxLogo size={38} logoUrl={branding.logoUrl} />
       <View style={styles.headerText}>
-        <Text numberOfLines={1} style={[ty.bodyStrong, { color: t.label }]} accessibilityRole="header">
+        <Text numberOfLines={1} style={[ty.title, { color: t.label }]} accessibilityRole="header">
           {branding.title || botName}
         </Text>
-        <View style={styles.row}>
+        <View style={[styles.row, { marginTop: 4 }]}>
           <View style={[styles.statusDot, { backgroundColor: t.success }]} />
-          <Text numberOfLines={1} style={[ty.caption, { color: t.secondary }]}>
+          <Text numberOfLines={1} style={[ty.subtitle, { color: t.secondary, flexShrink: 1 }]}>
             {chat.sending ? (chat.streaming ? 'Typing…' : 'Thinking…') : branding.subtitle || 'Online'}
           </Text>
         </View>
       </View>
-      {features.newChat !== false ? (
-        <IconButton icon="newChat" label="New chat" t={t} onPress={() => { setHistoryOpen(false); chat.newChat(); }} />
+      {onClose ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close chat"
+          hitSlop={6}
+          onPress={onClose}
+          style={({ pressed }) => [styles.close, { backgroundColor: t.closeBg, transform: [{ scale: pressed ? 0.94 : 1 }] }]}
+        >
+          <BrainboxIcon name="close" size={20} strokeWidth={1.8} color={t.closeIcon} />
+        </Pressable>
       ) : null}
-      {features.history !== false ? (
-        <IconButton icon="history" label="Conversation history" t={t} active={historyOpen} onPress={() => setHistoryOpen((v) => !v)} />
-      ) : null}
-      {onClose ? <IconButton icon="close" label="Close chat" t={t} onPress={onClose} /> : null}
     </View>
   );
 
+  const botAvatar = <BrainboxLogo size={34} logoUrl={branding.logoUrl} />;
+
   const welcomeView = (
-    <ScrollView contentContainerStyle={styles.welcome} keyboardShouldPersistTaps="handled">
-      <BrainboxLogo size={56} logoUrl={branding.logoUrl} />
-      <Text style={[ty.title3, { color: t.label, marginTop: 16, textAlign: 'center' }]}>{greeting}</Text>
-      {welcome.map((w, i) => (
-        <Text key={i} style={[ty.body, { color: t.secondary, marginTop: 6, textAlign: 'center' }]}>{w}</Text>
-      ))}
-      {quickActions.length ? (
-        <View style={styles.chips}>
-          {quickActions.map((qa, i) => {
-            const a = typeof qa === 'string' ? { title: qa } : qa;
-            return (
-              <Pressable
-                key={i}
-                accessibilityRole="button"
-                accessibilityHint={a.description}
-                onPress={() => submit(a.prompt || a.title)}
-                style={({ pressed }) => [
-                  styles.chip,
-                  { backgroundColor: pressed ? t.fillStrong : t.fill, transform: [{ scale: pressed ? 0.97 : 1 }] }
-                ]}
-              >
-                <BrainboxIcon name={a.icon || 'sparkles'} size={14} color={t.accent} />
-                <Text style={[ty.footnoteMedium, { color: t.label, marginLeft: 6 }]} numberOfLines={1}>
-                  {a.title}
-                </Text>
-              </Pressable>
-            );
-          })}
+    <ScrollView contentContainerStyle={styles.messages} keyboardShouldPersistTaps="handled">
+      <View style={[styles.msgRow, { marginTop: 12 }]}>
+        <View style={styles.avatarSlot}>{botAvatar}</View>
+        <View style={[styles.msgCol, { alignItems: 'flex-start' }]}>
+          <Text style={[ty.meta, styles.meta, { color: t.label }]} numberOfLines={1}>{botName}</Text>
+          {[greeting, ...welcome].map((w, i) => (
+            <View key={i} style={[styles.bubble, styles.botBubble, { backgroundColor: t.botBubble, marginTop: i ? 4 : 0 }]}>
+              <Text style={[i === 0 ? ty.bodyStrong : ty.body, { color: i === 0 ? t.label : t.botText }]}>{w}</Text>
+            </View>
+          ))}
+          {quickActions.length ? (
+            <View style={styles.pills}>
+              {quickActions.map((qa, i) => {
+                const a = typeof qa === 'string' ? { title: qa } : qa;
+                return (
+                  <Pill
+                    key={i}
+                    t={t}
+                    label={a.title}
+                    icon={a.icon}
+                    hint={a.description}
+                    onPress={() => submit(a.prompt || a.title)}
+                  />
+                );
+              })}
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      </View>
     </ScrollView>
   );
 
@@ -506,8 +564,8 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
     const animate = !m.fromHistory && created.getTime() >= mountedAt.current - 1000;
     const streamingNow = m.status === 'streaming';
     const bubbleRadius = isUser
-      ? { borderBottomRightRadius: r.last ? 6 : 18, borderTopRightRadius: r.first ? 18 : 6 }
-      : { borderBottomLeftRadius: r.last ? 6 : 18, borderTopLeftRadius: r.first ? 18 : 6 };
+      ? { borderBottomRightRadius: r.last ? 6 : 14 }
+      : { borderBottomLeftRadius: r.last ? 6 : 14 };
     const bubble = (
       <View
         style={[
@@ -524,22 +582,29 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
           <Markdown
             text={m.text}
             tokens={t}
-            color={t.label}
+            color={t.botText}
             linkColor={t.accent}
             clipboard={clipboard}
-            trailing={streamingNow ? <Caret color={t.tertiary} /> : undefined}
+            trailing={streamingNow ? <Caret color={t.accent} /> : undefined}
           />
         )}
       </View>
     );
     const showFooter = !isUser && (m.status === 'done' || m.status === 'stopped' || m.status === 'error') && !!m.text;
+    const avatar = <View style={styles.avatarSlot}>{r.first ? (isUser ? <UserAvatar user={user} t={t} /> : botAvatar) : null}</View>;
     return (
       <Appear key={r.key} enabled={animate} reduced={reduced}>
-        <View style={[styles.msgRow, isUser ? styles.msgRowUser : null, { marginTop: r.first ? 12 : 2 }]}>
-          {!isUser ? (
-            <View style={styles.avatarSlot}>{r.last ? <BrainboxLogo size={28} logoUrl={branding.logoUrl} /> : null}</View>
-          ) : null}
+        <View style={[styles.msgRow, isUser ? styles.msgRowUser : null, { marginTop: r.first ? 12 : 4 }]}>
+          {!isUser ? avatar : null}
           <View style={[styles.msgCol, isUser ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
+            {r.first ? (
+              <View style={[styles.row, styles.meta, isUser ? { flexDirection: 'row-reverse' } : null]}>
+                <Text style={[ty.meta, { color: t.label, flexShrink: 1 }]} numberOfLines={1}>
+                  {isUser ? userName : botName}
+                </Text>
+                <Text style={[ty.metaTime, { color: t.tertiary, marginHorizontal: 7 }]}>{timeLabel(created)}</Text>
+              </View>
+            ) : null}
             {bubble}
             {showFooter ? (
               <View style={styles.footer}>
@@ -577,18 +642,16 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
                     />
                   </>
                 ) : null}
-                {r.last ? <Text style={[ty.caption2, { color: t.tertiary, marginLeft: 6 }]}>{timeLabel(created)}</Text> : null}
               </View>
             ) : null}
             {!isUser && features.sources !== false && m.status === 'done' && m.searchResults && m.searchResults.length ? (
               <Sources results={m.searchResults} t={t} />
             ) : null}
-            {isUser && r.last ? (
-              <Text style={[ty.caption2, { color: m.status === 'error' ? t.dangerText : t.tertiary, marginTop: 3 }]}>
-                {m.status === 'error' ? 'Not delivered' : timeLabel(created)}
-              </Text>
+            {isUser && m.status === 'error' ? (
+              <Text style={[ty.caption2, { color: t.dangerText, marginTop: 3 }]}>Not delivered</Text>
             ) : null}
           </View>
+          {isUser ? avatar : null}
         </View>
       </Appear>
     );
@@ -597,7 +660,7 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
   const body =
     chat.historyLoading && chat.messages.length === 0 ? (
       <View style={styles.center}>
-        <ActivityIndicator color={t.tertiary} />
+        <ActivityIndicator color={t.accent} />
       </View>
     ) : chat.messages.length === 0 ? (
       welcomeView
@@ -617,7 +680,7 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
       >
         {rows.map((r) =>
           r.kind === 'day' ? (
-            <Text key={r.key} style={[ty.caption2, styles.day, { color: t.tertiary }]}>{r.label}</Text>
+            <Text key={r.key} style={[ty.metaTime, styles.day, { color: t.tertiary }]}>{r.label}</Text>
           ) : (
             renderMessage(r)
           )
@@ -627,21 +690,18 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
 
   const canSend = draft.trim().length > 0 && !chat.sending;
   const composer = (
-    <View style={[styles.composerWrap, { backgroundColor: t.surface }]}>
+    <View style={styles.composerWrap}>
       <View
         style={[
-          styles.capsule,
-          {
-            backgroundColor: focused ? t.surface : t.fill,
-            borderColor: focused ? t.accentTint : 'transparent'
-          }
+          styles.composer,
+          { backgroundColor: t.composerBg, borderColor: focused ? t.pillBorder : t.composerBorder }
         ]}
       >
         <TextInput
           value={draft}
           onChangeText={setDraft}
           placeholder={placeholder}
-          placeholderTextColor={t.tertiary}
+          placeholderTextColor={t.secondary}
           multiline
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
@@ -649,32 +709,57 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
           accessibilityLabel="Message"
           keyboardAppearance={t.dark ? 'dark' : 'light'}
           selectionColor={t.accent}
-          textAlignVertical="center"
+          textAlignVertical="top"
         />
-        {chat.sending ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Stop generating"
-            onPress={chat.stop}
-            style={({ pressed }) => [styles.sendBtn, { backgroundColor: t.label, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
-          >
-            <BrainboxIcon name="stop" size={16} color={t.surface} />
-          </Pressable>
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Send message"
-            accessibilityState={{ disabled: !canSend }}
-            disabled={!canSend}
-            onPress={() => submit()}
-            style={({ pressed }) => [
-              styles.sendBtn,
-              { backgroundColor: canSend ? (pressed ? t.accentPressed : t.accent) : t.fillStrong, transform: [{ scale: pressed ? 0.97 : 1 }] }
-            ]}
-          >
-            <BrainboxIcon name="arrowUp" size={18} strokeWidth={2.2} color={canSend ? t.onAccent : t.quaternary} />
-          </Pressable>
-        )}
+        <View style={styles.bar}>
+          {onAttach ? <ToolButton icon="paperclip" label="Attach file" t={t} onPress={onAttach} /> : null}
+          {features.newChat !== false ? (
+            <ToolButton icon="newChat" label="New chat" t={t} onPress={() => { setHistoryOpen(false); chat.newChat(); }} />
+          ) : null}
+          {features.history !== false ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={historyOpen ? 'Back to chat' : 'Conversation history'}
+              accessibilityState={{ expanded: historyOpen }}
+              onPress={() => setHistoryOpen((v) => !v)}
+              style={({ pressed }) => [
+                styles.historyPill,
+                { backgroundColor: pressed || historyOpen ? t.fillStrong : t.toolBg, transform: [{ scale: pressed ? 0.97 : 1 }] }
+              ]}
+            >
+              <BrainboxIcon name={historyOpen ? 'message' : 'history'} size={18} strokeWidth={2} color={historyOpen ? t.accent : t.label} />
+              <Text style={[ty.pill, { color: historyOpen ? t.pillText : t.label, marginLeft: 5 }]}>
+                {historyOpen ? 'Back to chat' : 'History'}
+              </Text>
+            </Pressable>
+          ) : null}
+          <View style={{ flex: 1 }} />
+          {chat.sending ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Stop generating"
+              onPress={chat.stop}
+              style={({ pressed }) => [styles.sendBtn, { backgroundColor: t.closeBg, transform: [{ scale: pressed ? 0.96 : 1 }] }]}
+            >
+              <BrainboxIcon name="stop" size={16} color={t.closeIcon} />
+            </Pressable>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
+              accessibilityState={{ disabled: !canSend }}
+              disabled={!canSend}
+              onPress={() => submit()}
+              style={({ pressed }) => [
+                styles.sendBtn,
+                { backgroundColor: t.accent, opacity: canSend ? 1 : 0.45, transform: [{ scale: pressed ? 0.96 : 1 }] }
+              ]}
+            >
+              <BrainboxGradientFill light={t.accentLight} mid={t.accent} deep={t.accentDeep} cx="36%" cy="28%" />
+              <BrainboxIcon name="send" size={18} strokeWidth={2.1} color={t.onAccent} />
+            </Pressable>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -704,19 +789,22 @@ export function BrainboxChatView(props: BrainboxChatViewProps) {
     >
       {header}
       <View style={{ flex: 1 }}>
-        {body}
-        {historyOpen ? <HistorySheet chat={chat} t={t} reduced={reduced} onClose={() => setHistoryOpen(false)} /> : null}
+        <BrainboxPanelBackground from={t.bodyFrom} to={t.bodyTo} glow={t.bodyGlow} />
+        <View style={{ flex: 1 }}>
+          {body}
+          {historyOpen ? <HistorySheet chat={chat} t={t} reduced={reduced} onClose={() => setHistoryOpen(false)} /> : null}
+        </View>
+        {historyOpen ? null : errorBanner}
+        {composer}
       </View>
-      {historyOpen ? null : errorBanner}
-      {historyOpen ? null : composer}
     </KeyboardAvoidingView>
   );
 
-  const rootStyle = [{ flex: 1, backgroundColor: t.surface }, style];
+  const rootStyle = [{ flex: 1, backgroundColor: t.panel }, style];
   return safeArea ? <SafeAreaView style={rootStyle}>{content}</SafeAreaView> : <View style={rootStyle}>{content}</View>;
 }
 
-/** Full-screen Brainbox chat: header, history, streaming answers, feedback, composer. */
+/** Full-screen Brainbox chat (omago design): header, history, streaming answers, feedback, composer. */
 export function BrainboxChat(props: BrainboxChatProps) {
   const client = useClientFromProps(props);
   const onEvent = useHapticEvents(props.haptics, props.onEvent);
@@ -731,54 +819,58 @@ export function BrainboxChat(props: BrainboxChatProps) {
   return <BrainboxChatView {...props} chat={chat} user={props.user || client.user} />;
 }
 
+/* No shadows or elevation anywhere: the omago look is flat frosted glass. */
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 4
+    minHeight: 68,
+    padding: 12,
+    borderBottomWidth: 1,
+    elevation: 0
   },
-  headerText: { flex: 1, marginLeft: 8, marginRight: 4 },
+  headerText: { flex: 1, marginLeft: 10, marginRight: 10 },
   statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 5 },
-  iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  welcome: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 20 },
-  chip: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 12, height: 34, maxWidth: '100%' },
-  messages: { paddingHorizontal: 12, paddingBottom: 12, paddingTop: 4 },
-  day: { textAlign: 'center', marginTop: 16, marginBottom: 2, fontWeight: '500' },
-  msgRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  close: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  tool: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
+  historyPill: { height: 34, borderRadius: 17, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center' },
+  pills: { flexDirection: 'column', alignItems: 'flex-start', gap: 8, marginTop: 10 },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 32,
+    paddingHorizontal: 13,
+    borderRadius: 999,
+    borderWidth: 1,
+    maxWidth: '100%'
+  },
+  userAvatar: { alignItems: 'center', justifyContent: 'center' },
+  messages: { paddingHorizontal: 12, paddingBottom: 12, paddingTop: 4, flexGrow: 1 },
+  day: { textAlign: 'center', marginTop: 16, marginBottom: 2 },
+  msgRow: { flexDirection: 'row', alignItems: 'flex-start' },
   msgRowUser: { justifyContent: 'flex-end' },
-  avatarSlot: { width: 28, marginRight: 8, alignSelf: 'flex-start', justifyContent: 'flex-end', minHeight: 28 },
-  msgCol: { maxWidth: '78%', flexShrink: 1 },
-  bubble: { paddingVertical: 9, paddingHorizontal: 13, borderRadius: 18 },
+  avatarSlot: { width: 34, marginHorizontal: 0 },
+  msgCol: { maxWidth: '78%', flexShrink: 1, marginHorizontal: 8 },
+  meta: { marginBottom: 4 },
+  bubble: { paddingVertical: 8, paddingHorizontal: 11, borderRadius: 14, elevation: 0 },
+  botBubble: { borderBottomLeftRadius: 6 },
   footer: { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginLeft: 2 },
   footerBtn: { width: 28, height: 24, alignItems: 'center', justifyContent: 'center' },
-  sources: { marginTop: 4, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden', alignSelf: 'stretch' },
+  sources: { marginTop: 4, borderRadius: 12, borderWidth: 1, overflow: 'hidden', alignSelf: 'stretch' },
   sourceRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8 },
-  composerWrap: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 10 },
-  capsule: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    borderRadius: 20,
-    borderWidth: 3,
-    paddingLeft: 11,
-    paddingRight: 3,
-    paddingVertical: 1,
-    minHeight: 46
-  },
+  composerWrap: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 12 },
+  composer: { minHeight: 88, padding: 10, borderRadius: 17, borderWidth: 1, elevation: 0 },
   input: {
-    flex: 1,
     maxHeight: 120,
-    minHeight: 38,
-    paddingTop: Platform.OS === 'ios' ? 9 : 6,
-    paddingBottom: Platform.OS === 'ios' ? 9 : 6,
-    paddingHorizontal: 0
+    minHeight: 30,
+    paddingTop: 2,
+    paddingBottom: 6,
+    paddingHorizontal: 2
   },
-  sendBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginLeft: 6, marginBottom: 3 },
+  bar: { flexDirection: 'row', alignItems: 'center' },
+  sendBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -786,7 +878,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 12
+    borderRadius: 14,
+    elevation: 0
   },
   retry: { paddingHorizontal: 6, marginRight: 6 },
   sheetHeader: {
@@ -794,13 +887,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth
+    paddingTop: 14,
+    paddingBottom: 4
   },
-  search: { flexDirection: 'row', alignItems: 'center', margin: 12, borderRadius: 10, paddingHorizontal: 10, height: 36 },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    margin: 12,
+    borderRadius: 17,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    height: 36
+  },
   searchInput: { flex: 1, marginLeft: 6, paddingVertical: 0 },
-  sectionLabel: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6, fontWeight: '500', letterSpacing: 0.44 },
-  sessionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 44, marginHorizontal: 8, borderRadius: 10 },
-  empty: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 32 },
-  emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' }
+  sectionLabel: { paddingHorizontal: 4, paddingTop: 14, paddingBottom: 6, letterSpacing: 0.44 },
+  sessionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    minHeight: 44,
+    marginBottom: 6,
+    borderRadius: 14,
+    borderWidth: 1
+  },
+  empty: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 32 }
 });

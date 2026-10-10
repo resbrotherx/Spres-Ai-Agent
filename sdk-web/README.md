@@ -1,4 +1,4 @@
-# Brainbox Web SDK (`spres-web`) v2.1
+# Brainbox Web SDK (`spres-web`) v2.2
 
 A single, dependency-free JavaScript file that adds the Brainbox AI chat assistant to any website:
 plain HTML, WordPress, Odoo, or any JavaScript app. It includes:
@@ -7,7 +7,11 @@ plain HTML, WordPress, Odoo, or any JavaScript app. It includes:
 - **`Brainbox.Client`**: a headless API client you can use without any UI. It works in the browser and in Node 18+.
 - **v1 compatibility**: `BrainboxWebSDK` and `BrainboxWebWidget` still work, so existing embeds keep running.
 
-New in 2.1: the Brainbox design system v2 (calm Apple-like look, light / dark / auto), **real token streaming**
+New in 2.2: **default design restored to the original pop-up; shadows removed.** The widget is back to the
+"omago" look (lavender frosted glass, purple orb logo, `#b93fff` accent, pill launcher) with no drop shadows
+anywhere: separation comes from translucent borders. Everything added in 2.1 is kept and restyled to match.
+
+New in 2.1: light / dark / auto themes (dark is a deep aubergine variant of the omago palette), **real token streaming**
 over `POST /api/chat/stream` with a Stop button and automatic fallback to `POST /api/chat`, subtle UI sounds,
 toasts, thumbs up/down feedback, a "Sources" disclosure, an unread badge on the launcher, grouped messages with
 day separators, skeleton loading and a full-screen sheet on phones.
@@ -46,7 +50,7 @@ The module exports the same `Brainbox` object, and in a browser it also sets `wi
 
 | Mode | What it renders | Needs `container` |
 |---|---|---|
-| `floating` (default) | Launcher in a corner. The 380×600 window opens above it. Below 576px it becomes a full-screen sheet (safe-area aware). | no |
+| `floating` (default) | Launcher in a corner. The 360×560 window opens above it. Below 576px it becomes a full-screen sheet (safe-area aware). | no |
 | `sidebar` | A fixed panel on the right at full height. While open it pushes the page with `padding-right` (on viewports 992px and wider; below that it overlays the page). | no |
 | `inline` | The chat panel fills the container. There is no launcher and no close button. | yes |
 | `page` | Full layout: a conversation sidebar (New chat, search, sessions grouped Today / Yesterday / This week / Older) and the main chat with a hero greeting and prompt cards. Below 760px of container width, the sidebar becomes a drawer. | yes |
@@ -88,20 +92,20 @@ own `storageKey` so they keep separate conversations.
 | `position` | `'bottom-right'` | Floating launcher corner: `'bottom-right'` or `'bottom-left'`. |
 | `offset` | `{ x: 24, y: 24 }` | Distance from the corner, in px. |
 | `zIndex` | `9999` | z-index for the floating and sidebar layers. |
-| `width` / `height` | `380` / `600` | Floating window size. The window is always capped to the viewport. |
+| `width` / `height` | `360` / `560` | Floating window size. The window is always capped to the viewport. |
 | `sidebarWidth` | `380` | Sidebar width. |
 | `sidebarTop` | `0` | Top offset of the sidebar, for example a fixed navbar height. |
 | `sidebarPushContent` | `document.body` | Element or selector that gets `padding-right` while the sidebar is open. Use `null` to never push. |
 | `defaultOpen` | `false` | Open on first load. After that, the user's last open or closed state is remembered. |
-| `launcher` | `{ type: 'icon', text: 'Chat' }` | `type` is `'icon'` (56px gradient circle, default since 2.1), `'button'` (pill with `text`), `'gif'` (uses `gifUrl`) or `'none'` (open it from your own UI with `bb.open()`). An unread badge appears when a reply arrives while the widget is closed. |
-| `theme` | `{ mode: 'light' }` | `mode`: `'light'`, `'dark'` or `'auto'` (follows `prefers-color-scheme` live). `primary` overrides the accent colour (default `#0071E3`, dark `#0A84FF`); hover, pressed, tint and focus-ring shades are derived from it, and the launcher uses it instead of the brand gradient. Optional: `radius` (window corner, default 18), `fontFamily`, and the light-mode-only overrides `panel` (surface) and `ink` (text). |
-| `branding` | `{ botName: 'Brainbox AI', subtitle: 'Typically replies in seconds' }` | Also accepts `title` (header, defaults to `botName`), `logoUrl` (header logo; default is the Brainbox logo) and `botAvatarUrl` (bot avatar; defaults to `logoUrl`, then the Brainbox logo). |
-| `welcomeMessages` | `["I'm {{botName}}. Ask me anything ..."]` | Text of the empty state (logo, greeting from `page.greeting`, these lines, quick-action chips). `{{name}}` is the user's first name, or "there" when no name is set. `{{botName}}` is also replaced. |
+| `launcher` | `{ type: 'button', text: 'Chat' }` | `type` is `'button'` (purple gradient pill with `text`, the default), `'icon'` (56px circle), `'gif'` (uses `gifUrl`) or `'none'` (open it from your own UI with `bb.open()`). An unread badge appears when a reply arrives while the widget is closed. |
+| `theme` | `{ mode: 'light' }` | `mode`: `'light'`, `'dark'` or `'auto'` (follows `prefers-color-scheme` live). `primary` overrides the accent colour (default `#b93fff`); the light / dark gradient stops and translucent tints of the orb, launcher, send button and pills are derived from it. Optional: `radius` (window corner, default 22), `fontFamily`, and the light-mode-only overrides `panel` (window background, default `#fbf1ff`) and `ink` (text, default `#08080a`). Dark mode uses an aubergine panel (`#1a1022`) with lavender accents. |
+| `branding` | `{ botName: 'Brainbox AI', subtitle: 'Typically replies in seconds' }` | Also accepts `title` (header, defaults to `botName`), `logoUrl` (header logo; default is the purple Brainbox orb) and `botAvatarUrl` (bot avatar; defaults to `logoUrl`, then the orb). |
+| `welcomeMessages` | `["I'm {{botName}}. Ask me anything ..."]` | Intro bubbles shown before the first message (bot name and time, these lines, then the quick-action pills). `{{name}}` is the user's first name, or "there" when no name is set. `{{botName}}` is also replaced. |
 | `quickActions` | `[]` | Strings, or `{ title, description, prompt, icon }` objects. Clicking one sends it. In `page` mode they render as prompt cards. |
-| `placeholder` | `'Message'` | Composer placeholder. |
+| `placeholder` | `'Type message...'` | Composer placeholder. |
 | `features` | `{ history: true, upload: true, emoji: true, modeSwitch: true, newChat: true, export: false, feedback: true }` | Turns UI features on or off. `export` downloads the conversation as a `.txt` file. `feedback` shows thumbs up/down under answers (`POST /api/chat/feedback`). |
 | `allowedModes` | `['floating', 'sidebar']` | Modes the user can cycle through with the header dock/undock button. The button appears only when the current mode is in this list and the list has at least two usable modes. |
-| `page` | `{ greeting: 'Hello, {{name}}', heading: 'How can I help you today?' }` | Hero text for `page` mode. `greeting` is also the title of the widget's empty state. |
+| `page` | `{ greeting: 'Hello, {{name}}', heading: 'How can I help you today?' }` | Hero text for `page` mode. |
 | `streaming` | `true` | Stream answers token by token from `POST /api/chat/stream`. When the server has no streaming endpoint (404/405) the SDK falls back to `POST /api/chat` automatically and remembers that for the page. `false` always uses `/api/chat`. |
 | `sounds` | `true` | Subtle WebAudio UI sounds (send, receive, notify, success, error). No audio files; nothing plays before the first user gesture or while the tab is hidden (except `notify`). Users can mute them with the speaker button in the header (remembered per `storageKey`). `false` disables sounds and hides the button. |
 | `context` | – | `() => string \| null` (it may also be async). The returned text is prepended to the question as `Context: ... Question: ...`, for example details of the record being viewed. Only the question is shown in the chat. |
@@ -261,12 +265,17 @@ Brainbox.init({ apiUrl: url, apiKey: key, tenantId: tenant,
 
 v1 widgets keep their pill launcher (`launcherType` defaults to `'button'` there) and their `primaryColor`.
 
-### Upgrading from 2.0
+### Upgrading to 2.2
 
-Everything is backwards compatible. Visible changes: the new look; `launcher.type` defaults to `'icon'` (pass
-`launcher: { type: 'button' }` for the pill); the default accent is `#0071E3` (hosts that pass `theme.primary`
-keep their colour); `theme.panel` / `theme.ink` only apply in light mode; the default window is 380×600; welcome
-messages render as an empty state instead of chat bubbles; the composer history pill moved to the header.
+No API changes. The default design is the original pop-up again (lavender glass, purple orb, `#b93fff`,
+pill launcher, 360×560 window, intro bubbles with quick-action pills, History pill in the composer), and all
+box-shadows / drop shadows were removed from the window, launcher, popovers, toasts and buttons. Keyboard focus
+rings are outlines. Hosts that pass `theme.primary`, `launcher.type`, `width` / `height` keep what they set.
+
+### Upgrading from 2.0 to 2.1
+
+Everything is backwards compatible. 2.1 briefly shipped a different default look (blue accent, icon launcher,
+380×600); 2.2 reverts that. `theme.panel` / `theme.ink` only apply in light mode.
 
 ---
 

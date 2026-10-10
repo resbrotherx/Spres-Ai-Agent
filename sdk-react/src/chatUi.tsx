@@ -936,13 +936,13 @@ export function PersonAvatar({ name, src, size = 28 }: { name?: string; src?: st
 /* Message list                                                        */
 /* ------------------------------------------------------------------ */
 
-type ListItem =
+export type ListItem =
   | { kind: 'day'; key: string; label: string }
   | { kind: 'group'; key: string; role: 'user' | 'bot'; messages: ChatMessage[] };
 
 const GROUP_GAP_MS = 5 * 60 * 1000;
 
-function buildItems(messages: ChatMessage[]): ListItem[] {
+export function buildItems(messages: ChatMessage[]): ListItem[] {
   const items: ListItem[] = [];
   let lastDay = '';
   let current: Extract<ListItem, { kind: 'group' }> | null = null;
@@ -976,7 +976,7 @@ function sourceUrl(s: ChatSource): string | null {
   return typeof url === 'string' && /^https?:\/\//i.test(url) ? url : null;
 }
 
-function Sources({ sources }: { sources: ChatSource[] }) {
+export function Sources({ sources }: { sources: ChatSource[] }) {
   return (
     <details className="bb-c-sources">
       <summary>

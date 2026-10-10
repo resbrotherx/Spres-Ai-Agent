@@ -18,7 +18,9 @@ export type BrainboxIconName =
   | 'refresh'
   | 'message'
   | 'file'
-  | 'search';
+  | 'search'
+  | 'paperclip'
+  | 'send';
 
 const PATHS: Record<BrainboxIconName, string[]> = {
   newChat: [
@@ -48,7 +50,9 @@ const PATHS: Record<BrainboxIconName, string[]> = {
   refresh: ['M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8', 'M21 3v5h-5'],
   message: ['M7.9 20A9 9 0 1 0 4 16.1L2 22Z'],
   file: ['M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z', 'M14 2v4a2 2 0 0 0 2 2h4', 'M16 13H8', 'M16 17H8'],
-  search: ['m21 21-4.3-4.3']
+  search: ['m21 21-4.3-4.3'],
+  paperclip: ['m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48'],
+  send: ['M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z', 'm21.854 2.147-10.94 10.939']
 };
 
 export interface BrainboxIconProps {

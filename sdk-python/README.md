@@ -1,149 +1,132 @@
-# Brainbox Python SDK
+# Brainbox Python SDK (`spres-ai`)
 
-Python client library for Brainbox AI Backend.
+Train your Brainbox from your own servers, scripts and databases, and chat with it.
+Everything you send goes straight to your Brainbox and is processed by Brainbox's own AI.
 
 ## Installation
 
+Until the package is on PyPI, install the wheel straight from your Brainbox server:
+
 ```bash
-pip install requests
+pip install https://port.smartpowerbilling.com/sdk/downloads/spres_ai-1.1.0-py3-none-any.whl
 ```
 
-## Quick Start
+(Later: `pip install spres-ai`.) Requires Python 3.8+ and `requests`.
+
+## Keys: which identifier is which
+
+| Identifier | Looks like | Use it for |
+|---|---|---|
+| Tenant ID | `acme-co` | Which company's knowledge base. Not a password. Optional here: the key already decides it. |
+| Publishable key | `pk_live_...` | Websites / apps chat widgets only. Safe in a browser. Cannot train. |
+| Secret key | `sk_live_...` | Servers, scripts, training. **Never put it in a browser or mobile app.** |
+
+Create a secret key in the staff dashboard: **Settings -> API keys -> Create -> Secret**.
+Keep it in an environment variable:
+
+```bash
+export BRAINBOX_SECRET_KEY=sk_live_...        # PowerShell: $env:BRAINBOX_SECRET_KEY="sk_live_..."
+```
+
+## Training quick start
 
 ```python
-from spres-ai import BrainboxPythonSDK
+import os
+from brainbox_sdk import BrainboxPythonSDK
 
 sdk = BrainboxPythonSDK(
-    api_url="http://localhost:8000",
-    api_key="your-api-key",
-    tenant_id="company-1"
+    api_url="https://port.smartpowerbilling.com",
+    api_key=os.environ["BRAINBOX_SECRET_KEY"],   # tenant comes from the key
 )
 
-# Ingest data
-result = sdk.ingest(
-    source_type="logs",
-    content="ERROR: Database connection failed",
-    file_path="/var/log/app.log"
+# 1) Upload a document (PDF, XML, DOCX, TXT, CSV, JSON...; max 25 MB)
+job = sdk.train_file("employee-handbook.pdf", name="Handbook", audience="internal")
+sdk.wait_for_task(job["task_id"])                 # polls until completed / failed
+
+# 2) Teach free text or database rows
+for row in rows_from_my_database():
+    sdk.train_text(
+        f"Q: {row['question']}\nA: {row['answer']}",
+        name=f"FAQ #{row['id']}",
+        audience="customer",
+    )
+
+# 3) Connect a support-tickets API (preview first, nothing is saved)
+config = dict(
+    url="https://helpdesk.example.com/api/tickets",
+    headers={"Authorization": "Bearer HELPDESK_TOKEN"},
+    data_path="data.tickets",
+    source_type="support_tickets",
+    mapping={"question_field": "subject", "answer_field": "resolution"},
+    pagination={"type": "page", "page_param": "page", "max_pages": 10},
+    audience="internal",
 )
-print(f"Task ID: {result['task_id']}")
+preview = sdk.test_api_source(**config)
+if preview["ok"]:
+    source = sdk.add_api_source(name="Helpdesk", **config)
 
-# Chat
-response = sdk.chat("What happened to the database?")
-print(f"Answer: {response['response']}")
+# 4) Manage sources
+print(sdk.list_sources()["totals"])                       # {'sources': 3, 'documents': 120}
+sdk.update_source(source["source"]["source_id"], audience="customer")
+sdk.sync_source(source["source"]["source_id"])            # re-fetch an API source now
+sdk.delete_source(source["source"]["source_id"])          # forget everything it taught
 ```
 
-## Methods
+A complete script lives in [`examples/train_from_python.py`](examples/train_from_python.py).
 
-### `ingest(source_type, content, file_path=None, metadata=None)`
+### Audiences
 
-Send data to Brainbox for processing.
+Every source has an audience that controls who the AI may show it to:
+`public`, `customer`, `vendor`, `internal` (default) and `admin`.
+Change it later with `update_source(source_id, audience=...)`.
 
-**Parameters:**
-- `source_type` (str): Type of data (logs, codebase, json, csv, docker_logs, nginx_logs, postgres_logs)
-- `content` (str): The actual content to ingest
-- `file_path` (str, optional): File path for reference
-- `metadata` (dict, optional): Additional metadata
+## Training methods
 
-**Returns:** Dictionary with `task_id` and `status`
+| Method | What it does | Returns |
+|---|---|---|
+| `train_file(path, name=None, audience=None)` | Upload a document | `{"source", "task_id"}` |
+| `train_text(content, name=None, audience=None)` | Teach free text / one record | `{"source", "task_id"}` |
+| `test_api_source(**config)` | Dry-run an API, preview records | `{"ok", "records_found", "preview", "detected_fields", "error"}` |
+| `add_api_source(**config)` | Save an API source and start syncing | `{"source", "task_id"}` |
+| `list_sources()` | All sources | `{"sources", "totals"}` |
+| `get_source(id)` | One source | source dict |
+| `update_source(id, audience=None, name=None)` | Rename / relabel | source dict |
+| `delete_source(id)` | Delete a source and its documents | `{"deleted", "documents_deleted"}` |
+| `sync_source(id)` | Re-fetch an API source | `{"source", "task_id"}` |
+| `get_ingest_status(task_id)` | Status of any task | `{"task_id", "status", "error_message"}` |
+| `wait_for_task(task_id, timeout=600, poll=3)` | Block until a task finishes | final status |
 
-### `chat(question, session_id=None)`
+`add_api_source` / `test_api_source` keywords: `url` (required), `name`, `method` (`GET`/`POST`),
+`headers`, `query`, `body`, `data_path`, `source_type` (`support_tickets` | `api_generic`),
+`mapping` (`id_field`, `question_field`, `answer_field`, `title_field`, `messages_field`,
+`extra_fields`), `pagination` (`type`: `none`/`page`/`cursor`, `page_param`, `cursor_path`,
+`cursor_param`, `max_pages`), `audience`.
 
-Ask a question to the AI.
+## Errors
 
-**Parameters:**
-- `question` (str): Your question
-- `session_id` (str, optional): Chat session ID
-
-**Returns:** Dictionary with `response`, `reasoning`, and `search_results`
-
-### `get_ingest_status(task_id)`
-
-Check ingestion task status.
-
-**Parameters:**
-- `task_id` (str): Task ID from ingest response
-
-**Returns:** Task status dictionary
-
-### `create_chat_session(title=None)`
-
-Create a new chat session.
-
-**Parameters:**
-- `title` (str, optional): Session title
-
-**Returns:** Dictionary with `session_id`
-
-### `health_check()`
-
-Check if backend is running.
-
-**Returns:** Service health status
-
-## Examples
-
-### Ingest Logs
+All API errors raise `BrainboxError` (or a subclass) with the backend's explanation:
 
 ```python
-sdk.ingest(
-    source_type="logs",
-    content=open("/var/log/nginx/error.log").read(),
-    file_path="/var/log/nginx/error.log"
-)
-```
+from brainbox_sdk import BrainboxError, BrainboxAuthError, BrainboxValidationError
 
-### Ingest Code
-
-```python
-sdk.ingest(
-    source_type="codebase",
-    content=open("app.py").read(),
-    file_path="app.py"
-)
-```
-
-### Ingest JSON
-
-```python
-sdk.ingest(
-    source_type="json",
-    content='{"error": "Failed", "code": 500}',
-    file_path="config.json"
-)
-```
-
-### Chat Session
-
-```python
-# Create session
-session = sdk.create_chat_session(title="Troubleshooting")
-session_id = session['session_id']
-
-# Ask questions in the session
-response = sdk.chat("What's happening?", session_id=session_id)
-response = sdk.chat("How do I fix it?", session_id=session_id)
-```
-
-## Error Handling
-
-```python
 try:
-    response = sdk.chat("Question")
-except Exception as e:
-    print(f"Error: {e}")
+    sdk.train_file("photo.png")
+except BrainboxValidationError as e:     # 400/409/413/415/422
+    print(e.status_code, e.detail)       # 415 "Unsupported file type '.png'. Allowed: ..."
+except BrainboxAuthError:                # 401/403: wrong or publishable key
+    print("Use a secret key (sk_live_...)")
+except BrainboxError as e:               # anything else, incl. network errors
+    print(e)
 ```
 
-## Source Types
+## Other methods
 
-| Type | Use Case |
-|------|----------|
-| logs | Generic log files |
-| nginx_logs | Nginx access/error logs |
-| docker_logs | Docker container logs |
-| postgres_logs | PostgreSQL logs |
-| codebase | Source code |
-| json | JSON formatted data |
-| csv | CSV formatted data |
+- `ingest(source_type, content, file_path=None, metadata=None, audience=None)`: low-level ingest
+  (logs, codebase, json, csv, nginx_logs, docker_logs, postgres_logs).
+- `chat(question, session_id=None)`, `create_chat_session(title=None)`.
+- `health_check()`.
+
+API reference: https://port.smartpowerbilling.com/docs
 
 ## Function Locator (Built-in)
 
@@ -152,7 +135,7 @@ Find functions in your codebase without needing a separate tool.
 ### Find a Specific Function
 
 ```python
-sdk = BrainboxPythonSDK("http://localhost:8000", "api-key", "tenant-1")
+sdk = BrainboxPythonSDK(api_key="sk_live_...")
 
 # Find login function
 login_funcs = sdk.find_function("login", directory="./src")

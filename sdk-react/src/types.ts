@@ -70,7 +70,8 @@ export interface ChatUiData {
   quickActions?: (string | ChatQuickAction)[];
   /** Full-page (ChatPanel) empty-state cards. */
   promptCards?: ChatPromptCard[];
-  composer?: { placeholder?: string };
+  /** `searchLabel` is the ChatWidget composer's history button label (default "History"). */
+  composer?: { placeholder?: string; searchLabel?: string };
   [key: string]: any;
 }
 
@@ -86,15 +87,15 @@ export interface ChatPerson {
 
 export interface CustomizationProps {
   // Colors
-  /** Accent color: user bubbles, send button, focus rings. Defaults to Apple blue (#0071E3). */
+  /** Accent color: user bubbles, send button, focus rings. ChatWidget default #b93fff (omago purple); ChatPanel default #0071E3. */
   primaryColor?: string;
-  /** Second brand color: used with `primaryColor` for the launcher/brand gradient. */
+  /** Second brand color. ChatWidget: text/ink colour in light mode (default #08080a). ChatPanel: end of the brand gradient. */
   accentColor?: string;
-  /** Window / page surface color. */
+  /** Window / page surface color (ChatWidget light-mode default #fbf1ff). */
   backgroundColor?: string;
   /** CSS border of the floating window. */
   border?: string;
-  /** Corner radius of the floating window (default 18px). */
+  /** Corner radius of the floating window (default 22px). */
   borderRadius?: string;
   /** 'light' (default), 'dark', or 'auto' (follows prefers-color-scheme). */
   mode?: BrainboxColorMode;
@@ -145,13 +146,13 @@ export type ChatWidgetPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 
 export interface ChatWidgetProps extends CustomizationProps {
   sdk: BrainboxReactSDK;
   position?: ChatWidgetPosition;
-  /** 'icon' (default) = 56px gradient circle, 'button' = pill with `buttonText`, 'gif' = `launcherGifUrl` image. */
+  /** 'button' (default) = purple pill with `buttonText`, 'icon' = 56px circle, 'gif' = `launcherGifUrl` image. */
   launcherType?: 'icon' | 'button' | 'gif';
   launcherGifUrl?: string;
   buttonText?: string;
-  /** Window width (default 380px). */
+  /** Window width (default 360px). */
   width?: string;
-  /** Window height (default 600px). */
+  /** Window height (default 540px). */
   height?: string;
   defaultOpen?: boolean;
   /** Called whenever the window opens or closes. */

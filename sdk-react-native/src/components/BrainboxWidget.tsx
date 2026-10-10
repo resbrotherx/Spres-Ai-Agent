@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { useBrainboxChat, BrainboxChatEventName } from '../useBrainboxChat';
 import type { BrainboxChatResponse } from '../types';
 import { BrainboxChatProps, BrainboxChatView, useClientFromProps, useHapticEvents } from './BrainboxChat';
-import { BrainboxLauncher, BrainboxModal, BrainboxPosition } from './BrainboxLauncher';
+import { BrainboxLauncher, BrainboxLauncherVariant, BrainboxModal, BrainboxPosition } from './BrainboxLauncher';
 
 export interface BrainboxWidgetProps extends Omit<BrainboxChatProps, 'onClose' | 'safeArea'> {
   position?: BrainboxPosition;
@@ -17,6 +17,10 @@ export interface BrainboxWidgetProps extends Omit<BrainboxChatProps, 'onClose' |
   /** Show the floating launcher (default true). Set false to open from your own button via the ref. */
   launcher?: boolean;
   launcherLabel?: string;
+  /** 'button' (default): purple "Chat" pill. 'icon': round purple button. */
+  launcherVariant?: BrainboxLauncherVariant;
+  /** Text on the 'button' launcher (default 'Chat'). */
+  launcherText?: string;
 }
 
 export interface BrainboxWidgetHandle {
@@ -33,7 +37,7 @@ export interface BrainboxWidgetHandle {
  * app (it overlays the screen and lets touches through outside the launcher).
  */
 export const BrainboxWidget = forwardRef<BrainboxWidgetHandle, BrainboxWidgetProps>(function BrainboxWidget(props, ref) {
-  const { position = 'bottom-right', offset, defaultOpen = false, launcher = true, launcherLabel } = props;
+  const { position = 'bottom-right', offset, defaultOpen = false, launcher = true, launcherLabel, launcherVariant, launcherText } = props;
   const client = useClientFromProps(props);
   const [innerOpen, setInnerOpen] = useState(defaultOpen);
   const isOpen = props.open ?? innerOpen;
@@ -97,6 +101,8 @@ export const BrainboxWidget = forwardRef<BrainboxWidgetHandle, BrainboxWidgetPro
           theme={props.theme}
           hidden={isOpen}
           accessibilityLabel={launcherLabel}
+          variant={launcherVariant}
+          text={launcherText}
         />
       ) : null}
       <BrainboxModal visible={isOpen} onClose={() => setOpen(false)} position={position} theme={props.theme}>

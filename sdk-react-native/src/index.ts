@@ -39,10 +39,11 @@ export type {
   BrainboxAppearanceProps
 } from './components/BrainboxChat';
 export { BrainboxLauncher, BrainboxModal } from './components/BrainboxLauncher';
-export type { BrainboxLauncherProps, BrainboxModalProps, BrainboxPosition } from './components/BrainboxLauncher';
+export type { BrainboxLauncherProps, BrainboxModalProps, BrainboxPosition, BrainboxLauncherVariant } from './components/BrainboxLauncher';
 export { BrainboxWidget } from './components/BrainboxWidget';
 export type { BrainboxWidgetProps, BrainboxWidgetHandle } from './components/BrainboxWidget';
-export { BrainboxLogo, BrainboxLauncherMark } from './components/Logo';
+export { BrainboxLogo, BrainboxOrb, BrainboxLauncherMark } from './components/Logo';
+export type { BrainboxLogoProps, BrainboxOrbColors } from './components/Logo';
 export { BrainboxIcon } from './components/Icon';
 export type { BrainboxIconName } from './components/Icon';
 export { Markdown } from './components/Markdown';

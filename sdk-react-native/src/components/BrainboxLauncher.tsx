@@ -2,7 +2,6 @@ import React, { ReactNode, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Modal,
-  Platform,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -12,10 +11,13 @@ import {
   useWindowDimensions
 } from 'react-native';
 import { BrainboxThemeOptions, useBrainboxTheme } from '../theme';
-import { BrainboxLauncherMark } from './Logo';
+import { BrainboxGradientFill } from './Logo';
+import { BrainboxIcon } from './Icon';
 import { EASE_SHEET, useReducedMotion } from './motion';
 
 export type BrainboxPosition = 'bottom-right' | 'bottom-left';
+/** 'button' (default): purple pill with a chat icon and label. 'icon': round purple button. */
+export type BrainboxLauncherVariant = 'button' | 'icon';
 
 export interface BrainboxLauncherProps {
   onPress: () => void;
@@ -24,7 +26,12 @@ export interface BrainboxLauncherProps {
   position?: BrainboxPosition;
   /** Distance from the screen corner (default {x: 20, y: 28}). */
   offset?: { x?: number; y?: number };
+  /** Diameter of the 'icon' launcher (default 56). The 'button' pill is 46pt tall. */
   size?: number;
+  /** 'button' (default, omago pill) or 'icon' (round). */
+  variant?: BrainboxLauncherVariant;
+  /** Pill label (default 'Chat'). */
+  text?: string;
   theme?: BrainboxThemeOptions;
   accessibilityLabel?: string;
   /** Hide with a scale-out (e.g. while the chat is open). */
@@ -32,9 +39,10 @@ export interface BrainboxLauncherProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** Floating 56px brand-gradient circle with the Brainbox mark and an unread badge. */
+/** Floating omago launcher: a purple gradient "Chat" pill (or a round icon) with an unread badge. No shadow. */
 export function BrainboxLauncher({
-  onPress, unread = 0, position = 'bottom-right', offset, size = 56, theme, accessibilityLabel, hidden = false, style
+  onPress, unread = 0, position = 'bottom-right', offset, size = 56, variant = 'button', text = 'Chat', theme,
+  accessibilityLabel, hidden = false, style
 }: BrainboxLauncherProps) {
   const t = useBrainboxTheme(theme);
   const reduced = useReducedMotion();
@@ -49,12 +57,14 @@ export function BrainboxLauncher({
   const x = offset?.x ?? 20;
   const y = offset?.y ?? 28;
   const label = accessibilityLabel || (unread ? `Open chat, ${unread} unread` : 'Open chat');
+  const pill = variant !== 'icon';
+  const h = pill ? 46 : size;
   return (
     <Animated.View
       pointerEvents={hidden ? 'none' : 'auto'}
       style={[
         styles.wrap,
-        { width: size, height: size, borderRadius: size / 2, bottom: y },
+        pill ? { minWidth: 104, height: h, borderRadius: h / 2, bottom: y } : { width: size, height: size, borderRadius: size / 2, bottom: y },
         position === 'bottom-left' ? { left: x } : { right: x },
         { opacity: scale, transform: [{ scale: Animated.multiply(scale, press) }] },
         style
@@ -66,12 +76,21 @@ export function BrainboxLauncher({
         onPress={onPress}
         onPressIn={() => pressTo(0.94)}
         onPressOut={() => pressTo(1)}
-        style={{ width: size, height: size, borderRadius: size / 2 }}
+        style={[
+          pill ? styles.pill : { width: size, height: size, alignItems: 'center', justifyContent: 'center' },
+          { borderRadius: h / 2, backgroundColor: t.accent }
+        ]}
       >
-        <BrainboxLauncherMark size={size} from={theme?.primary ? t.accent : undefined} />
+        {pill ? <BrainboxGradientFill light={t.accentLight} mid={t.accent} deep={t.accentDeep} /> : null}
+        <BrainboxIcon name="message" size={pill ? 22 : Math.round(size * 0.46)} color={t.onAccent} strokeWidth={2} />
+        {pill && text ? (
+          <Text style={[styles.pillText, { color: t.onAccent }, t.fontFamily ? { fontFamily: t.fontFamily } : null]} numberOfLines={1}>
+            {text}
+          </Text>
+        ) : null}
       </Pressable>
       {unread > 0 ? (
-        <View style={[styles.badge, { backgroundColor: t.danger, borderColor: t.surface }]} pointerEvents="none">
+        <View style={[styles.badge, { backgroundColor: t.danger, borderColor: t.panel }]} pointerEvents="none">
           <Text style={styles.badgeText}>{unread > 9 ? '9+' : String(unread)}</Text>
         </View>
       ) : null}
@@ -89,8 +108,8 @@ export interface BrainboxModalProps {
 }
 
 /**
- * Presents the chat with a slide-up spring. Phones (< 576pt wide): full-screen sheet with a 12pt top
- * radius. Tablets: a 380×600 floating window in the launcher's corner.
+ * Presents the chat with a slide-up spring. Phones (< 576pt wide): full-screen lavender sheet with a 22pt
+ * top radius. Tablets: a 380×600 floating omago window (radius 22, 2pt frosted border, no shadow).
  */
 export function BrainboxModal({ visible, onClose, position = 'bottom-right', theme, children }: BrainboxModalProps) {
   const t = useBrainboxTheme(theme);
@@ -119,7 +138,7 @@ export function BrainboxModal({ visible, onClose, position = 'bottom-right', the
   const sheetStyle = floating
     ? [
         styles.window,
-        { width: winW, height: winH, backgroundColor: t.surface, bottom: 24 },
+        { width: winW, height: winH, backgroundColor: t.panel, borderColor: t.frameBorder, bottom: 24 },
         position === 'bottom-left' ? { left: 16 } : { right: 16 },
         reduced
           ? { opacity: v }
@@ -133,7 +152,7 @@ export function BrainboxModal({ visible, onClose, position = 'bottom-right', the
       ]
     : [
         styles.sheet,
-        { backgroundColor: t.surface },
+        { backgroundColor: t.panel, borderColor: t.frameBorder },
         reduced
           ? { opacity: v }
           : { transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [height, 0] }) }] }
@@ -156,14 +175,17 @@ export function BrainboxModal({ visible, onClose, position = 'bottom-right', the
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    position: 'absolute',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-      android: { elevation: 4 },
-      default: {}
-    })
+  wrap: { position: 'absolute', elevation: 0 },
+  pill: {
+    height: 46,
+    minWidth: 104,
+    paddingHorizontal: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden'
   },
+  pillText: { fontSize: 15, lineHeight: 18, fontWeight: '700', marginLeft: 10 },
   badge: {
     position: 'absolute',
     top: -2,
@@ -179,18 +201,17 @@ const styles = StyleSheet.create({
   badgeText: { color: '#FFFFFF', fontSize: 11, lineHeight: 13, fontWeight: '600' },
   sheet: {
     ...StyleSheet.absoluteFillObject,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    overflow: 'hidden'
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 2,
+    overflow: 'hidden',
+    elevation: 0
   },
   window: {
     position: 'absolute',
-    borderRadius: 18,
-    overflow: Platform.OS === 'android' ? 'hidden' : 'visible',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 12 } },
-      android: { elevation: 4 },
-      default: {}
-    })
+    borderRadius: 22,
+    borderWidth: 2,
+    overflow: 'hidden',
+    elevation: 0
   }
 });

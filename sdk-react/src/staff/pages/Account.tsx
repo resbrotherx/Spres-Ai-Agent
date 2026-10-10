@@ -234,7 +234,7 @@ export function NotificationsPage() {
 }
 
 export function TrainingPage() {
-  const { client, can, user, live, themeMode } = useStaff();
+  const { client, can, user, live, themeMode, href } = useStaff();
   const canTrain = can('trainer');
   const [rev, setRev] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -261,7 +261,7 @@ export function TrainingPage() {
         </div>
       </div>
       {!canTrain ? <Alert tone="info">Your role ({user.role}) can view training sources. Trainers, admins and owners can add or change them.</Alert> : null}
-      <TrainingPanel sdk={sdk} variant="embedded" readOnly={!canTrain} title="Knowledge sources" mode={themeMode} />
+      <TrainingPanel sdk={sdk} variant="embedded" readOnly={!canTrain} title="Knowledge sources" mode={themeMode} keysHref={href('/settings')} />
     </div>
   );
 }
