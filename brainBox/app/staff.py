@@ -319,6 +319,21 @@ def user_by_token(db: Session, raw: Optional[str], kind: str) -> Optional[User]:
     return user
 
 
+def request_base(request) -> Optional[str]:
+    """Where the dashboard that made this request lives, for invite/reset links.
+
+    The Origin header has no path, so a dashboard hosted under a sub-path (e.g. /sdk/staff/) would get
+    links to the site root. A same-origin Referer carries the path, so prefer it when it matches Origin.
+    """
+    origin = (request.headers.get("origin") or "").strip().rstrip("/")
+    referer = (request.headers.get("referer") or "").split("#", 1)[0].split("?", 1)[0].strip()
+    m = re.match(r"^(https?://[^/\s]+)(/[^\s]*)?$", referer)
+    if m and (not origin or m.group(1) == origin):
+        path = (m.group(2) or "/").rsplit("/", 1)[0]  # drop a trailing file name such as index.html
+        return m.group(1) + path
+    return origin or None
+
+
 def dashboard_link(path_and_query: str, origin: Optional[str] = None) -> str:
     """``{DASHBOARD_URL or request Origin}/#/...``; relative ``#/...`` when neither is known."""
     base = settings.DASHBOARD_URL or (origin or "").strip().rstrip("/")

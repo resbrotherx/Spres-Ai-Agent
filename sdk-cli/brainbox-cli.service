@@ -1,14 +1,18 @@
 [Unit]
-Description=Brainbox CLI SDK Agent
-After=network.target
+Description=Brainbox server agent (sends this server's logs to Brainbox)
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=/opt/brainbox-cli
-ExecStart=/usr/local/bin/brainbox-cli daemon --interval 60
-Restart=on-failure
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/brainbox-cli/brainbox_cli.py daemon
+Restart=always
 RestartSec=10
+Nice=10
+CPUQuota=20%
 StandardOutput=journal
 StandardError=journal
 

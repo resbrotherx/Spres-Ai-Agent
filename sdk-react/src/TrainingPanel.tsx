@@ -2127,14 +2127,15 @@ function SourcesList({
 /* SDK tab: train from your own code                                   */
 /* ------------------------------------------------------------------ */
 
-type SdkLang = 'python' | 'node' | 'curl' | 'react';
+type SdkLang = 'python' | 'node' | 'curl' | 'react' | 'server';
 type SampleKey = 'upload' | 'records' | 'api' | 'status' | 'audience';
 
 const SDK_LANGS: { key: SdkLang; label: string }[] = [
   { key: 'python', label: 'Python' },
   { key: 'node', label: 'Node.js' },
   { key: 'curl', label: 'cURL' },
-  { key: 'react', label: 'React' }
+  { key: 'react', label: 'React' },
+  { key: 'server', label: 'Server (Ubuntu)' }
 ];
 
 const SAMPLE_TITLES: Record<SampleKey, string> = {
@@ -2203,7 +2204,7 @@ function useCopy(announce: Announce): [string | null, (id: string, text: string,
 
 /** Language used for colouring a sample, from its id (e.g. "python-install", "node-file"). */
 function codeLang(id: string): string {
-  if (/install|curl/.test(id)) return 'bash';
+  if (/install|curl|server/.test(id)) return 'bash';
   if (id.startsWith('python')) return 'python';
   if (id.startsWith('react')) return 'tsx';
   if (id.startsWith('node')) return 'js';
@@ -2247,7 +2248,17 @@ function CodeBlock({
   );
 }
 
-function sdkSamples(lang: SdkLang, api: string): { install: string; installNote: string; samples: Record<SampleKey, string> } {
+type SdkGuide = {
+  install: string;
+  installNote: string;
+  samples: Record<SampleKey, string>;
+  /** Overrides for languages whose steps are not "send data from code" (the server agent). */
+  titles?: Record<SampleKey, string>;
+  stepTitle?: string;
+  stepText?: string;
+};
+
+function sdkSamples(lang: SdkLang, api: string): SdkGuide {
   const fill = (s: string) => s.replace(/__API__/g, api).replace(/^\n/, '');
   const fillAll = (rec: Record<SampleKey, string>) => {
     const out = {} as Record<SampleKey, string>;
@@ -2415,6 +2426,66 @@ curl -X PATCH __API__/api/train/sources/SOURCE_ID \\
     };
   }
 
+  if (lang === 'server') {
+    return {
+      install: `curl -fsSL __API__/sdk/downloads/install-server-agent.sh | sudo bash`.replace(/__API__/g, api),
+      installNote:
+        'Ubuntu or Debian (any Linux with systemd). Run it on the server. It asks for your secret key, installs the agent and turns it on as a service that starts on boot and restarts by itself. Run it again later to upgrade.',
+      stepTitle: 'It is already running: add your logs',
+      stepText:
+        'The agent checks every 5 minutes and sends only new log lines. Out of the box it reads the Nginx access and error logs, the system and login logs, Docker container logs, and service and resource status. Everything is labelled Admins only, and passwords, tokens and keys are masked before they leave the server.',
+      titles: {
+        upload: 'Add your own logs (access log, build log, app log)',
+        records: 'Check it is running and watch it work',
+        api: 'Start, stop, restart and start on boot',
+        status: 'Choose what it reads and how often',
+        audience: 'Who may see it, upgrade and remove'
+      },
+      samples: fillAll({
+        upload: `# Any text log file. Only new lines are sent; log rotation is handled.
+sudo brainbox-cli add-log /var/www/myapp/logs/build.log --name "Build log"
+sudo brainbox-cli add-log /var/log/apache2/access.log   --name "Apache access log"
+sudo brainbox-cli add-log /var/www/myapp/logs/app.log   --name "Application log"
+
+brainbox-cli logs                              # list everything it reads
+sudo brainbox-cli remove-log /var/www/myapp/logs/app.log
+# No restart needed: changes are picked up on the next check.`,
+        records: `sudo systemctl status brainbox-cli     # should say "active (running)"
+sudo journalctl -u brainbox-cli -f     # live activity, Ctrl+C to leave
+
+sudo brainbox-cli collect              # show what would be sent, send nothing
+sudo brainbox-cli run-once             # collect and send right now
+sudo brainbox-cli health               # can it reach __API__ ?`,
+        api: `# The installer already did this. It starts on boot and, if it ever
+# stops or crashes, systemd starts it again after 10 seconds.
+sudo systemctl enable --now brainbox-cli
+
+sudo systemctl restart brainbox-cli
+sudo systemctl stop brainbox-cli       # pause
+sudo systemctl start brainbox-cli
+sudo systemctl is-enabled brainbox-cli # "enabled" = starts on boot`,
+        status: `# Built-in sources: nginx, system, postgres, docker, services, resources, ports, nginx_sites, ssl
+sudo brainbox-cli set --collectors nginx,system,docker,services,resources
+sudo brainbox-cli set --interval 300   # seconds between checks (minimum 30)
+
+# Optional: let the agent restart nginx / postgresql / redis / docker / mysql
+# when it finds them down. Off by default.
+sudo brainbox-cli set --restart-services on`,
+        audience: `# public | customer | vendor | internal | admin (default)
+# Logs can hold private details: keep them on admin or internal.
+sudo brainbox-cli set --audience internal
+
+# Upgrade (settings are kept)
+curl -fsSL __API__/sdk/downloads/install-server-agent.sh | sudo bash
+
+# Remove
+sudo systemctl disable --now brainbox-cli
+sudo rm -rf /etc/systemd/system/brainbox-cli.service /opt/brainbox-cli /usr/local/bin/brainbox-cli /etc/brainbox-cli /var/lib/brainbox-cli
+sudo systemctl daemon-reload`
+      })
+    };
+  }
+
   // React: browser upload via TrainingPanel, signed in as staff (never a secret key in a browser).
   const setup = `import { BrainboxReactSDK } from 'spres-react';
 
@@ -2481,15 +2552,17 @@ function SdkTab({
   const [lang, setLang] = useState<SdkLang>('python');
   const [copied, copy] = useCopy(announce);
   const uid = useId();
-  const { install, installNote, samples } = useMemo(() => sdkSamples(lang, apiUrl), [lang, apiUrl]);
+  const { install, installNote, samples, titles, stepTitle, stepText } = useMemo(() => sdkSamples(lang, apiUrl), [lang, apiUrl]);
   const docsUrl = `${apiUrl}/docs`;
   const langLabel = SDK_LANGS.find((l) => l.key === lang)?.label || lang;
 
   const installLink = lang === 'python' ? downloads.python : lang === 'node' ? downloads.node : lang === 'curl' ? docsUrl : install;
+  const serverInstall = `curl -fsSL ${apiUrl}/sdk/downloads/install-server-agent.sh | sudo bash`;
   const shareText = [
     'Train Brainbox from your own code',
     `Python:  pip install ${downloads.python}`,
     `Node.js: npm install ${downloads.node}`,
+    `Ubuntu server (reads logs as a service): ${serverInstall}`,
     `API docs: ${docsUrl}`,
     'Use a secret key (sk_live_...) from Staff dashboard > Settings > API keys. Never put it in a browser or app.'
   ].join('\n');
@@ -2580,7 +2653,7 @@ function SdkTab({
             1
           </span>
           <div className="bb-train-step-body">
-            <h3 className="bb-train-step-title">{lang === 'curl' ? 'Set your key' : 'Install'}</h3>
+            <h3 className="bb-train-step-title">{lang === 'curl' ? 'Set your key' : lang === 'server' ? 'Install on the server' : 'Install'}</h3>
             <p className="bb-train-step-text">{installNote}</p>
             <CodeBlock id={`install-${lang}`} title={lang === 'curl' ? 'Terminal' : 'Install command'} code={install} copied={copied === `install-${lang}`} onCopy={copy} />
           </div>
@@ -2591,7 +2664,9 @@ function SdkTab({
             2
           </span>
           <div className="bb-train-step-body">
-            <h3 className="bb-train-step-title">{lang === 'react' ? 'Sign in as staff (no secret key)' : 'Get a secret key'}</h3>
+            <h3 className="bb-train-step-title">
+              {lang === 'react' ? 'Sign in as staff (no secret key)' : lang === 'server' ? 'Have a secret key ready' : 'Get a secret key'}
+            </h3>
             {lang === 'react' ? (
               <p className="bb-train-step-text">
                 A browser can’t keep secrets, so the React panel authenticates with the <strong>signed-in staff member’s token</strong>{' '}
@@ -2620,17 +2695,21 @@ function SdkTab({
             3
           </span>
           <div className="bb-train-step-body">
-            <h3 className="bb-train-step-title">Send your data</h3>
-            <p className="bb-train-step-text">
-              Copy a sample — <code>{apiUrl}</code> is already filled in. Training runs in the background; new sources appear in the
-              list below.
-            </p>
+            <h3 className="bb-train-step-title">{stepTitle || 'Send your data'}</h3>
+            {stepText ? (
+              <p className="bb-train-step-text">{stepText}</p>
+            ) : (
+              <p className="bb-train-step-text">
+                Copy a sample — <code>{apiUrl}</code> is already filled in. Training runs in the background; new sources appear in the
+                list below.
+              </p>
+            )}
             <div className="bb-train-samples">
               {SAMPLE_ORDER.map((k) => (
                 <CodeBlock
                   key={`${lang}-${k}`}
                   id={`${lang}-${k}`}
-                  title={SAMPLE_TITLES[k]}
+                  title={(titles || SAMPLE_TITLES)[k]}
                   code={samples[k]}
                   copied={copied === `${lang}-${k}`}
                   onCopy={copy}

@@ -231,7 +231,7 @@ def forgot_password(payload: ForgotPassword, request: Request, background_tasks:
             user.reset_token_hash = digest
             user.reset_expires_at = now + staff_mod.RESET_TTL
             db.commit()
-            background_tasks.add_task(_send_reset_bg, user.id, raw, request.headers.get("origin"))
+            background_tasks.add_task(_send_reset_bg, user.id, raw, staff_mod.request_base(request))
     return {"ok": True}
 
 
@@ -314,7 +314,7 @@ def invite_staff(payload: InvitePayload, request: Request, auth: AuthContext = D
         logger.info(f"Staff created with a temporary password: user={user.id} tenant={auth.tenant_id} "
                     f"role={role} by={auth.staff_user_id}")
         return {"user": staff_mod.to_dict(user), "invite_url": None, "email_sent": False, "password_set": True}
-    url, sent = _send_invite(db, user, raw, request.headers.get("origin"), auth.staff_name)
+    url, sent = _send_invite(db, user, raw, staff_mod.request_base(request), auth.staff_name)
     logger.info(f"Staff invited: user={user.id} tenant={auth.tenant_id} role={role} by={auth.staff_user_id}")
     return {"user": staff_mod.to_dict(user), "invite_url": url, "email_sent": sent}
 
@@ -379,7 +379,7 @@ def resend_invite(user_id: int, request: Request, auth: AuthContext = Depends(re
     if user.invite_token_hash is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This user has already accepted the invite")
     raw = staff_mod.refresh_invite(db, user)
-    url, sent = _send_invite(db, user, raw, request.headers.get("origin"), auth.staff_name)
+    url, sent = _send_invite(db, user, raw, staff_mod.request_base(request), auth.staff_name)
     return {"invite_url": url, "email_sent": sent}
 
 

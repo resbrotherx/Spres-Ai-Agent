@@ -265,7 +265,7 @@ def _raise(e: staff_mod.StaffError):
 def _invite(db: Session, user: User, raw: str, request: Request, inviter: Optional[str]):
     """(invite_url, email_sent) - emails the invite when SMTP + an absolute link are available."""
     from app.api.staff import _send_invite
-    return _send_invite(db, user, raw, request.headers.get("origin"), inviter)
+    return _send_invite(db, user, raw, staff_mod.request_base(request), inviter)
 
 
 # ---------------------------------------------------------------------------
@@ -504,7 +504,7 @@ def new_invite_link(user_id: int, request: Request, auth: AuthContext = Depends(
     if user.invite_token_hash is None and staff_mod.has_password(user):
         raise HTTPException(status_code=400, detail="This user already has a password. Set a new one instead.")
     raw = staff_mod.refresh_invite(db, user)
-    return {"invite_url": staff_mod.dashboard_link(f"accept-invite?token={raw}", request.headers.get("origin"))}
+    return {"invite_url": staff_mod.dashboard_link(f"accept-invite?token={raw}", staff_mod.request_base(request))}
 
 
 @router.delete("/users/{user_id}")

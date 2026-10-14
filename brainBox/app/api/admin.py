@@ -100,5 +100,5 @@ def create_staff(payload: StaffCreate, request: Request, db: Session = Depends(g
     logger.info(f"Staff user created via admin API: id={user.id} tenant={user.tenant_id} role={user.role}")
     out = {"user": staff_mod.to_dict(user)}
     if raw:
-        out["invite_url"] = staff_mod.dashboard_link(f"accept-invite?token={raw}", request.headers.get("origin"))
+        out["invite_url"] = staff_mod.dashboard_link(f"accept-invite?token={raw}", staff_mod.request_base(request))
     return out
