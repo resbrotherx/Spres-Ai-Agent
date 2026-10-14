@@ -95,6 +95,19 @@ services:
       - OLLAMA_HOST=0.0.0.0:11434
     networks:
       - brainbox
+  # Staff dashboard on http://<server-ip>:2029 (static files + /api proxy). Test use: plain HTTP.
+  staff:
+    image: nginx:1.27-alpine
+    container_name: brainbox-staff
+    restart: unless-stopped
+    ports:
+      - "${STAFF_PORT:-2029}:80"
+    volumes:
+      - ../sdk-web/staff:/usr/share/nginx/html:ro
+      - ../sdk-web/downloads:/usr/share/nginx/downloads:ro
+      - ./docker/staff-nginx:/etc/nginx/conf.d:ro
+    networks:
+      - brainbox
   # portainer:
   #   image: portainer/portainer-ce:latest
   #   container_name: brainbox-ui
