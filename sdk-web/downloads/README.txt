@@ -9,11 +9,19 @@ Files
   spres_ai-1.1.0-py3-none-any.whl   Python SDK (wheel)           Python 3.8+
   spres_ai-1.1.0.tar.gz             Python SDK (source dist)
   spres-ai-1.1.0.tgz                Node.js SDK (npm tarball)    Node 14+, 18+ recommended
+  spres-react-1.4.0.tgz             React SDK (npm tarball)      React 18+
+  spres-react-native-2.1.0.tgz      React Native SDK             React Native 0.72+
+  spres-web-2.4.0.tgz               Web SDK (npm tarball)        any browser; or the <script> tag
+  install-server-agent.sh           Ubuntu/Debian server agent   reads server logs as a service
 
 Install (works before the packages are on PyPI / npm)
 -----------------------------------------------------
   pip install https://port.smartpowerbilling.com/sdk/downloads/spres_ai-1.1.0-py3-none-any.whl
   npm install https://port.smartpowerbilling.com/sdk/downloads/spres-ai-1.1.0.tgz
+  npm install https://port.smartpowerbilling.com/sdk/downloads/spres-react-1.4.0.tgz
+  npm install https://port.smartpowerbilling.com/sdk/downloads/spres-react-native-2.1.0.tgz
+  npm install https://port.smartpowerbilling.com/sdk/downloads/spres-web-2.4.0.tgz
+  curl -fsSL https://port.smartpowerbilling.com/sdk/downloads/install-server-agent.sh | sudo bash
 
 Keys
 ----
