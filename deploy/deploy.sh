@@ -17,13 +17,6 @@ HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8000/api/health}"
 LOCK=/tmp/brainbox-deploy.lock
 STAFF_PORT="${STAFF_PORT:-2029}"
 
-# One-time: create the first platform-admin account if it does not exist (password printed encrypted).
-bootstrap_admin() {
-  if [ -f "$API_DIR/scripts/bootstrap_admin.py" ]; then
-    docker exec brainbox-api python /app/scripts/bootstrap_admin.py || echo "!! bootstrap-admin failed"
-  fi
-}
-
 # Staff dashboard: its own small nginx container on $STAFF_PORT. Never fails the deploy.
 ensure_staff() {
   cd "$API_DIR"
@@ -58,7 +51,6 @@ OLD=$(git rev-parse HEAD)
 NEW=$(git rev-parse "origin/$BRANCH")
 if [ "$OLD" = "$NEW" ] && [ "${FORCE:-0}" != "1" ]; then
   echo "Already at $NEW — nothing to deploy"
-  bootstrap_admin
   ensure_staff || echo "!! staff dashboard step failed"
   exit 0
 fi
@@ -88,7 +80,6 @@ echo "==> Waiting for health"
 for i in $(seq 1 60); do
   if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
     echo "Healthy after ${i}x2s: $(curl -fsS "$HEALTH_URL")"
-    bootstrap_admin
     ensure_staff || echo "!! staff dashboard step failed"
     exit 0
   fi
